@@ -31,9 +31,9 @@ export default function TabLayout() {
         };
       }}
     >
-      {/* Hide [id] from tab bar, but DON'T hide the tab bar itself */}
+      {/* Hide [slug] from tab bar, but DON'T hide the tab bar itself */}
       <Tabs.Screen
-        name="wineries/[id]"
+        name="wineries/[slug]"
         options={{
           href: null, // prevents it from showing up as a tab
           headerShown: true, // you’ll still get a header with back button

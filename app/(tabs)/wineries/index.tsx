@@ -4,10 +4,10 @@ import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-na
 
 // Dummy winery data (later you’ll fetch this from Firebase)
 const WINERIES = [
-  { id: "1", name: "Vasse Felix" },
-  { id: "2", name: "Oak Valley Winery" },
-  { id: "3", name: "Silver Creek Estates" },
-  { id: "4", name: "Red Hill Cellars" },
+  { id: "1", name: "Vasse Felix", slug: "vasse-felix" },
+  { id: "2", name: "Oak Valley Winery", slug: "oak-valley" },
+  { id: "3", name: "Silver Creek Estates", slug: "silver-creek-estates" },
+  { id: "4", name: "Red Hill Cellars", slug: "red-hill-cellars" },
 ];
 
 export default function WineriesScreen() {
@@ -32,7 +32,7 @@ export default function WineriesScreen() {
         data={filtered}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <Link href={`/wineries/${item.id}`} asChild>
+          <Link href={`/wineries/${item.slug}`} asChild>
             <Pressable style={styles.card}>
               <Text style={styles.cardText}>{item.name}</Text>
             </Pressable>
