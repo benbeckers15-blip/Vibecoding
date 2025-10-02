@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: Platform.OS === "ios" ? 20 : 12,
     alignItems: "center",
-    zIndex: 1000,
+    zIndex: 2000,
   },
   shadowWrapper: {
     // drop shadow
@@ -142,4 +142,3 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
-
