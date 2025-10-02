@@ -3,24 +3,20 @@ import { Stack } from "expo-router";
 
 export default function EventsLayout() {
   return (
-    <Stack>
-      {/* Events list */}
+    <Stack
+      screenOptions={{
+        headerStyle: { backgroundColor: "#720969" },
+        headerTintColor: "#fff",
+        headerTitleStyle: { fontWeight: "bold" },
+      }}
+    >
       <Stack.Screen
         name="index"
         options={{
           title: "Events",
-          headerShown: false,
         }}
       />
-
-      {/* Optional: if you later want event details */}
-      {/* <Stack.Screen
-        name="[id]"
-        options={{
-          title: "Event Details",
-          gestureEnabled: true,
-        }}
-      /> */}
     </Stack>
   );
 }
+

@@ -1,7 +1,7 @@
+// app/(tabs)/_layout.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 
-// Capitalizes the first letter of each word in the tab button string
 function toTitleCase(str: string) {
   return str.replace(
     /\w\S*/g,
@@ -27,12 +27,12 @@ export default function TabLayout() {
           ),
           tabBarActiveTintColor: "#720969",
           tabBarInactiveTintColor: "#aaa",
-          headerShown: false, // 👈 disable Tabs header
+          headerShown: false, // 👈 hide Tabs headers everywhere
         };
       }}
     >
-      {/* No need to define wineries/[slug] here.
-          It's handled by the nested Stack in app/(tabs)/wineries/_layout.tsx */}
+      {/* If you ever want a header directly from Tabs, you can override:
+      <Tabs.Screen name="home" options={{ headerShown: true }} /> */}
     </Tabs>
   );
 }
