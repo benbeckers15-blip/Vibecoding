@@ -15,10 +15,30 @@ import Carousel from "react-native-reanimated-carousel";
 const { width } = Dimensions.get("window");
 
 const mockAds = [
-  { id: "1", uri: "https://picsum.photos/800/400?random=1" },
-  { id: "2", uri: "https://picsum.photos/800/400?random=2" },
-  { id: "3", uri: "https://picsum.photos/800/400?random=3" },
-  { id: "4", uri: "https://picsum.photos/800/400?random=4" },
+  {
+    id: "1",
+    uri: "https://picsum.photos/800/400?random=1",
+    title: "Explore Margaret River",
+    description: "Discover iconic wineries and their best vintages.",
+  },
+  {
+    id: "2",
+    uri: "https://picsum.photos/800/400?random=2",
+    title: "Exclusive Tastings",
+    description: "Join intimate events hosted by world-class sommeliers.",
+  },
+  {
+    id: "3",
+    uri: "https://picsum.photos/800/400?random=3",
+    title: "Seasonal Specials",
+    description: "Limited-time offers from your favorite wineries.",
+  },
+  {
+    id: "4",
+    uri: "https://picsum.photos/800/400?random=4",
+    title: "Private Wine Tours",
+    description: "Book tailored vineyard experiences for groups or couples.",
+  },
 ];
 
 export default function HomeScreen() {
@@ -45,17 +65,23 @@ export default function HomeScreen() {
         <Carousel
           loop
           width={width * 0.9}
-          height={200}
+          height={300} // taller to fit caption + image
           autoPlay
           data={mockAds}
-          scrollAnimationDuration={1000}
+          scrollAnimationDuration={3000}
           renderItem={({ item }) => (
             <Pressable
-              style={styles.slide}
+              style={styles.carouselCard}
               onPressIn={handlePressIn}
               onPress={handlePress}
             >
               <Image source={{ uri: item.uri }} style={styles.image} />
+
+              {/* Caption */}
+              <View style={styles.captionBox}>
+                <Text style={styles.captionTitle}>{item.title}</Text>
+                <Text style={styles.captionText}>{item.description}</Text>
+              </View>
             </Pressable>
           )}
         />
@@ -121,19 +147,34 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 30,
   },
-  slide: {
+  carouselCard: {
     borderRadius: 16,
+    backgroundColor: "#fff",
     overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
-    shadowRadius: 5,
+    shadowRadius: 6,
     elevation: 5,
   },
   image: {
     width: "100%",
     height: 200,
     resizeMode: "cover",
+  },
+  captionBox: {
+    backgroundColor: "#fff",
+    padding: 12,
+  },
+  captionTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 4,
+    color: "#720969",
+  },
+  captionText: {
+    fontSize: 14,
+    color: "#444",
   },
   cardsWrapper: {
     width: "90%",
@@ -175,6 +216,3 @@ const styles = StyleSheet.create({
     color: "#555",
   },
 });
-
-
-
