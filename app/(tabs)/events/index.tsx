@@ -43,7 +43,8 @@ export default function EventsScreen() {
       renderItem={({ item }) => (
         <Pressable
           style={styles.card}
-          onPress={() => router.push(`/wineries/${item.winerySlug}`)} // ✅ use slug now
+          // ✅ pass `from=events` as query param
+          onPress={() => router.push(`/wineries/${item.winerySlug}?from=events`)}
         >
           {item.image && <Image source={{ uri: item.image }} style={styles.image} />}
           <View style={styles.content}>

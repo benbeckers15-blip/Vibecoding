@@ -32,7 +32,8 @@ export default function WineriesScreen() {
         data={filtered}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <Link href={`/wineries/${item.slug}`} asChild>
+         //  Navigate to `/wineries/[slug]?from=wineries` on press
+          <Link href={`/wineries/${item.slug}?from=wineries`} asChild>
             <Pressable style={styles.card}>
               <Text style={styles.cardText}>{item.name}</Text>
             </Pressable>
@@ -60,3 +61,4 @@ const styles = StyleSheet.create({
   },
   cardText: { fontSize: 16, fontWeight: "500" },
 });
+

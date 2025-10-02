@@ -27,18 +27,12 @@ export default function TabLayout() {
           ),
           tabBarActiveTintColor: "#720969",
           tabBarInactiveTintColor: "#aaa",
-          headerShown: true,
+          headerShown: false, // 👈 disable Tabs header
         };
       }}
     >
-      {/* Hide [slug] from tab bar, but DON'T hide the tab bar itself */}
-      <Tabs.Screen
-        name="wineries/[slug]"
-        options={{
-          href: null, // prevents it from showing up as a tab
-          headerShown: true, // you’ll still get a header with back button
-        }}
-      />
+      {/* No need to define wineries/[slug] here.
+          It's handled by the nested Stack in app/(tabs)/wineries/_layout.tsx */}
     </Tabs>
   );
 }

@@ -1,6 +1,6 @@
 // app/(tabs)/wineries/[slug].tsx
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
 
 // Dummy details data (replace with Firestore later)
 const WINERY_DETAILS: Record<
@@ -15,9 +15,8 @@ const WINERY_DETAILS: Record<
       "https://picsum.photos/400/200?3",
     ],
     description: [
-      "Vasse Felix is one of the oldest wineries in Margaret River.",
-      "It specializes in Chardonnay and Cabernet Sauvignon.",
-      "Guests enjoy tours, tastings, and seasonal events on the estate.",
+      "I stole a lot of wine from here.",
+      "Also banged the manager.",
     ],
   },
   "oak-valley": {
@@ -32,7 +31,7 @@ const WINERY_DETAILS: Record<
 };
 
 export default function WineryDetailsScreen() {
-  const { slug } = useLocalSearchParams<{ slug: string }>();
+  const { slug, from } = useLocalSearchParams<{ slug: string; from?: string }>();
   const router = useRouter();
 
   const winery = slug ? WINERY_DETAILS[slug] : undefined;
@@ -47,24 +46,7 @@ export default function WineryDetailsScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Back button */}
-    <Pressable
-  onPress={() => {
-    if (router.canGoBack()) {
-      router.back(); // go back if there's history
-    } else {
-      router.replace("/wineries"); // fallback to Wineries tab
-    }
-  }}
-  style={({ pressed }) => [
-    styles.backButton,
-    pressed && { opacity: 0.6 },
-  ]}
->
-  <Text style={styles.backButtonText}>← Back</Text>
-</Pressable>
-
-
+    
       {/* Slideshow */}
       {winery.images.map((uri, idx) => (
         <Image key={idx} source={{ uri }} style={styles.image} />
@@ -81,6 +63,18 @@ export default function WineryDetailsScreen() {
   );
 }
 
+// options export that dynamically changes the header to winery title
+export const options = ({ route }: { route: { params?: { slug?: string } } }) => {
+  const slug = route.params?.slug;
+  const winery = slug ? WINERY_DETAILS[slug] : undefined;
+
+  return {
+    headerTitle: winery ? winery.name : "Winery Details", 
+  };
+};
+
+
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
@@ -92,12 +86,5 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     lineHeight: 22,
   },
-  backButton: {
-    margin: 16,
-    padding: 8,
-    backgroundColor: "#eee",
-    borderRadius: 6,
-    alignSelf: "flex-start",
-  },
-  backButtonText: { fontSize: 16 },
+  
 });
