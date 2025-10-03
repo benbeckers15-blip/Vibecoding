@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   activeDot: {
-    backgroundColor: "#720969",
+    backgroundColor: "#723FEB",
     width: 10,
     height: 10,
   },
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     marginBottom: 10,
-    color: "#720969",
+    color: "#723FEB",
   },
   link: {
     fontSize: 16,

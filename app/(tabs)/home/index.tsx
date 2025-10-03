@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     marginBottom: 4,
-    color: "#720969",
+    color: "#723FEB",
   },
   captionText: {
     fontSize: 14,
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     marginBottom: 6,
-    color: "#720969",
+    color: "#723FEB",
   },
   cardText: {
     fontSize: 13,

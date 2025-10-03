@@ -5,7 +5,7 @@ export default function EventsLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: "#720969" },
+        headerStyle: { backgroundColor: "#723FEB" },
         headerTintColor: "#fff",
         headerTitleStyle: { fontWeight: "bold" },
       }}
