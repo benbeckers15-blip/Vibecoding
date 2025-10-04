@@ -1,7 +1,17 @@
 // app/(tabs)/wineries/[slug].tsx
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Dimensions, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Dimensions,
+  ImageBackground,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import Carousel from "react-native-reanimated-carousel";
 
 const { width } = Dimensions.get("window");
@@ -21,9 +31,9 @@ const WINERY_DETAILS: Record<
   "vasse-felix": {
     name: "Vasse Felix",
     images: [
-      "https://picsum.photos/400/200?1",
-      "https://picsum.photos/400/200?2",
-      "https://picsum.photos/400/200?3",
+      "https://picsum.photos/800/400?1",
+      "https://picsum.photos/800/400?2",
+      "https://picsum.photos/800/400?3",
     ],
     description: [
       "I stole a lot of wine from here.",
@@ -31,19 +41,22 @@ const WINERY_DETAILS: Record<
     ],
     phone: "+61 8 1234 5678",
     website: "https://www.vassefelix.com.au",
-    hours: "Mon–Sun: 10:00 AM – 5:00 PM",
+    hours: "Mon–Sun: 10:00 AM – 5:00 PM"
   },
   "oak-valley": {
     name: "Oak Valley Winery",
-    images: ["https://picsum.photos/400/200?4", "https://picsum.photos/400/200?5"],
+    images: [
+      "https://picsum.photos/800/400?4",
+      "https://picsum.photos/800/400?5",
+    ],
     description: [
       "Known for its oak-aged reds.",
       "Family-owned for three generations.",
     ],
     phone: "+61 8 9876 5432",
     website: "https://www.oakvalley.com",
-    hours: "Wed–Sun: 11:00 AM – 6:00 PM",
-  },
+    hours: "Wed–Sun: 11:00 AM – 6:00 PM"
+  }
 };
 
 export default function WineryDetailsScreen() {
@@ -61,38 +74,53 @@ export default function WineryDetailsScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Image Carousel */}
-      <Carousel
-        width={width}
-        height={220}
-        data={winery.images}
-        loop
-        autoPlay
-        autoPlayInterval={3000}
-        scrollAnimationDuration={800}
-        onSnapToItem={(index) => setCurrentIndex(index)}
-        renderItem={({ item }) => (
-          <Image source={{ uri: item }} style={styles.image} />
-        )}
-      />
+      {/* Hero Image Carousel with parallax + rounded corners */}
+      <View style={styles.heroContainer}>
+        <Carousel
+          width={width}
+          height={260}
+          data={winery.images}
+          loop
+          autoPlay
+          autoPlayInterval={4000}
+          scrollAnimationDuration={800}
+          onSnapToItem={(index) => setCurrentIndex(index)}
+          mode="parallax" // 👈 subtle parallax
+          modeConfig={{
+            parallaxScrollingScale: 0.9,
+            parallaxScrollingOffset: 50,
+          }}
+          renderItem={({ item }) => (
+            <View style={styles.heroCard}>
+              <ImageBackground source={{ uri: item }} style={styles.heroImage}>
+                <LinearGradient
+                  colors={["rgba(0,0,0,0.6)", "transparent"]}
+                  style={styles.overlay}
+                />
+                <View style={styles.heroContent}>
+                  <Text style={styles.heroTitle}>{winery.name}</Text>
+                </View>
+              </ImageBackground>
+            </View>
+          )}
+        />
 
-      {/* Pagination Dots */}
-      <View style={styles.dotsContainer}>
-        {winery.images.map((_, index) => (
-          <View
-            key={index}
-            style={[
-              styles.dot,
-              currentIndex === index && styles.activeDot,
-            ]}
-          />
-        ))}
+        {/* Pagination Dots */}
+        <View style={styles.dotsContainer}>
+          {winery.images.map((_, index) => (
+            <View
+              key={index}
+              style={[
+                styles.dot,
+                currentIndex === index && styles.activeDot,
+              ]}
+            />
+          ))}
+        </View>
       </View>
 
       {/* Info Container */}
       <View style={styles.infoBox}>
-        <Text style={styles.infoTitle}>{winery.name}</Text>
-
         <Pressable onPress={() => Linking.openURL(`tel:${winery.phone}`)}>
           <Text style={styles.link}>📞 {winery.phone}</Text>
         </Pressable>
@@ -127,15 +155,41 @@ export const options = ({ route }: { route: { params?: { slug?: string } } }) =>
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  image: {
-    width: width,
-    height: 220,
-    resizeMode: "cover",
+  heroContainer: {
+    position: "relative",
+  },
+  heroCard: {
+    borderRadius: 16,
+    overflow: "hidden", // 👈 ensures rounded corners
+    marginHorizontal: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  heroImage: {
+    width: width - 24, // a bit smaller so parallax looks good
+    height: 260,
+    justifyContent: "flex-end",
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  heroContent: {
+    padding: 16,
+  },
+  heroTitle: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#fff",
   },
   dotsContainer: {
     flexDirection: "row",
     justifyContent: "center",
     marginVertical: 8,
+    position: "absolute",
+    bottom: 10,
+    width: "100%",
   },
   dot: {
     width: 8,
@@ -159,12 +213,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  infoTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 10,
-    color: "#723FEB",
-  },
   link: {
     fontSize: 16,
     color: "#0066cc",
@@ -182,4 +230,3 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
 });
- 
