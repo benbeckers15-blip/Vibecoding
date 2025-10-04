@@ -1,25 +1,71 @@
 import { Link } from "expo-router";
-import { useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { collection, getDocs } from "firebase/firestore";
+import { useEffect, useState } from "react";
+import {
+    ActivityIndicator,
+    FlatList,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+} from "react-native";
+import { db } from "../../../firebaseConfig"; // adjust if needed
 
-// Dummy winery data (later you’ll fetch this from Firebase)
-const WINERIES = [
-  { id: "1", name: "Vasse Felix", slug: "vasse-felix" },
-  { id: "2", name: "Oak Valley Winery", slug: "oak-valley" },
-  { id: "3", name: "Silver Creek Estates", slug: "silver-creek-estates" },
-  { id: "4", name: "Red Hill Cellars", slug: "red-hill-cellars" },
-];
+type Winery = {
+  id: string;
+  name: string;
+  slug: string;
+};
 
 export default function WineriesScreen() {
+  const [wineries, setWineries] = useState<Winery[]>([]);
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  const filtered = WINERIES.filter((winery) =>
-    winery.name.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    const fetchWineries = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, "wineries"));
+        const data: Winery[] = snapshot.docs.map((doc) => {
+          const docData = doc.data();
+          return {
+            id: doc.id,
+            name: docData.name || "",
+            slug: docData.slug || doc.id, // fallback to doc ID just in case
+          };
+        });
+        setWineries(data);
+      } catch (err) {
+        console.error("Error fetching wineries:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchWineries();
+  }, []);
+
+  const filtered =
+    wineries.length > 0
+      ? wineries.filter((winery) =>
+          winery.name
+            ?.toLowerCase()
+            .includes(search.trim().toLowerCase())
+        )
+      : [];
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#723FEB" />
+        <Text>Loading wineries...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      {/* Search bar */}
       <TextInput
         style={styles.search}
         placeholder="Search wineries..."
@@ -27,12 +73,10 @@ export default function WineriesScreen() {
         onChangeText={setSearch}
       />
 
-      {/* Winery list */}
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-         //  Navigate to `/wineries/[slug]?from=wineries` on press
           <Link href={`/wineries/${item.slug}?from=wineries`} asChild>
             <Pressable style={styles.card}>
               <Text style={styles.cardText}>{item.name}</Text>
@@ -40,12 +84,19 @@ export default function WineriesScreen() {
           </Link>
         )}
       />
+
+      {filtered.length === 0 && !loading && (
+        <View style={styles.center}>
+          <Text>No wineries found</Text>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: "#fff" },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
   search: {
     borderWidth: 1,
     borderColor: "#ccc",
@@ -61,4 +112,3 @@ const styles = StyleSheet.create({
   },
   cardText: { fontSize: 16, fontWeight: "500" },
 });
-

@@ -1,8 +1,9 @@
-// app/(tabs)/wineries/[slug].tsx
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { doc, getDoc } from "firebase/firestore";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Dimensions,
   ImageBackground,
   Linking,
@@ -13,57 +14,70 @@ import {
   View,
 } from "react-native";
 import Carousel from "react-native-reanimated-carousel";
+import { db } from "../../../firebaseConfig"; // ✅ make sure this path is correct
 
 const { width } = Dimensions.get("window");
 
-// Dummy details data (replace with Firestore later)
-const WINERY_DETAILS: Record<
-  string,
-  {
-    name: string;
-    images: string[];
-    description: string[];
-    phone: string;
-    website: string;
-    hours: string;
-  }
-> = {
-  "vasse-felix": {
-    name: "Vasse Felix",
-    images: [
-      "https://picsum.photos/800/400?1",
-      "https://picsum.photos/800/400?2",
-      "https://picsum.photos/800/400?3",
-    ],
-    description: [
-      "I stole a lot of wine from here.",
-      "Also banged the manager.",
-    ],
-    phone: "+61 8 1234 5678",
-    website: "https://www.vassefelix.com.au",
-    hours: "Mon–Sun: 10:00 AM – 5:00 PM"
-  },
-  "oak-valley": {
-    name: "Oak Valley Winery",
-    images: [
-      "https://picsum.photos/800/400?4",
-      "https://picsum.photos/800/400?5",
-    ],
-    description: [
-      "Known for its oak-aged reds.",
-      "Family-owned for three generations.",
-    ],
-    phone: "+61 8 9876 5432",
-    website: "https://www.oakvalley.com",
-    hours: "Wed–Sun: 11:00 AM – 6:00 PM"
-  }
-};
+interface WineryData {
+  name: string;
+  images: string[];
+  description: string[];
+  phone: string;
+  website: string;
+  hours: string;
+}
 
 export default function WineryDetailsScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
-  const winery = slug ? WINERY_DETAILS[slug] : undefined;
+  const [winery, setWinery] = useState<WineryData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  // ✅ Fetch data from Firestore
+  useEffect(() => {
+    if (!slug) return;
+
+    const fetchWinery = async () => {
+      try {
+        const docRef = doc(db, "wineries", slug);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setWinery({
+            name: data.name || "Unnamed Winery",
+            images: Array.isArray(data.images) ? data.images : [],
+            description: Array.isArray(data.description)
+              ? data.description
+              : [String(data.description || "")],
+            phone: data.phone || "N/A",
+            website: data.website || "",
+            hours: data.hours || "N/A",
+          });
+        } else {
+          console.warn("No such winery found!");
+        }
+      } catch (error) {
+        console.error("Error fetching winery:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchWinery();
+  }, [slug]);
+
+  // ⏳ Loading State
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#723FEB" />
+        <Text>Loading winery details...</Text>
+      </View>
+    );
+  }
+
+  // ❌ Not Found
   if (!winery) {
     return (
       <View style={styles.center}>
@@ -74,38 +88,47 @@ export default function WineryDetailsScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Hero Image Carousel with parallax + rounded corners */}
+      {/* 🖼 Hero Carousel */}
       <View style={styles.heroContainer}>
-        <Carousel
-          width={width}
-          height={260}
-          data={winery.images}
-          loop
-          autoPlay
-          autoPlayInterval={4000}
-          scrollAnimationDuration={800}
-          onSnapToItem={(index) => setCurrentIndex(index)}
-          mode="parallax" // 👈 subtle parallax
-          modeConfig={{
-            parallaxScrollingScale: 0.9,
-            parallaxScrollingOffset: 50,
-          }}
-          renderItem={({ item }) => (
-            <View style={styles.heroCard}>
-              <ImageBackground source={{ uri: item }} style={styles.heroImage}>
-                <LinearGradient
-                  colors={["rgba(0,0,0,0.6)", "transparent"]}
-                  style={styles.overlay}
-                />
-                <View style={styles.heroContent}>
-                  <Text style={styles.heroTitle}>{winery.name}</Text>
-                </View>
-              </ImageBackground>
-            </View>
-          )}
-        />
+        {winery.images.length > 0 ? (
+          <Carousel
+            width={width}
+            height={260}
+            data={winery.images}
+            loop
+            autoPlay
+            autoPlayInterval={4000}
+            scrollAnimationDuration={800}
+            onSnapToItem={(index) => setCurrentIndex(index)}
+            mode="parallax"
+            modeConfig={{
+              parallaxScrollingScale: 0.9,
+              parallaxScrollingOffset: 50,
+            }}
+            renderItem={({ item }) => (
+              <View style={styles.heroCard}>
+                <ImageBackground
+                  source={{ uri: String(item) }}
+                  style={styles.heroImage}
+                >
+                  <LinearGradient
+                    colors={["rgba(0,0,0,0.6)", "transparent"]}
+                    style={styles.overlay}
+                  />
+                  <View style={styles.heroContent}>
+                    <Text style={styles.heroTitle}>{winery.name}</Text>
+                  </View>
+                </ImageBackground>
+              </View>
+            )}
+          />
+        ) : (
+          <View style={styles.heroPlaceholder}>
+            <Text>No images available</Text>
+          </View>
+        )}
 
-        {/* Pagination Dots */}
+        {/* 🔵 Pagination Dots */}
         <View style={styles.dotsContainer}>
           {winery.images.map((_, index) => (
             <View
@@ -119,20 +142,24 @@ export default function WineryDetailsScreen() {
         </View>
       </View>
 
-      {/* Info Container */}
+      {/* 📞 Info Section */}
       <View style={styles.infoBox}>
-        <Pressable onPress={() => Linking.openURL(`tel:${winery.phone}`)}>
-          <Text style={styles.link}>📞 {winery.phone}</Text>
-        </Pressable>
+        {winery.phone !== "N/A" && (
+          <Pressable onPress={() => Linking.openURL(`tel:${winery.phone}`)}>
+            <Text style={styles.link}>📞 {winery.phone}</Text>
+          </Pressable>
+        )}
 
-        <Pressable onPress={() => Linking.openURL(winery.website)}>
-          <Text style={styles.link}>🌐 Visit Website</Text>
-        </Pressable>
+        {winery.website && (
+          <Pressable onPress={() => Linking.openURL(winery.website)}>
+            <Text style={styles.link}>🌐 Visit Website</Text>
+          </Pressable>
+        )}
 
         <Text style={styles.hours}>⏰ {winery.hours}</Text>
       </View>
 
-      {/* Descriptions */}
+      {/* 📖 Descriptions */}
       {winery.description.map((para, idx) => (
         <Text key={idx} style={styles.paragraph}>
           {para}
@@ -142,25 +169,13 @@ export default function WineryDetailsScreen() {
   );
 }
 
-// Dynamic header title
-export const options = ({ route }: { route: { params?: { slug?: string } } }) => {
-  const slug = route.params?.slug;
-  const winery = slug ? WINERY_DETAILS[slug] : undefined;
-
-  return {
-    headerTitle: winery ? winery.name : "Winery Details",
-  };
-};
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  heroContainer: {
-    position: "relative",
-  },
+  heroContainer: { position: "relative" },
   heroCard: {
     borderRadius: 16,
-    overflow: "hidden", // 👈 ensures rounded corners
+    overflow: "hidden",
     marginHorizontal: 12,
     shadowColor: "#000",
     shadowOpacity: 0.15,
@@ -168,20 +183,20 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   heroImage: {
-    width: width - 24, // a bit smaller so parallax looks good
+    width: width - 24,
     height: 260,
     justifyContent: "flex-end",
   },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  heroContent: {
-    padding: 16,
-  },
-  heroTitle: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#fff",
+  overlay: { ...StyleSheet.absoluteFillObject },
+  heroContent: { padding: 16 },
+  heroTitle: { fontSize: 28, fontWeight: "700", color: "#fff" },
+  heroPlaceholder: {
+    height: 260,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#eee",
+    borderRadius: 12,
+    margin: 12,
   },
   dotsContainer: {
     flexDirection: "row",
@@ -213,16 +228,8 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  link: {
-    fontSize: 16,
-    color: "#0066cc",
-    marginBottom: 8,
-  },
-  hours: {
-    fontSize: 15,
-    color: "#444",
-    marginTop: 4,
-  },
+  link: { fontSize: 16, color: "#0066cc", marginBottom: 8 },
+  hours: { fontSize: 15, color: "#444", marginTop: 4 },
   paragraph: {
     fontSize: 16,
     marginHorizontal: 16,
@@ -230,3 +237,4 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
 });
+
