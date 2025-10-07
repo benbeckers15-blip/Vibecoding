@@ -14,7 +14,8 @@ import {
   View,
 } from "react-native";
 import Carousel from "react-native-reanimated-carousel";
-import { db } from "../../../firebaseConfig"; // ✅ make sure this path is correct
+import { db } from "../../../firebaseConfig";
+import { fetchPlaceDetails } from "../../../lib/googlePlaces"; // ✅ Import the helper
 
 const { width } = Dimensions.get("window");
 
@@ -25,6 +26,9 @@ interface WineryData {
   phone: string;
   website: string;
   hours: string;
+  googlePlaceId?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export default function WineryDetailsScreen() {
@@ -33,7 +37,7 @@ export default function WineryDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // ✅ Fetch data from Firestore
+  // ✅ Fetch Firestore + Google Places
   useEffect(() => {
     if (!slug) return;
 
@@ -42,21 +46,53 @@ export default function WineryDetailsScreen() {
         const docRef = doc(db, "wineries", slug);
         const docSnap = await getDoc(docRef);
 
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setWinery({
-            name: data.name || "Unnamed Winery",
-            images: Array.isArray(data.images) ? data.images : [],
-            description: Array.isArray(data.description)
-              ? data.description
-              : [String(data.description || "")],
-            phone: data.phone || "N/A",
-            website: data.website || "",
-            hours: data.hours || "N/A",
-          });
-        } else {
+        if (!docSnap.exists()) {
           console.warn("No such winery found!");
+          setLoading(false);
+          return;
         }
+
+        const data = docSnap.data();
+        let mergedData: WineryData = {
+          name: data.name || "Unnamed Winery",
+          images: Array.isArray(data.images) ? data.images : [],
+          description: Array.isArray(data.description)
+            ? data.description
+            : [String(data.description || "")],
+          phone: data.phone || "N/A",
+          website: data.website || "",
+          hours: data.hours || "N/A",
+          googlePlaceId: data.googlePlaceId || null,
+        };
+
+        // 🌐 Merge Google API data
+        if (mergedData.googlePlaceId) {
+          try {
+            const gData = await fetchPlaceDetails(mergedData.googlePlaceId);
+
+            mergedData = {
+              ...mergedData,
+              phone: gData.formatted_phone_number || mergedData.phone,
+              website: gData.website || mergedData.website,
+              hours:
+                gData.opening_hours?.weekday_text?.join("\n") ||
+                mergedData.hours,
+              latitude: gData.geometry?.location?.lat,
+              longitude: gData.geometry?.location?.lng,
+              images:
+                mergedData.images.length > 0
+                  ? mergedData.images
+                  : gData.photos?.map(
+                      (p: any) =>
+                        `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photoreference=${p.photo_reference}&key=${process.env.EXPO_PUBLIC_GOOGLE_API_KEY}`
+                    ) || [],
+            };
+          } catch (err) {
+            console.warn("Google API fetch failed:", err);
+          }
+        }
+
+        setWinery(mergedData);
       } catch (error) {
         console.error("Error fetching winery:", error);
       } finally {
@@ -67,7 +103,7 @@ export default function WineryDetailsScreen() {
     fetchWinery();
   }, [slug]);
 
-  // ⏳ Loading State
+  // ⏳ Loading
   if (loading) {
     return (
       <View style={styles.center}>
@@ -86,6 +122,7 @@ export default function WineryDetailsScreen() {
     );
   }
 
+  // ✅ Main UI
   return (
     <ScrollView style={styles.container}>
       {/* 🖼 Hero Carousel */}
@@ -156,7 +193,32 @@ export default function WineryDetailsScreen() {
           </Pressable>
         )}
 
-        <Text style={styles.hours}>⏰ {winery.hours}</Text>
+        {winery.hours && <Text style={styles.hours}>⏰ {winery.hours}</Text>}
+
+        {/* 🧭 Directions */}
+        {(winery.latitude && winery.longitude) ? (
+          <Pressable
+            onPress={() =>
+              Linking.openURL(
+                `https://www.google.com/maps/dir/?api=1&destination=${winery.latitude},${winery.longitude}`
+              )
+            }
+          >
+            <Text style={[styles.link, { marginTop: 8 }]}>🧭 Get Directions</Text>
+          </Pressable>
+        ) : winery.name ? (
+          <Pressable
+            onPress={() =>
+              Linking.openURL(
+                `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                  winery.name
+                )}`
+              )
+            }
+          >
+            <Text style={[styles.link, { marginTop: 8 }]}>🧭 Get Directions</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {/* 📖 Descriptions */}
@@ -237,4 +299,5 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
 });
+
 
