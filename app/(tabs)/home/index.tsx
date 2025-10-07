@@ -6,13 +6,15 @@ import {
   GestureResponderEvent,
   Image,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
-  View,
+  View
 } from "react-native";
 import Carousel from "react-native-reanimated-carousel";
 
 const { width } = Dimensions.get("window");
+const TAB_BAR_HEIGHT = 60; // Adjust this if your tab bar is taller
 
 const mockAds = [
   {
@@ -59,13 +61,20 @@ export default function HomeScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ alignItems: "center", paddingTop: 40, paddingBottom: TAB_BAR_HEIGHT + 20 }}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Header */}
+      <Text style={styles.header}>SipLocal</Text>
+
       {/* Floating carousel */}
       <View style={styles.carouselWrapper}>
         <Carousel
           loop
           width={width * 0.9}
-          height={300} // taller to fit caption + image
+          height={300}
           autoPlay
           data={mockAds}
           scrollAnimationDuration={3000}
@@ -76,8 +85,6 @@ export default function HomeScreen() {
               onPress={handlePress}
             >
               <Image source={{ uri: item.uri }} style={styles.image} />
-
-              {/* Caption */}
               <View style={styles.captionBox}>
                 <Text style={styles.captionTitle}>{item.title}</Text>
                 <Text style={styles.captionText}>{item.description}</Text>
@@ -87,9 +94,143 @@ export default function HomeScreen() {
         />
       </View>
 
+      {/* Learn About Margaret River Section */}
+      <View style={styles.learnWrapper}>
+        <Text style={styles.sectionTitle}>Learn About Margaret River</Text>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.learnScroll}
+        >
+          <Pressable
+            style={styles.learnCard}
+            onPress={() => router.push("/facet-climate")}
+          >
+            <Image
+              source={{ uri: "https://picsum.photos/240/140?random=10" }}
+              style={styles.learnCardImage}
+            />
+            <Text style={styles.cardTitle}>Climate</Text>
+            <Text style={styles.cardText}>
+              Mediterranean climate shapes grape ripening and wine balance.
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.learnCard}
+            onPress={() => router.push("/facet-soil")}
+          >
+            <Image
+              source={{ uri: "https://picsum.photos/240/140?random=11" }}
+              style={styles.learnCardImage}
+            />
+            <Text style={styles.cardTitle}>Soil & Geology</Text>
+            <Text style={styles.cardText}>
+              Gravelly loam and clay provide drainage and complexity.
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.learnCard}
+            onPress={() => router.push("/facet-topography")}
+          >
+            <Image
+              source={{ uri: "https://picsum.photos/240/140?random=12" }}
+              style={styles.learnCardImage}
+            />
+            <Text style={styles.cardTitle}>Topography</Text>
+            <Text style={styles.cardText}>
+              Hills and valleys influence sun exposure and temperature.
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.learnCard}
+            onPress={() => router.push("/facet-ocean")}
+          >
+            <Image
+              source={{ uri: "https://picsum.photos/240/140?random=13" }}
+              style={styles.learnCardImage}
+            />
+            <Text style={styles.cardTitle}>Proximity to Ocean</Text>
+            <Text style={styles.cardText}>
+              Cooling sea breezes moderate heat and preserve acidity.
+            </Text>
+          </Pressable>
+        </ScrollView>
+      </View>
+
+      {/* Sommelier Recommendations Section */}
+      <View style={styles.learnWrapper}>
+        <Text style={styles.sectionTitleLarge}>Sommelier Recommendations</Text>
+        <Text style={styles.sectionDescription}>Curated by a local wine expert</Text>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.learnScroll}
+        >
+          <Pressable
+            style={styles.learnCard}
+            onPress={() => router.push("/sommelier-underrated-wineries")}
+          >
+            <Image
+              source={{ uri: "https://picsum.photos/240/140?random=21" }}
+              style={styles.learnCardImage}
+            />
+            <Text style={styles.cardTitle}>Underrated Wineries</Text>
+            <Text style={styles.cardText}>
+              Hidden gems producing exceptional wines, waiting to be discovered.
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.learnCard}
+            onPress={() => router.push("/sommelier-underrated-wines")}
+          >
+            <Image
+              source={{ uri: "https://picsum.photos/240/140?random=22" }}
+              style={styles.learnCardImage}
+            />
+            <Text style={styles.cardTitle}>Underrated Wines</Text>
+            <Text style={styles.cardText}>
+              Lesser-known bottles with unique flavors recommended by our sommelier.
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.learnCard}
+            onPress={() => router.push("/sommelier-tasting-notes")}
+          >
+            <Image
+              source={{ uri: "https://picsum.photos/240/140?random=23" }}
+              style={styles.learnCardImage}
+            />
+            <Text style={styles.cardTitle}>Tasting Notes</Text>
+            <Text style={styles.cardText}>
+              Expert tasting highlights of the region’s finest wines.
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.learnCard}
+            onPress={() => router.push("/sommelier-pairing-tips")}
+          >
+            <Image
+              source={{ uri: "https://picsum.photos/240/140?random=24" }}
+              style={styles.learnCardImage}
+            />
+            <Text style={styles.cardTitle}>Food Pairing Tips</Text>
+            <Text style={styles.cardText}>
+              Pairing recommendations from the local wine expert.
+            </Text>
+          </Pressable>
+        </ScrollView>
+      </View>
+
       {/* Cards Section */}
       <View style={styles.cardsWrapper}>
-        {/* Card 1 */}
         <Pressable style={styles.card} onPress={() => router.push("/events")}>
           <Text style={styles.cardTitle}>Upcoming Events</Text>
           <Text style={styles.cardText}>
@@ -97,40 +238,14 @@ export default function HomeScreen() {
           </Text>
         </Pressable>
 
-        {/* Card 2 */}
         <Pressable style={styles.card} onPress={() => router.push("/specials")}>
           <Text style={styles.cardTitle}>Exclusive Specials</Text>
           <Text style={styles.cardText}>
             Browse limited-time winery deals.
           </Text>
         </Pressable>
-
-        {/* Row of two cards */}
-        <View style={styles.row}>
-          {/* Somm's Picks */}
-          <Pressable
-            style={[styles.smallCard, { marginRight: 10 }]}
-            onPress={() => router.push("/somms-picks")}
-          >
-            <Text style={styles.cardTitle}>Somm's Picks</Text>
-            <Text style={styles.cardText}>
-              Curated by sommeliers: the best of Margaret River wines.
-            </Text>
-          </Pressable>
-
-          {/* Private Dinners */}
-          <Pressable
-            style={[styles.smallCard, { marginLeft: 10 }]}
-            onPress={() => router.push("/private-dinners")}
-          >
-            <Text style={styles.cardTitle}>Private Dinners</Text>
-            <Text style={styles.cardText}>
-              Book intimate in-home dinners with guided wine tastings.
-            </Text>
-          </Pressable>
-        </View>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -138,9 +253,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "flex-start",
-    paddingTop: 40,
+  },
+  header: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#723FEB",
+    marginBottom: 20,
+    alignSelf: "flex-start",
+    paddingHorizontal: 20,
   },
   carouselWrapper: {
     width: "100%",
@@ -176,9 +296,56 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#444",
   },
+  learnWrapper: {
+    width: "100%",
+    marginBottom: 30,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#723FEB",
+    marginLeft: 20,
+    marginBottom: 12,
+  },
+  sectionTitleLarge: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#723FEB",
+    marginLeft: 20,
+    marginBottom: 4,
+  },
+  sectionDescription: {
+    fontSize: 14,
+    color: "#555",
+    marginLeft: 20,
+    marginBottom: 12,
+  },
+  learnScroll: {
+    paddingHorizontal: 20,
+    gap: 15,
+  },
+  learnCard: {
+    width: 240,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 18,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 4,
+    marginBottom: 10,
+  },
+  learnCardImage: {
+    width: "100%",
+    height: 120,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
   cardsWrapper: {
     width: "90%",
     gap: 20,
+    marginBottom: 20,
   },
   card: {
     backgroundColor: "#fff",
@@ -190,29 +357,14 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 5,
   },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  smallCard: {
-    flex: 1,
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
-  },
   cardTitle: {
     fontSize: 16,
     fontWeight: "bold",
     marginBottom: 6,
     color: "#723FEB",
   },
-  cardText: {
-    fontSize: 13,
-    color: "#555",
-  },
-});
+    cardText: {
+      fontSize: 13,
+      color: "#555",
+    },
+  });
