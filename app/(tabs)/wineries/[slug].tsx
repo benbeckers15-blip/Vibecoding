@@ -29,6 +29,8 @@ interface WineryData {
   googlePlaceId?: string;
   latitude?: number;
   longitude?: number;
+  rating?: number;              // ⭐️ New
+  userRatingsTotal?: number;    // ⭐️ New
 }
 
 export default function WineryDetailsScreen() {
@@ -79,6 +81,8 @@ export default function WineryDetailsScreen() {
                 mergedData.hours,
               latitude: gData.geometry?.location?.lat,
               longitude: gData.geometry?.location?.lng,
+              rating: gData.rating || null,                    // ⭐️ Include rating
+              
               images:
                 mergedData.images.length > 0
                   ? mergedData.images
@@ -181,6 +185,13 @@ export default function WineryDetailsScreen() {
 
       {/* 📞 Info Section */}
       <View style={styles.infoBox}>
+        {/* ⭐️ Rating */}
+        {winery.rating && (
+          <Text style={styles.rating}>
+            ⭐ {winery.rating.toFixed(1)} 
+          </Text>
+        )}
+
         {winery.phone !== "N/A" && (
           <Pressable onPress={() => Linking.openURL(`tel:${winery.phone}`)}>
             <Text style={styles.link}>📞 {winery.phone}</Text>
@@ -289,6 +300,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  rating: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#444",
+    marginBottom: 8,
   },
   link: { fontSize: 16, color: "#0066cc", marginBottom: 8 },
   hours: { fontSize: 15, color: "#444", marginTop: 4 },

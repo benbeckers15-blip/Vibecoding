@@ -15,7 +15,8 @@ export async function fetchPlaceDetails(placeId: string) {
     throw new Error("Missing Google Place ID");
   }
 
-  const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,formatted_phone_number,website,opening_hours,photos,geometry&key=${GOOGLE_API_KEY}`;
+  // ✅ Added `rating` to the fields list
+  const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,formatted_phone_number,website,opening_hours,photos,geometry,rating&key=${GOOGLE_API_KEY}`;
 
   try {
     const response = await fetch(url);
@@ -28,16 +29,19 @@ export async function fetchPlaceDetails(placeId: string) {
 
     const result = data.result || {};
 
+    // ✅ Return the rating field too
     return {
       formatted_phone_number: result.formatted_phone_number || null,
       website: result.website || null,
       opening_hours: result.opening_hours || null,
       photos: result.photos || [],
-      geometry: result.geometry || null, // ✅ lat/lng support
+      geometry: result.geometry || null, // lat/lng support
+      rating: result.rating || null, // ⭐ Added rating
     };
   } catch (error) {
     console.error("🔥 fetchPlaceDetails failed:", error);
     throw error;
   }
 }
+
 

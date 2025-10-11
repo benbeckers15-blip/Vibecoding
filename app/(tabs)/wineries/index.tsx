@@ -1,59 +1,84 @@
 import { Link } from "expo-router";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
     Pressable,
     StyleSheet,
+    Switch,
     Text,
     TextInput,
     View,
 } from "react-native";
-import { db } from "../../../firebaseConfig"; // adjust if needed
+import { db } from "../../../firebaseConfig";
 
 type Winery = {
   id: string;
   name: string;
   slug: string;
+  rating?: number;
+  userRatingsTotal?: number;
 };
 
 export default function WineriesScreen() {
   const [wineries, setWineries] = useState<Winery[]>([]);
+  const [ratings, setRatings] = useState<{ [key: string]: { rating: number; userRatingsTotal: number } }>({});
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [sortByRating, setSortByRating] = useState(false);
 
   useEffect(() => {
-    const fetchWineries = async () => {
+    const fetchWineriesAndRatings = async () => {
       try {
+        // 🔹 Fetch wineries
         const snapshot = await getDocs(collection(db, "wineries"));
-        const data: Winery[] = snapshot.docs.map((doc) => {
+        const wineryData: Winery[] = snapshot.docs.map((doc) => {
           const docData = doc.data();
           return {
             id: doc.id,
             name: docData.name || "",
-            slug: docData.slug || doc.id, // fallback to doc ID just in case
+            slug: docData.slug || doc.id,
           };
         });
-        setWineries(data);
+
+        // 🔹 Fetch ratings from googleRatings/latest
+        const ratingsDoc = await getDoc(doc(db, "googleRatings", "latest"));
+        const ratingsData = ratingsDoc.exists() ? ratingsDoc.data() : {};
+        setRatings(ratingsData);
+
+        // 🔹 Merge ratings into wineries
+        const merged = wineryData.map((w) => ({
+          ...w,
+          rating: ratingsData[w.id]?.rating || null,
+          userRatingsTotal: ratingsData[w.id]?.userRatingsTotal || 0,
+        }));
+
+        setWineries(merged);
       } catch (err) {
-        console.error("Error fetching wineries:", err);
+        console.error("Error fetching wineries or ratings:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchWineries();
+    fetchWineriesAndRatings();
   }, []);
 
-  const filtered =
-    wineries.length > 0
-      ? wineries.filter((winery) =>
-          winery.name
-            ?.toLowerCase()
-            .includes(search.trim().toLowerCase())
-        )
-      : [];
+  // 🧠 Filter matches starting with search input
+  const filtered = wineries
+    .filter((w) =>
+      w.name.toLowerCase().startsWith(search.trim().toLowerCase())
+    )
+    .sort((a, b) => {
+      if (sortByRating) {
+        const aRating = a.rating || 0;
+        const bRating = b.rating || 0;
+        return bRating - aRating;
+      } else {
+        return a.name.localeCompare(b.name);
+      }
+    });
 
   if (loading) {
     return (
@@ -73,6 +98,19 @@ export default function WineriesScreen() {
         onChangeText={setSearch}
       />
 
+      {/* 🧭 Toggle between alphabetical / rating */}
+      <View style={styles.toggleContainer}>
+        <Text style={styles.toggleLabel}>
+          Sort by: {sortByRating ? "⭐ Rating" : "🔤 Name"}
+        </Text>
+        <Switch
+          value={sortByRating}
+          onValueChange={setSortByRating}
+          thumbColor={sortByRating ? "#FFD700" : "#ccc"}
+          trackColor={{ false: "#ddd", true: "#723FEB" }}
+        />
+      </View>
+
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
@@ -80,6 +118,9 @@ export default function WineriesScreen() {
           <Link href={`/wineries/${item.slug}?from=wineries`} asChild>
             <Pressable style={styles.card}>
               <Text style={styles.cardText}>{item.name}</Text>
+              {item.rating && (
+                <Text style={styles.rating}>⭐ {item.rating.toFixed(1)}</Text>
+              )}
             </Pressable>
           </Link>
         )}
@@ -104,11 +145,25 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 12,
   },
+  toggleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+    backgroundColor: "#f8f8f8",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  toggleLabel: { fontSize: 16, color: "#333", fontWeight: "500" },
   card: {
     padding: 16,
     backgroundColor: "#f5f5f5",
     borderRadius: 8,
     marginBottom: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   cardText: { fontSize: 16, fontWeight: "500" },
+  rating: { fontSize: 14, color: "#555" },
 });

@@ -73,7 +73,7 @@ export default function HomeScreen() {
       <View style={styles.carouselWrapper}>
         <Carousel
           loop
-          width={width * 0.9}
+          width={width}
           height={300}
           autoPlay
           data={mockAds}
@@ -264,22 +264,18 @@ const styles = StyleSheet.create({
   },
   carouselWrapper: {
     width: "100%",
-    alignItems: "center",
+    alignItems: "stretch",
     marginBottom: 30,
   },
   carouselCard: {
     borderRadius: 16,
     backgroundColor: "#fff",
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 5,
+   
   },
   image: {
     width: "100%",
-    height: 200,
+    height: 300,
     resizeMode: "cover",
   },
   captionBox: {

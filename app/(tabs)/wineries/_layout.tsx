@@ -4,7 +4,7 @@ export default function WineriesLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: "#4B0E15" },
+        headerStyle: { backgroundColor: "#723FEB" },
         headerTintColor: "#fff",
         headerTitleStyle: { fontWeight: "bold" },
       }}

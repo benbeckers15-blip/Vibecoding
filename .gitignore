@@ -43,3 +43,5 @@ app-example
 /ios
 /android
 
+#firebase server side key
+firebase-admin.json
