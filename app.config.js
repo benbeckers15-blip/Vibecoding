@@ -33,6 +33,7 @@ export default {
 
     plugins: [
       "expo-router",
+      "expo-font", // ✅ Added this line so Expo can handle Google Fonts
       [
         "expo-splash-screen",
         {
@@ -52,12 +53,9 @@ export default {
       reactCompiler: true,
     },
 
-    // ✅ All environment variables pulled from .env
+    // ✅ Environment variables from .env
     extra: {
-      // Google
       googleApiKey: process.env.EXPO_PUBLIC_GOOGLE_API_KEY,
-
-      // Firebase
       firebaseApiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
       firebaseAuthDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
       firebaseProjectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
