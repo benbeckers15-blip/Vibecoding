@@ -4,12 +4,12 @@ import { initializeFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyA5TNrAIwxLBHnlAb9Sv7vUtwdz-edoFAc",
-  authDomain: "solid-garden-474012-q4.firebaseapp.com",
-  projectId: "solid-garden-474012-q4",
-  storageBucket: "solid-garden-474012-q4.appspot.com",
-  messagingSenderId: "386342294467",
-  appId: "1:386342294467:web:adbc90bbf6735efb142376",
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
 
 // Initialize Firebase

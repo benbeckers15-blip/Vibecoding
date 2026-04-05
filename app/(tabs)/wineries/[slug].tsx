@@ -2,6 +2,17 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
+
+function safeOpenURL(url: string) {
+  const trimmed = url.trim();
+  const withProtocol =
+    trimmed.startsWith("http://") || trimmed.startsWith("https://")
+      ? trimmed
+      : `https://${trimmed}`;
+  Linking.openURL(withProtocol).catch(() => {
+    console.warn("Could not open URL:", withProtocol);
+  });
+}
 import {
   ActivityIndicator,
   Dimensions,
@@ -14,7 +25,7 @@ import {
   View,
 } from "react-native";
 import Carousel from "react-native-reanimated-carousel";
-import { db } from "../../../firebaseConfig"; // ✅ make sure this path is correct
+import { db } from "../../../firebaseConfig";
 
 const { width } = Dimensions.get("window");
 
@@ -33,7 +44,6 @@ export default function WineryDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // ✅ Fetch data from Firestore
   useEffect(() => {
     if (!slug) return;
 
@@ -50,8 +60,8 @@ export default function WineryDetailsScreen() {
             description: Array.isArray(data.description)
               ? data.description
               : [String(data.description || "")],
-            phone: data.phone || "N/A",
-            website: data.website || "",
+            phone: (data.phone || "N/A").trim(),
+            website: (data.website || "").trim(),
             hours: data.hours || "N/A",
           });
         } else {
@@ -67,33 +77,38 @@ export default function WineryDetailsScreen() {
     fetchWinery();
   }, [slug]);
 
-  // ⏳ Loading State
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#723FEB" />
-        <Text>Loading winery details...</Text>
+        <ActivityIndicator size="large" color="#1a1a1a" />
+        <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
   }
 
-  // ❌ Not Found
   if (!winery) {
     return (
       <View style={styles.center}>
-        <Text>Winery not found</Text>
+        <Text style={styles.notFoundLabel}>WINERY NOT FOUND</Text>
+        <Text style={styles.notFoundText}>
+          This winery could not be loaded.
+        </Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      {/* 🖼 Hero Carousel */}
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Hero Carousel */}
       <View style={styles.heroContainer}>
         {winery.images.length > 0 ? (
           <Carousel
             width={width}
-            height={260}
+            height={380}
             data={winery.images}
             loop
             autoPlay
@@ -106,135 +121,278 @@ export default function WineryDetailsScreen() {
               parallaxScrollingOffset: 50,
             }}
             renderItem={({ item }) => (
-              <View style={styles.heroCard}>
-                <ImageBackground
-                  source={{ uri: String(item) }}
-                  style={styles.heroImage}
-                >
-                  <LinearGradient
-                    colors={["rgba(0,0,0,0.6)", "transparent"]}
-                    style={styles.overlay}
-                  />
-                  <View style={styles.heroContent}>
-                    <Text style={styles.heroTitle}>{winery.name}</Text>
-                  </View>
-                </ImageBackground>
-              </View>
+              <ImageBackground
+                source={{ uri: String(item) }}
+                style={styles.heroImage}
+              >
+                <LinearGradient
+                  colors={["transparent", "rgba(0,0,0,0.75)"]}
+                  style={styles.heroGradient}
+                />
+                <View style={styles.heroContent}>
+                  <Text style={styles.heroRegion}>MARGARET RIVER</Text>
+                  <Text style={styles.heroTitle}>{winery.name}</Text>
+                </View>
+              </ImageBackground>
             )}
           />
         ) : (
           <View style={styles.heroPlaceholder}>
-            <Text>No images available</Text>
+            <Text style={styles.heroPlaceholderText}>🍷</Text>
+            <Text style={styles.heroPlaceholderName}>{winery.name}</Text>
           </View>
         )}
 
-        {/* 🔵 Pagination Dots */}
-        <View style={styles.dotsContainer}>
-          {winery.images.map((_, index) => (
-            <View
-              key={index}
-              style={[
-                styles.dot,
-                currentIndex === index && styles.activeDot,
-              ]}
-            />
-          ))}
+        {/* Pagination dashes */}
+        {winery.images.length > 1 && (
+          <View style={styles.dotsContainer}>
+            {winery.images.map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.dot,
+                  currentIndex === index && styles.activeDot,
+                ]}
+              />
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* Info Grid */}
+      <View style={styles.infoGrid}>
+        <View style={styles.infoCell}>
+          <Text style={styles.infoCellLabel}>HOURS</Text>
+          <Text style={styles.infoCellValue}>{winery.hours}</Text>
+        </View>
+
+        <View style={[styles.infoCell, styles.infoCellBorderLeft]}>
+          <Text style={styles.infoCellLabel}>LOCATION</Text>
+          <Text style={styles.infoCellValue}>Margaret River</Text>
         </View>
       </View>
 
-      {/* 📞 Info Section */}
-      <View style={styles.infoBox}>
+      {/* Contact Buttons */}
+      <View style={styles.contactRow}>
         {winery.phone !== "N/A" && (
-          <Pressable onPress={() => Linking.openURL(`tel:${winery.phone}`)}>
-            <Text style={styles.link}>📞 {winery.phone}</Text>
+          <Pressable
+            style={styles.contactButton}
+            onPress={() => Linking.openURL(`tel:${winery.phone.replace(/\s/g, "")}`).catch(() => console.warn("Could not open phone link"))}
+          >
+            <Text style={styles.contactButtonText}>CALL</Text>
+            <Text style={styles.contactButtonSub}>{winery.phone}</Text>
           </Pressable>
         )}
 
-        {winery.website && (
-          <Pressable onPress={() => Linking.openURL(winery.website)}>
-            <Text style={styles.link}>🌐 Visit Website</Text>
+        {winery.website ? (
+          <Pressable
+            style={[
+              styles.contactButton,
+              winery.phone !== "N/A" && styles.contactButtonBorderLeft,
+            ]}
+            onPress={() => safeOpenURL(winery.website)}
+          >
+            <Text style={styles.contactButtonText}>WEBSITE</Text>
+            <Text style={styles.contactButtonSub}>Visit Online</Text>
           </Pressable>
-        )}
-
-        <Text style={styles.hours}>⏰ {winery.hours}</Text>
+        ) : null}
       </View>
 
-      {/* 📖 Descriptions */}
-      {winery.description.map((para, idx) => (
-        <Text key={idx} style={styles.paragraph}>
-          {para}
-        </Text>
-      ))}
+      {/* About Section */}
+      <View style={styles.section}>
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerLabel}>ABOUT</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        {winery.description.map((para, idx) => (
+          <Text key={idx} style={styles.paragraph}>
+            {para}
+          </Text>
+        ))}
+      </View>
+
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  heroContainer: { position: "relative" },
-  heroCard: {
-    borderRadius: 16,
-    overflow: "hidden",
-    marginHorizontal: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
   },
-  heroImage: {
-    width: width - 24,
-    height: 260,
-    justifyContent: "flex-end",
+  contentContainer: {
+    paddingBottom: 120,
   },
-  overlay: { ...StyleSheet.absoluteFillObject },
-  heroContent: { padding: 16 },
-  heroTitle: { fontSize: 28, fontWeight: "700", color: "#fff" },
-  heroPlaceholder: {
-    height: 260,
+  center: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#eee",
-    borderRadius: 12,
-    margin: 12,
+    backgroundColor: "#fff",
+    gap: 10,
   },
-  dotsContainer: {
-    flexDirection: "row",
+  loadingText: {
+    fontSize: 11,
+    letterSpacing: 2,
+    color: "#999",
+  },
+  notFoundLabel: {
+    fontSize: 9,
+    letterSpacing: 3,
+    color: "#ccc",
+    marginBottom: 8,
+  },
+  notFoundText: {
+    fontSize: 14,
+    color: "#999",
+  },
+
+  // Hero
+  heroContainer: {
+    position: "relative",
+  },
+  heroImage: {
+    width: width,
+    height: 380,
+    justifyContent: "flex-end",
+  },
+  heroGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  heroContent: {
+    padding: 24,
+    paddingBottom: 32,
+  },
+  heroRegion: {
+    fontSize: 9,
+    letterSpacing: 3,
+    color: "rgba(255,255,255,0.7)",
+    marginBottom: 8,
+  },
+  heroTitle: {
+    fontSize: 32,
+    fontWeight: "700",
+    fontFamily: "Georgia",
+    color: "#fff",
+    lineHeight: 38,
+  },
+  heroPlaceholder: {
+    height: 380,
+    backgroundColor: "#f5f5f0",
     justifyContent: "center",
-    marginVertical: 8,
+    alignItems: "center",
+    gap: 12,
+  },
+  heroPlaceholderText: {
+    fontSize: 48,
+  },
+  heroPlaceholderName: {
+    fontSize: 24,
+    fontFamily: "Georgia",
+    color: "#1a1a1a",
+  },
+
+  // Pagination
+  dotsContainer: {
     position: "absolute",
-    bottom: 10,
-    width: "100%",
+    bottom: 16,
+    right: 20,
+    flexDirection: "row",
+    gap: 4,
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#ccc",
-    marginHorizontal: 4,
+    width: 16,
+    height: 2,
+    backgroundColor: "rgba(255,255,255,0.4)",
+    borderRadius: 1,
   },
   activeDot: {
-    backgroundColor: "#723FEB",
-    width: 10,
-    height: 10,
+    width: 24,
+    backgroundColor: "#fff",
   },
-  infoBox: {
-    backgroundColor: "#f8f8f8",
-    padding: 16,
-    margin: 16,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+
+  // Info Grid
+  infoGrid: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderTopWidth: 1,
+    borderColor: "#e0e0e0",
   },
-  link: { fontSize: 16, color: "#0066cc", marginBottom: 8 },
-  hours: { fontSize: 15, color: "#444", marginTop: 4 },
+  infoCell: {
+    flex: 1,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+  },
+  infoCellBorderLeft: {
+    borderLeftWidth: 1,
+    borderLeftColor: "#e0e0e0",
+  },
+  infoCellLabel: {
+    fontSize: 9,
+    letterSpacing: 3,
+    color: "#999",
+    marginBottom: 6,
+  },
+  infoCellValue: {
+    fontSize: 13,
+    color: "#1a1a1a",
+    fontWeight: "500",
+  },
+
+  // Contact
+  contactRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderColor: "#e0e0e0",
+  },
+  contactButton: {
+    flex: 1,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+  },
+  contactButtonBorderLeft: {
+    borderLeftWidth: 1,
+    borderLeftColor: "#e0e0e0",
+  },
+  contactButtonText: {
+    fontSize: 9,
+    letterSpacing: 3,
+    color: "#999",
+    marginBottom: 4,
+  },
+  contactButtonSub: {
+    fontSize: 13,
+    color: "#1a1a1a",
+    fontWeight: "500",
+  },
+
+  // About
+  section: {
+    paddingHorizontal: 24,
+    paddingTop: 28,
+  },
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#e0e0e0",
+  },
+  dividerLabel: {
+    fontSize: 9,
+    letterSpacing: 3,
+    color: "#999",
+    marginHorizontal: 12,
+  },
   paragraph: {
-    fontSize: 16,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    lineHeight: 22,
+    fontSize: 15,
+    color: "#444",
+    lineHeight: 26,
+    marginBottom: 16,
+    fontFamily: "Georgia",
   },
 });
-
