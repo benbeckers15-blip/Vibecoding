@@ -276,7 +276,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   carouselCard: {
-    borderRadius: 4,
+    borderRadius: 16,
     overflow: "hidden",
   },
   image: {
@@ -329,6 +329,7 @@ const styles = StyleSheet.create({
   featuredCard: {
     borderWidth: 1,
     borderColor: "#e8e8e8",
+    borderRadius: 16,
     overflow: "hidden",
   },
   featuredImageWrapper: {
