@@ -2,8 +2,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
+import SkeletonBox from "../../../components/SkeletonBox";
 import {
-  ActivityIndicator,
   Dimensions,
   ImageBackground,
   Linking,
@@ -80,7 +80,11 @@ function normaliseHours(raw: unknown): HoursEntry[] {
 }
 
 export default function WineryDetailsScreen() {
-  const { slug } = useLocalSearchParams<{ slug: string }>();
+  const { slug, from } = useLocalSearchParams<{ slug: string; from?: string }>();
+  const backLabel =
+    from === "events"   ? "‹ Events"   :
+    from === "wineries" ? "‹ Wineries" :
+    from === "home"     ? "‹ Home"     : "‹ Back";
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [winery, setWinery] = useState<WineryData | null>(null);
@@ -149,9 +153,50 @@ export default function WineryDetailsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#1a1a1a" />
-        <Text style={styles.loadingText}>Loading...</Text>
+      <View style={styles.container}>
+        {/* Hero skeleton */}
+        <SkeletonBox style={{ height: HERO_HEIGHT, borderRadius: 0 }} />
+
+        {/* Info grid skeleton */}
+        <View style={skeletonStyles.infoGrid}>
+          <View style={skeletonStyles.infoCell}>
+            <SkeletonBox style={skeletonStyles.labelLine} />
+            <SkeletonBox style={skeletonStyles.valueLine} />
+            <SkeletonBox style={skeletonStyles.subLine} />
+          </View>
+          <View style={[skeletonStyles.infoCell, skeletonStyles.infoCellBorderLeft]}>
+            <SkeletonBox style={skeletonStyles.labelLine} />
+            <SkeletonBox style={skeletonStyles.valueLine} />
+          </View>
+        </View>
+
+        {/* Contact row skeleton */}
+        <View style={skeletonStyles.contactRow}>
+          <View style={skeletonStyles.infoCell}>
+            <SkeletonBox style={skeletonStyles.labelLine} />
+            <SkeletonBox style={[skeletonStyles.valueLine, { width: "60%" }]} />
+          </View>
+          <View style={[skeletonStyles.infoCell, skeletonStyles.infoCellBorderLeft]}>
+            <SkeletonBox style={skeletonStyles.labelLine} />
+            <SkeletonBox style={[skeletonStyles.valueLine, { width: "70%" }]} />
+          </View>
+        </View>
+
+        {/* About section skeleton */}
+        <View style={skeletonStyles.aboutSection}>
+          <View style={skeletonStyles.dividerSkeleton}>
+            <View style={skeletonStyles.dividerLine} />
+            <SkeletonBox style={skeletonStyles.dividerLabel} />
+            <View style={skeletonStyles.dividerLine} />
+          </View>
+          <SkeletonBox style={skeletonStyles.textLineLg} />
+          <SkeletonBox style={skeletonStyles.textLineLg} />
+          <SkeletonBox style={[skeletonStyles.textLineLg, { width: "75%" }]} />
+          <SkeletonBox style={{ height: 12, marginTop: 20 }} />
+          <SkeletonBox style={skeletonStyles.textLineSm} />
+          <SkeletonBox style={skeletonStyles.textLineSm} />
+          <SkeletonBox style={[skeletonStyles.textLineSm, { width: "60%" }]} />
+        </View>
       </View>
     );
   }
@@ -193,7 +238,7 @@ export default function WineryDetailsScreen() {
           {/* Custom header overlay */}
           <View style={[styles.headerOverlay, { top: insets.top + 10 }]}>
             <Pressable style={styles.headerBtn} onPress={() => router.back()}>
-              <Text style={styles.headerBtnText}>‹ Wineries</Text>
+              <Text style={styles.headerBtnText}>{backLabel}</Text>
             </Pressable>
             <Pressable style={styles.headerBtn} onPress={handleShare}>
               <Text style={styles.headerBtnText}>⬆ Share</Text>
@@ -267,7 +312,7 @@ export default function WineryDetailsScreen() {
           {/* Hours cell — tappable, opens modal */}
           <Pressable style={styles.infoCell} onPress={() => setHoursVisible(true)}>
             <Text style={styles.infoCellLabel}>HOURS</Text>
-            <Text style={styles.infoCellValue} numberOfLines={1}>
+            <Text style={styles.infoCellValue}>
               {winery.hours[0]?.time ?? "N/A"}
             </Text>
             <Text style={styles.infoCellTap}>See all hours ›</Text>
@@ -398,7 +443,7 @@ export default function WineryDetailsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#faf9f6",
   },
   contentContainer: {
     paddingBottom: 120,
@@ -407,7 +452,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: "#faf9f6",
     gap: 10,
   },
   loadingText: {
@@ -746,5 +791,76 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 1,
     color: "#555",
+  },
+});
+
+const skeletonStyles = StyleSheet.create({
+  infoGrid: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderTopWidth: 1,
+    borderColor: "#e0e0e0",
+  },
+  infoCell: {
+    flex: 1,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    gap: 8,
+  },
+  infoCellBorderLeft: {
+    borderLeftWidth: 1,
+    borderLeftColor: "#e0e0e0",
+  },
+  contactRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderColor: "#e0e0e0",
+  },
+  labelLine: {
+    height: 8,
+    width: "40%",
+    borderRadius: 4,
+  },
+  valueLine: {
+    height: 13,
+    width: "80%",
+    borderRadius: 4,
+  },
+  subLine: {
+    height: 9,
+    width: "50%",
+    borderRadius: 4,
+  },
+  aboutSection: {
+    backgroundColor: "#faf9f6",
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 40,
+    marginTop: 2,
+    gap: 14,
+  },
+  dividerSkeleton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+    gap: 12,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#e0e0e0",
+  },
+  dividerLabel: {
+    height: 8,
+    width: 48,
+    borderRadius: 4,
+  },
+  textLineLg: {
+    height: 14,
+    borderRadius: 4,
+  },
+  textLineSm: {
+    height: 12,
+    borderRadius: 4,
   },
 });

@@ -1,13 +1,16 @@
 // app/(tabs)/home/index.tsx
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Dimensions,
   GestureResponderEvent,
   Image,
+  ImageBackground,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,9 +19,22 @@ import {
 } from "react-native";
 import Carousel from "react-native-reanimated-carousel";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import SkeletonBox from "../../../components/SkeletonBox";
 import { db } from "../../../firebaseConfig";
 
 const { width } = Dimensions.get("window");
+
+// ─── Explore card background images ──────────────────────────────────────────
+const CARD_IMAGES = {
+  events:
+    "https://images.unsplash.com/photo-1528823872057-9c018a7a7553?w=800&q=80",
+  specials:
+    "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=800&q=80",
+  somms:
+    "https://images.unsplash.com/photo-1474722883778-792e7990302f?w=800&q=80",
+  dinners:
+    "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&q=80",
+};
 
 type CarouselSlide = {
   id: string;
@@ -41,6 +57,16 @@ type FeaturedWinery = {
   userRatingsTotal?: number;
 };
 
+// ─── Carousel skeleton ────────────────────────────────────────────────────────
+function CarouselSkeleton() {
+  return (
+    <View style={skeletonStyles.carouselWrapper}>
+      <SkeletonBox style={skeletonStyles.carouselBlock} />
+    </View>
+  );
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -107,9 +133,7 @@ export default function HomeScreen() {
       {/* Carousel */}
       <View style={styles.carouselWrapper}>
         {loadingSlides ? (
-          <View style={styles.carouselPlaceholder}>
-            <ActivityIndicator color="#999" />
-          </View>
+          <CarouselSkeleton />
         ) : slides.length > 0 ? (
           <Carousel
             loop
@@ -152,7 +176,7 @@ export default function HomeScreen() {
 
           <Pressable
             style={styles.featuredCard}
-            onPress={() => router.push(`/wineries/${featuredWinery.slug}` as any)}
+            onPress={() => router.push(`/wineries/${featuredWinery.slug}?from=home` as any)}
           >
             {featuredWinery.images && featuredWinery.images.length > 0 ? (
               <View style={styles.featuredImageWrapper}>
@@ -168,12 +192,15 @@ export default function HomeScreen() {
                   <Text style={styles.featuredRegion}>MARGARET RIVER</Text>
                   <Text style={styles.featuredName}>{featuredWinery.name}</Text>
                   {featuredWinery.rating && (
-                    <Text style={styles.featuredRating}>
-                      ⭐ {featuredWinery.rating.toFixed(1)}
-                      {featuredWinery.userRatingsTotal
-                        ? `  ·  ${featuredWinery.userRatingsTotal.toLocaleString()} reviews`
-                        : ""}
-                    </Text>
+                    <View style={styles.ratingRow}>
+                      <Ionicons name="star" size={11} color="#C8860A" />
+                      <Text style={styles.featuredRating}>
+                        {featuredWinery.rating.toFixed(1)}
+                        {featuredWinery.userRatingsTotal
+                          ? `  ·  ${featuredWinery.userRatingsTotal.toLocaleString()} reviews`
+                          : ""}
+                      </Text>
+                    </View>
                   )}
                   <Text style={styles.featuredCta}>VIEW WINERY ›</Text>
                 </View>
@@ -183,9 +210,12 @@ export default function HomeScreen() {
                 <Text style={styles.featuredRegion}>MARGARET RIVER</Text>
                 <Text style={styles.featuredNameDark}>{featuredWinery.name}</Text>
                 {featuredWinery.rating && (
-                  <Text style={styles.featuredRatingDark}>
-                    ⭐ {featuredWinery.rating.toFixed(1)}
-                  </Text>
+                  <View style={styles.ratingRowDark}>
+                    <Ionicons name="star" size={11} color="#C8860A" />
+                    <Text style={styles.featuredRatingDark}>
+                      {featuredWinery.rating.toFixed(1)}
+                    </Text>
+                  </View>
                 )}
                 <Text style={styles.featuredCtaDark}>VIEW WINERY ›</Text>
               </View>
@@ -201,25 +231,43 @@ export default function HomeScreen() {
         <View style={styles.dividerLine} />
       </View>
 
-      {/* Cards */}
+      {/* Explore Cards */}
       <View style={styles.cardsWrapper}>
 
         <Pressable style={styles.card} onPress={() => router.push("/events")}>
-          <Text style={styles.cardLabel}>CALENDAR</Text>
-          <Text style={styles.cardTitle}>Upcoming Events</Text>
-          <Text style={styles.cardText}>
-            Discover wine festivals, tastings, and more.
-          </Text>
-          <View style={styles.cardBorder} />
+          <ImageBackground
+            source={{ uri: CARD_IMAGES.events }}
+            style={styles.cardImageBg}
+          >
+            <LinearGradient
+              colors={["transparent", "rgba(0,0,0,0.80)"]}
+              style={styles.cardGradient}
+            >
+              <Text style={styles.cardLabel}>CALENDAR</Text>
+              <Text style={styles.cardTitle}>Upcoming Events</Text>
+              <Text style={styles.cardText}>
+                Discover wine festivals, tastings, and more.
+              </Text>
+            </LinearGradient>
+          </ImageBackground>
         </Pressable>
 
         <Pressable style={styles.card} onPress={() => router.push("/specials")}>
-          <Text style={styles.cardLabel}>OFFERS</Text>
-          <Text style={styles.cardTitle}>Exclusive Specials</Text>
-          <Text style={styles.cardText}>
-            Browse limited-time winery deals.
-          </Text>
-          <View style={styles.cardBorder} />
+          <ImageBackground
+            source={{ uri: CARD_IMAGES.specials }}
+            style={styles.cardImageBg}
+          >
+            <LinearGradient
+              colors={["transparent", "rgba(0,0,0,0.80)"]}
+              style={styles.cardGradient}
+            >
+              <Text style={styles.cardLabel}>OFFERS</Text>
+              <Text style={styles.cardTitle}>Exclusive Specials</Text>
+              <Text style={styles.cardText}>
+                Browse limited-time winery deals.
+              </Text>
+            </LinearGradient>
+          </ImageBackground>
         </Pressable>
 
         <View style={styles.row}>
@@ -227,22 +275,42 @@ export default function HomeScreen() {
             style={[styles.smallCard, { marginRight: 8 }]}
             onPress={() => router.push("/wineries")}
           >
-            <Text style={styles.cardLabel}>CURATED</Text>
-            <Text style={styles.smallCardTitle}>Somm's{"\n"}Picks</Text>
-            <Text style={styles.cardText}>
-              The best of the region, selected by experts.
-            </Text>
+            <ImageBackground
+              source={{ uri: CARD_IMAGES.somms }}
+              style={styles.cardImageBg}
+            >
+              <LinearGradient
+                colors={["transparent", "rgba(0,0,0,0.80)"]}
+                style={styles.cardGradient}
+              >
+                <Text style={styles.cardLabel}>CURATED</Text>
+                <Text style={styles.smallCardTitle}>Somm's{"\n"}Picks</Text>
+                <Text style={styles.cardText}>
+                  The best of the region, selected by experts.
+                </Text>
+              </LinearGradient>
+            </ImageBackground>
           </Pressable>
 
           <Pressable
             style={[styles.smallCard, { marginLeft: 8 }]}
             onPress={() => router.push("/wineries")}
           >
-            <Text style={styles.cardLabel}>EXCLUSIVE</Text>
-            <Text style={styles.smallCardTitle}>Private{"\n"}Dinners</Text>
-            <Text style={styles.cardText}>
-              Intimate guided tastings in stunning settings.
-            </Text>
+            <ImageBackground
+              source={{ uri: CARD_IMAGES.dinners }}
+              style={styles.cardImageBg}
+            >
+              <LinearGradient
+                colors={["transparent", "rgba(0,0,0,0.80)"]}
+                style={styles.cardGradient}
+              >
+                <Text style={styles.cardLabel}>EXCLUSIVE</Text>
+                <Text style={styles.smallCardTitle}>Private{"\n"}Dinners</Text>
+                <Text style={styles.cardText}>
+                  Intimate guided tastings in stunning settings.
+                </Text>
+              </LinearGradient>
+            </ImageBackground>
           </Pressable>
         </View>
 
@@ -251,10 +319,22 @@ export default function HomeScreen() {
   );
 }
 
+const skeletonStyles = StyleSheet.create({
+  carouselWrapper: {
+    width: width * 0.92,
+    alignItems: "center",
+  },
+  carouselBlock: {
+    width: "100%",
+    height: 280,
+    borderRadius: 16,
+  },
+});
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#faf9f6",
   },
   contentContainer: {
     paddingBottom: 120,
@@ -266,14 +346,6 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
     marginBottom: 28,
-  },
-  carouselPlaceholder: {
-    width: width * 0.92,
-    height: 280,
-    backgroundColor: "#f5f5f0",
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: 4,
   },
   carouselCard: {
     borderRadius: 16,
@@ -368,10 +440,15 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     lineHeight: 30,
   },
+  ratingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginBottom: 10,
+  },
   featuredRating: {
     fontSize: 12,
     color: "rgba(255,255,255,0.8)",
-    marginBottom: 10,
     letterSpacing: 0.3,
   },
   featuredCta: {
@@ -392,10 +469,16 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     lineHeight: 30,
   },
+  ratingRowDark: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginBottom: 10,
+  },
   featuredRatingDark: {
     fontSize: 12,
     color: "#666",
-    marginBottom: 10,
+    letterSpacing: 0.3,
   },
   featuredCtaDark: {
     fontSize: 9,
@@ -423,39 +506,42 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
   },
 
-  // Cards
+  // Explore cards
   cardsWrapper: {
     width: "90%",
     gap: 16,
   },
   card: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#e8e8e8",
-    padding: 20,
+    overflow: "hidden",
+    borderRadius: 4,
   },
-  cardBorder: {
-    height: 1,
-    backgroundColor: "#f0f0f0",
-    marginTop: 16,
+  cardImageBg: {
+    height: 160,
+  },
+  cardGradient: {
+    flex: 1,
+    justifyContent: "flex-end",
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    paddingTop: 60,
   },
   cardLabel: {
     fontSize: 9,
     letterSpacing: 3,
-    color: "#999",
-    marginBottom: 8,
+    color: "rgba(255,255,255,0.7)",
+    marginBottom: 6,
   },
   cardTitle: {
     fontSize: 22,
     fontWeight: "700",
     fontFamily: "Georgia",
-    color: "#940c0c",
-    marginBottom: 6,
+    color: "#fff",
+    marginBottom: 5,
   },
   cardText: {
-    fontSize: 13,
-    color: "#666",
-    lineHeight: 19,
+    fontSize: 12,
+    color: "rgba(255,255,255,0.75)",
+    lineHeight: 17,
   },
   row: {
     flexDirection: "row",
@@ -463,17 +549,15 @@ const styles = StyleSheet.create({
   },
   smallCard: {
     flex: 1,
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#e8e8e8",
-    padding: 16,
+    overflow: "hidden",
+    borderRadius: 4,
   },
   smallCardTitle: {
     fontSize: 18,
     fontWeight: "700",
     fontFamily: "Georgia",
-    color: "#1a1a1a",
-    marginBottom: 6,
+    color: "#fff",
+    marginBottom: 5,
     lineHeight: 24,
   },
 });
