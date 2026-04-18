@@ -37,6 +37,9 @@ yarn-error.*
 # secrets — never commit these
 service-account.json
 
+# Claude Code worktrees / local agent state
+.claude/
+
 # typescript
 *.tsbuildinfo
 

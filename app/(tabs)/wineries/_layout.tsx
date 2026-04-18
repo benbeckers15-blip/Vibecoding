@@ -9,11 +9,7 @@ export default function WineriesLayout() {
       />
       <Stack.Screen
         name="[slug]"
-        options={{
-          headerTransparent: true,
-          headerTitle: "",
-          headerTintColor: "#fff",
-        }}
+        options={{ headerShown: false }}
       />
     </Stack>
   );

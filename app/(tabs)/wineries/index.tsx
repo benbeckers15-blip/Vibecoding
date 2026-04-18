@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { Link, useRouter } from "expo-router";
 import { collection, getDocs } from "firebase/firestore";
 import { useEffect, useState } from "react";
@@ -25,6 +26,7 @@ type Winery = {
   hasWifi?: boolean;
   isOrganic?: boolean;
   isBiodynamic?: boolean;
+  walkinWelcome?: boolean;
   rating?: number;
   userRatingsTotal?: number;
   latitude?: number;
@@ -34,9 +36,9 @@ type Winery = {
 const BOOLEAN_FILTERS: { key: keyof Winery; label: string }[] = [
   { key: "dogFriendly", label: "Dog Friendly" },
   { key: "hasRestaurant", label: "Restaurant" },
-  { key: "hasWifi", label: "WiFi" },
   { key: "isOrganic", label: "Organic" },
   { key: "isBiodynamic", label: "Biodynamic" },
+  { key: "walkinWelcome", label: "Walk-ins Welcome" },
 ];
 
 const RATING_OPTIONS = [
@@ -89,7 +91,7 @@ export default function WineriesScreen() {
   };
 
   const filtered = wineries.filter((w) => {
-    if (search.trim() && !w.name?.toLowerCase().includes(search.trim().toLowerCase())) {
+    if (search.trim() && !w.name?.toLowerCase().startsWith(search.trim().toLowerCase())) {
       return false;
     }
     for (const key of activeFilters) {
@@ -158,9 +160,11 @@ export default function WineriesScreen() {
           </View>
 
           {/* Boolean Filter Chips */}
+          <Text style={styles.filterSectionLabel}>FILTER</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
+            style={styles.filtersScroll}
             contentContainerStyle={styles.filtersRow}
           >
             {BOOLEAN_FILTERS.map(({ key, label }) => {
@@ -180,14 +184,14 @@ export default function WineriesScreen() {
           </ScrollView>
 
           {/* Rating Filter */}
-          <View style={styles.ratingRow}>
+          <View style={styles.ratingBlock}>
             <Text style={styles.ratingLabel}>RATING</Text>
             <View style={styles.ratingOptions}>
               {RATING_OPTIONS.map(({ label, value }) => (
                 <Pressable
                   key={value}
                   style={[styles.ratingBtn, minRating === value && styles.ratingBtnActive]}
-                  onPress={() => setMinRating(value)}
+                  onPress={() => setMinRating(minRating === value ? 0 : value)}
                 >
                   <Text style={[styles.ratingBtnText, minRating === value && styles.ratingBtnTextActive]}>
                     {label}
@@ -221,9 +225,12 @@ export default function WineriesScreen() {
                   <View style={styles.rowMiddle}>
                     <Text style={styles.rowName}>{item.name}</Text>
                     {item.rating ? (
-                      <Text style={styles.rowRating}>
-                        ⭐ {item.rating.toFixed(1)} ({item.userRatingsTotal?.toLocaleString()})
-                      </Text>
+                      <View style={styles.ratingRow}>
+                        <Ionicons name="star" size={11} color="#C8860A" />
+                        <Text style={styles.rowRating}>
+                          {item.rating.toFixed(1)} ({item.userRatingsTotal?.toLocaleString()})
+                        </Text>
+                      </View>
                     ) : null}
                   </View>
                   <Text style={styles.rowArrow}>›</Text>
@@ -359,18 +366,33 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
 
+  filterSectionLabel: {
+    fontSize: 9,
+    letterSpacing: 3,
+    color: "#999",
+    fontWeight: "500",
+    paddingHorizontal: 24,
+    marginBottom: 8,
+  },
+
   // Boolean chips
+  filtersScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
+    marginBottom: 12,
+  },
   filtersRow: {
     paddingHorizontal: 24,
+    paddingVertical: 2,
     gap: 8,
-    marginBottom: 12,
+    alignItems: "center",
   },
   chip: {
     borderWidth: 1,
     borderColor: "#ddd",
-    borderRadius: 2,
+    borderRadius: 999,
     paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingVertical: 6,
   },
   chipActive: {
     backgroundColor: "#1a1a1a",
@@ -387,12 +409,10 @@ const styles = StyleSheet.create({
   },
 
   // Rating filter
-  ratingRow: {
-    flexDirection: "row",
-    alignItems: "center",
+  ratingBlock: {
     paddingHorizontal: 24,
     marginBottom: 14,
-    gap: 12,
+    gap: 8,
   },
   ratingLabel: {
     fontSize: 9,
@@ -430,7 +450,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 24,
-    marginBottom: 8,
+    marginTop: 6,
+    marginBottom: 14,
   },
   dividerLine: {
     flex: 1,
@@ -470,6 +491,11 @@ const styles = StyleSheet.create({
     fontFamily: "Georgia",
     color: "#1a1a1a",
     marginBottom: 2,
+  },
+  ratingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   rowRating: {
     fontSize: 11,

@@ -154,8 +154,10 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
                 target: route.key,
                 canPreventDefault: true,
               });
-              if (!isFocused && !event.defaultPrevented) {
-                navigation.navigate(route.name);
+              if (!event.defaultPrevented) {
+                // Always navigate to the root list screen of the tab,
+                // whether coming from another tab or already deep in this tab's stack
+                navigation.navigate(route.name, { screen: "index" });
               }
             };
 
