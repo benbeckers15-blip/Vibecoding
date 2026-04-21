@@ -1,6 +1,7 @@
 import { Redirect } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
+import { REGION_NAME_UPPER } from "../constants/region";
 
 function FadingDots() {
   const dot1 = useRef(new Animated.Value(0.2)).current;
@@ -46,7 +47,7 @@ export default function Index() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.region}>MARGARET RIVER</Text>
+        <Text style={styles.region}>{REGION_NAME_UPPER}</Text>
         <Text style={styles.title}>Winery Guide</Text>
         <FadingDots />
       </View>

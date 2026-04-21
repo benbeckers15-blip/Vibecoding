@@ -1,0 +1,527 @@
+{
+  "bangor-vineyard-shed": {
+    "done": true,
+    "name": "Bangor Vineyard Shed"
+  },
+  "bream-creek-vineyard": {
+    "done": true,
+    "name": "Bream Creek Vineyard"
+  },
+  "brook-eden-vineyard": {
+    "done": true,
+    "name": "Brook Eden Vineyard"
+  },
+  "bruny-island-premium-wines": {
+    "done": true,
+    "name": "Bruny Island Premium Wines"
+  },
+  "caledon-estate": {
+    "done": true,
+    "name": "Caledon Estate"
+  },
+  "cataract-gorge-reserve": {
+    "done": false,
+    "error": "Unexpected token 'T', \"The known \"... is not valid JSON",
+    "name": "Cataract Gorge Reserve"
+  },
+  "cathedral-rock-winery-cellar-door": {
+    "done": true,
+    "name": "Cathedral Rock Winery Cellar Door"
+  },
+  "clover-hill-wines": {
+    "done": true,
+    "name": "Clover Hill Wines"
+  },
+  "coal-river-farm": {
+    "done": true,
+    "name": "Coal River Farm"
+  },
+  "coal-valley-vineyard": {
+    "done": true,
+    "name": "Coal Valley Vineyard"
+  },
+  "craigie-knowe-vineyard--floras-restaurant": {
+    "done": true,
+    "name": "Craigie Knowe Vineyard & Flora's Restaurant"
+  },
+  "craigow-vineyard": {
+    "done": true,
+    "name": "Craigow Vineyard"
+  },
+  "dalrymple-vineyards": {
+    "done": true,
+    "name": "Dalrymple Vineyards"
+  },
+  "darlington-vineyard": {
+    "done": true,
+    "name": "Darlington Vineyard"
+  },
+  "delamere-vineyard": {
+    "done": true,
+    "name": "Delamere Vineyard"
+  },
+  "derwent-estate-vineyard": {
+    "done": true,
+    "name": "Derwent Estate Vineyard"
+  },
+  "devils-corner-cellar-door": {
+    "done": true,
+    "name": "Devil's Corner Cellar Door"
+  },
+  "domaine-a-stoney-vineyard": {
+    "done": true,
+    "name": "Domaine A Stoney Vineyard"
+  },
+  "evenfall-winery-and-restaurant": {
+    "done": true,
+    "name": "Evenfall Winery and Restaurant"
+  },
+  "every-man--his-dog-vineyard": {
+    "done": true,
+    "name": "Every Man & His Dog Vineyard"
+  },
+  "freycinet-vineyards": {
+    "done": true,
+    "name": "Freycinet Vineyards"
+  },
+  "frogmore-creek-cellar-door--restaurant": {
+    "done": true,
+    "name": "Frogmore Creek Cellar Door & Restaurant"
+  },
+  "ghost-rock-wines-tasmania": {
+    "done": true,
+    "name": "Ghost Rock Wines Tasmania"
+  },
+  "glaetzer-dixon-family-winemakers": {
+    "done": true,
+    "name": "Glaetzer-Dixon Family Winemakers"
+  },
+  "glendale-vineyard": {
+    "done": true,
+    "name": "Glendale Vineyard"
+  },
+  "gorge-scenic-chairlift": {
+    "done": true,
+    "name": "Gorge Scenic Chairlift"
+  },
+  "grape-food-and-wine-bar": {
+    "done": true,
+    "name": "Grape Food and Wine Bar"
+  },
+  "hartzview-vineyard": {
+    "done": true,
+    "name": "Hartzview Vineyard"
+  },
+  "heriots-point-vineyard-and-boutique-accommodation": {
+    "done": true,
+    "name": "Heriots Point Vineyard and Boutique Accommodation"
+  },
+  "highclare-estate-wine-room": {
+    "done": true,
+    "name": "Highclare Estate Wine Room"
+  },
+  "holm-oak-vineyards": {
+    "done": true,
+    "name": "Holm Oak Vineyards"
+  },
+  "home-hill-winery": {
+    "done": true,
+    "name": "Home Hill Winery"
+  },
+  "house-of-arras": {
+    "done": true,
+    "name": "House Of Arras"
+  },
+  "in-the-hanging-garden": {
+    "done": true,
+    "name": "In The Hanging Garden"
+  },
+  "institut-polaire": {
+    "done": true,
+    "name": "Institut Polaire"
+  },
+  "iron-pot-bay-vineyard": {
+    "done": true,
+    "name": "Iron Pot Bay Vineyard"
+  },
+  "isle-drive-u2-drink": {
+    "done": true,
+    "name": "Isle Drive U2 Drink"
+  },
+  "jansz-tasmania": {
+    "done": true,
+    "name": "Jansz Tasmania"
+  },
+  "josef-chromy-wines": {
+    "done": true,
+    "name": "Josef Chromy Wines"
+  },
+  "kate-hill-wines": {
+    "done": true,
+    "name": "Kate Hill Wines"
+  },
+  "la-sardina-loca": {
+    "done": true,
+    "name": "La Sardina Loca"
+  },
+  "lark-cellar-door-hobart": {
+    "done": true,
+    "name": "LARK Cellar Door, Hobart"
+  },
+  "laurel-bank-vineyard": {
+    "done": true,
+    "name": "Laurel Bank Vineyard"
+  },
+  "loira-vines": {
+    "done": true,
+    "name": "Loira Vines"
+  },
+  "lucinda-wine-bar": {
+    "done": true,
+    "name": "Lucinda Wine Bar"
+  },
+  "marions-vineyard": {
+    "done": true,
+    "name": "Marion's Vineyard"
+  },
+  "mayfield-estate": {
+    "done": true,
+    "name": "Mayfield Estate"
+  },
+  "meander-valley-vineyard": {
+    "done": true,
+    "name": "Meander Valley Vineyard"
+  },
+  "mewstone-wines": {
+    "done": true,
+    "name": "Mewstone Wines"
+  },
+  "moores-hill-estate": {
+    "done": true,
+    "name": "Moores Hill Estate"
+  },
+  "moorilla-winery": {
+    "done": true,
+    "name": "Moorilla Winery"
+  },
+  "nadines--pipers-brook": {
+    "done": true,
+    "name": "Nadine's @ Piper's Brook"
+  },
+  "nandroya-vineyard": {
+    "done": true,
+    "name": "Nandroya Vineyard"
+  },
+  "nocton-vineyard": {
+    "done": true,
+    "name": "Nocton Vineyard"
+  },
+  "ogee": {
+    "done": true,
+    "name": "Ogee"
+  },
+  "pablos-cocktails-and-dreams": {
+    "done": true,
+    "name": "Pablos Cocktails and Dreams"
+  },
+  "pagan-cider-cellar-door": {
+    "done": true,
+    "name": "Pagan Cider Cellar Door"
+  },
+  "pipers-brook-vineyard": {
+    "done": true,
+    "name": "Pipers Brook Vineyard"
+  },
+  "pipers-brook-winery": {
+    "done": true,
+    "name": "Pipers Brook Winery"
+  },
+  "pooley-wines": {
+    "done": true,
+    "name": "Pooley Wines"
+  },
+  "pressing-matters-cellar-door": {
+    "done": true,
+    "name": "Pressing Matters Cellar Door"
+  },
+  "puddleduck-wines": {
+    "done": true,
+    "name": "Puddleduck Wines"
+  },
+  "riversdale-estate-winery-cellar-door--french-bistro": {
+    "done": true,
+    "name": "Riversdale Estate Winery, Cellar Door & French Bistro"
+  },
+  "rosie-in-my-midnight-dreams": {
+    "done": true,
+    "name": "Rosie in My Midnight Dreams"
+  },
+  "rusty-roof-vineyard": {
+    "done": true,
+    "name": "Rusty Roof Vineyard"
+  },
+  "ryelands-farm--vineyard-tasmania": {
+    "done": true,
+    "name": "Ryelands Farm & Vineyard, Tasmania"
+  },
+  "schol": {
+    "done": true,
+    "name": "scholé"
+  },
+  "sen-vineyard": {
+    "done": true,
+    "name": "Sen Vineyard"
+  },
+  "sinapius-wines": {
+    "done": true,
+    "name": "Sinapius Wines"
+  },
+  "small-wonder-wines": {
+    "done": true,
+    "name": "Small Wonder Wines"
+  },
+  "society-salamanca": {
+    "done": true,
+    "name": "Society Salamanca"
+  },
+  "sonny": {
+    "done": true,
+    "name": "Sonny"
+  },
+  "south-wine-bar": {
+    "done": true,
+    "name": "South Wine Bar"
+  },
+  "stefano-lubiana-wines": {
+    "done": true,
+    "name": "Stefano Lubiana Wines"
+  },
+  "stelavino-wine-tours": {
+    "done": true,
+    "name": "StelaVino Wine Tours"
+  },
+  "stone--flame": {
+    "done": true,
+    "name": "Stone & Flame"
+  },
+  "stoney-rise-wine-company": {
+    "done": true,
+    "name": "Stoney Rise Wine Company"
+  },
+  "swinging-gate-vineyard": {
+    "done": true,
+    "name": "Swinging Gate Vineyard"
+  },
+  "tamar-ridge-cellar-door": {
+    "done": true,
+    "name": "Tamar Ridge Cellar Door"
+  },
+  "tamar-valley-wine-centre": {
+    "done": true,
+    "name": "Tamar Valley Wine Centre"
+  },
+  "tamar-valley-wine-tours": {
+    "done": true,
+    "name": "Tamar Valley Wine Tours"
+  },
+  "the-den-salamanca": {
+    "done": true,
+    "name": "The Den Salamanca"
+  },
+  "timbre-kitchen": {
+    "done": true,
+    "name": "Timbre Kitchen"
+  },
+  "tolpuddle-vineyard": {
+    "done": true,
+    "name": "Tolpuddle Vineyard"
+  },
+  "trophy-room": {
+    "done": true,
+    "name": "Trophy Room"
+  },
+  "velo-wines": {
+    "done": true,
+    "name": "Velo Wines"
+  },
+  "viridian-wines": {
+    "done": true,
+    "name": "Viridian Wines"
+  },
+  "westella-vineyard": {
+    "done": true,
+    "name": "Westella Vineyard"
+  },
+  "willie-smiths-apple-shed": {
+    "done": true,
+    "name": "Willie Smith's Apple Shed"
+  },
+  "willing-wine-bar": {
+    "done": true,
+    "name": "Willing Wine Bar"
+  },
+  "wineries--vineyards": {
+    "done": true,
+    "name": "Wineries & Vineyards"
+  },
+  "apogee-tasmania": {
+    "done": true,
+    "name": "Apogee Tasmania"
+  },
+  "apsley-gorge-vineyard": {
+    "done": true,
+    "name": "Apsley Gorge Vineyard"
+  },
+  "bellebonne": {
+    "done": true,
+    "name": "Bellebonne"
+  },
+  "bremley-vineyard": {
+    "done": true,
+    "name": "Bremley Vineyard"
+  },
+  "brinktop-vineyard": {
+    "done": true,
+    "name": "Brinktop Vineyard"
+  },
+  "broad-acres-vineyard": {
+    "done": true,
+    "name": "Broad Acres Vineyard"
+  },
+  "broad-arrow-wines": {
+    "done": true,
+    "name": "Broad Arrow Wines"
+  },
+  "bundaleera-vineyard": {
+    "done": true,
+    "name": "Bundaleera Vineyard"
+  },
+  "charles-reuben-estate": {
+    "done": true,
+    "name": "Charles Reuben Estate"
+  },
+  "chartley-estate": {
+    "done": true,
+    "name": "Chartley Estate"
+  },
+  "chatto-wines": {
+    "done": true,
+    "name": "Chatto Wines"
+  },
+  "dawson-james-wines": {
+    "done": true,
+    "name": "Dawson James Wines"
+  },
+  "domaine-dawnelle": {
+    "done": true,
+    "name": "Domaine Dawnelle"
+  },
+  "eastford-creek-vineyard": {
+    "done": true,
+    "name": "Eastford Creek Vineyard"
+  },
+  "eversley-vines": {
+    "done": true,
+    "name": "Eversley Vines"
+  },
+  "frankcomb-vineyard": {
+    "done": true,
+    "name": "Frankcomb Vineyard"
+  },
+  "glenelg-estate": {
+    "done": true,
+    "name": "Glenelg Estate"
+  },
+  "grey-sands-vineyard": {
+    "done": true,
+    "name": "Grey Sands Vineyard"
+  },
+  "handpicked-wines": {
+    "done": true,
+    "name": "Handpicked Wines"
+  },
+  "heemskerk-wines": {
+    "done": true,
+    "name": "Heemskerk Wines"
+  },
+  "invercarron-wines": {
+    "done": true,
+    "name": "Invercarron Wines"
+  },
+  "kinvarra-wines": {
+    "done": true,
+    "name": "Kinvarra Wines"
+  },
+  "la-villa-wines": {
+    "done": true,
+    "name": "La Villa Wines"
+  },
+  "leven-valley-vineyard": {
+    "done": true,
+    "name": "Leven Valley Vineyard"
+  },
+  "lost-farm-wines": {
+    "done": true,
+    "name": "Lost Farm Wines"
+  },
+  "lowestoft-estate": {
+    "done": true,
+    "name": "Lowestoft Estate"
+  },
+  "mapleton-vineyards": {
+    "done": true,
+    "name": "Mapleton Vineyards"
+  },
+  "meadowbank-wines": {
+    "done": true,
+    "name": "Meadowbank Wines"
+  },
+  "merriworth-wines": {
+    "done": true,
+    "name": "Merriworth Wines"
+  },
+  "richmond-park-estate": {
+    "done": true,
+    "name": "Richmond Park Estate"
+  },
+  "roslyn-1823": {
+    "done": true,
+    "name": "Roslyn 1823"
+  },
+  "sailor-seeks-horse": {
+    "done": true,
+    "name": "Sailor Seeks Horse"
+  },
+  "sisu-wines": {
+    "done": true,
+    "name": "Sisu Wines"
+  },
+  "sixfriends-vineyard": {
+    "done": true,
+    "name": "sixfriends Vineyard"
+  },
+  "stargazer-wine": {
+    "done": true,
+    "name": "Stargazer Wine"
+  },
+  "uplands-vineyard": {
+    "done": true,
+    "name": "Uplands Vineyard"
+  },
+  "utzinger-wines": {
+    "done": true,
+    "name": "Utzinger Wines"
+  },
+  "wellington--wolfe": {
+    "done": true,
+    "name": "Wellington & Wolfe"
+  },
+  "wines-by-rory": {
+    "done": true,
+    "name": "Wines By Rory"
+  },
+  "winter-brook-vineyard": {
+    "done": true,
+    "name": "Winter Brook Vineyard"
+  }
+}

@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Link, useRouter } from "expo-router";
+import { Link, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { collection, getDocs } from "firebase/firestore";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -15,6 +15,7 @@ import {
 import MapView from "react-native-map-clustering";
 import { Callout, Marker } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { REGION_NAME_UPPER } from "../../../constants/region";
 import { db } from "../../../firebaseConfig";
 
 type Winery = {
@@ -41,6 +42,15 @@ const BOOLEAN_FILTERS: { key: keyof Winery; label: string }[] = [
   { key: "walkinWelcome", label: "Walk-ins Welcome" },
 ];
 
+// Filter keys accepted via ?filter=<key> URL param (from home screen)
+const VALID_FILTER_KEYS: (keyof Winery)[] = [
+  "dogFriendly",
+  "hasRestaurant",
+  "isOrganic",
+  "isBiodynamic",
+  "walkinWelcome",
+];
+
 const RATING_OPTIONS = [
   { label: "All", value: 0 },
   { label: "4.0+", value: 4.0 },
@@ -48,22 +58,74 @@ const RATING_OPTIONS = [
   { label: "4.5+", value: 4.5 },
 ];
 
-const MARGARET_RIVER_REGION = {
-  latitude: -33.95,
-  longitude: 115.07,
-  latitudeDelta: 1.0,
-  longitudeDelta: 0.5,
+const TASMANIA_REGION = {
+  latitude: -42.0,
+  longitude: 147.0,
+  latitudeDelta: 3.0,
+  longitudeDelta: 2.0,
 };
+
+// Haversine distance in kilometers between two lat/lng pairs
+function distanceKm(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
 
 export default function WineriesScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    search?: string;
+    filter?: string;
+    near?: string;
+    lat?: string;
+    lng?: string;
+    t?: string;
+  }>();
   const [wineries, setWineries] = useState<Winery[]>([]);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() =>
+    typeof params.search === "string" ? params.search : ""
+  );
   const [loading, setLoading] = useState(true);
-  const [activeFilters, setActiveFilters] = useState<Set<keyof Winery>>(new Set());
+  const [activeFilters, setActiveFilters] = useState<Set<keyof Winery>>(() => {
+    const set = new Set<keyof Winery>();
+    if (
+      typeof params.filter === "string" &&
+      VALID_FILTER_KEYS.includes(params.filter as keyof Winery)
+    ) {
+      set.add(params.filter as keyof Winery);
+    }
+    return set;
+  });
   const [minRating, setMinRating] = useState(0);
   const [view, setView] = useState<"list" | "map">("list");
   const insets = useSafeAreaInsets();
+
+  // Sync state with URL params whenever screen is focused with new params
+  // (e.g. when the home screen pushes to /wineries?filter=dogFriendly)
+  useFocusEffect(
+    useCallback(() => {
+      if (typeof params.search === "string") {
+        setSearch(params.search);
+      }
+      if (
+        typeof params.filter === "string" &&
+        VALID_FILTER_KEYS.includes(params.filter as keyof Winery)
+      ) {
+        setActiveFilters(new Set([params.filter as keyof Winery]));
+      }
+    }, [params.search, params.filter, params.t])
+  );
 
   useEffect(() => {
     const fetchWineries = async () => {
@@ -103,6 +165,30 @@ export default function WineriesScreen() {
     return true;
   });
 
+  // Near-me distance sort — activated by ?near=1&lat=<x>&lng=<y> from home
+  const nearLat =
+    typeof params.lat === "string" ? parseFloat(params.lat) : NaN;
+  const nearLng =
+    typeof params.lng === "string" ? parseFloat(params.lng) : NaN;
+  const nearActive =
+    params.near === "1" && !isNaN(nearLat) && !isNaN(nearLng);
+
+  const displayed = nearActive
+    ? [...filtered].sort((a, b) => {
+        const aHas =
+          typeof a.latitude === "number" && typeof a.longitude === "number";
+        const bHas =
+          typeof b.latitude === "number" && typeof b.longitude === "number";
+        if (!aHas && !bHas) return 0;
+        if (!aHas) return 1;
+        if (!bHas) return -1;
+        return (
+          distanceKm(nearLat, nearLng, a.latitude!, a.longitude!) -
+          distanceKm(nearLat, nearLng, b.latitude!, b.longitude!)
+        );
+      })
+    : filtered;
+
   const mappableWineries = filtered.filter(
     (w) => typeof w.latitude === "number" && typeof w.longitude === "number"
   );
@@ -121,7 +207,7 @@ export default function WineriesScreen() {
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-        <Text style={styles.headerLabel}>MARGARET RIVER</Text>
+        <Text style={styles.headerLabel}>{REGION_NAME_UPPER}</Text>
         <Text style={styles.headerTitle}>Our Wineries</Text>
       </View>
 
@@ -205,14 +291,16 @@ export default function WineriesScreen() {
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
             <Text style={styles.dividerLabel}>
-              {filtered.length} {filtered.length === 1 ? "WINERY" : "WINERIES"}
+              {nearActive ? "NEAREST · " : ""}
+              {displayed.length}{" "}
+              {displayed.length === 1 ? "WINERY" : "WINERIES"}
             </Text>
             <View style={styles.dividerLine} />
           </View>
 
           {/* List */}
           <FlatList
-            data={filtered}
+            data={displayed}
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.listContent}
@@ -252,7 +340,7 @@ export default function WineriesScreen() {
       {view === "map" && (
         <MapView
           style={styles.map}
-          initialRegion={MARGARET_RIVER_REGION}
+          initialRegion={TASMANIA_REGION}
           showsUserLocation
           showsMyLocationButton
           clusterColor="#1a1a1a"

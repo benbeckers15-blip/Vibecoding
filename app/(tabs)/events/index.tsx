@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import SkeletonBox from "../../../components/SkeletonBox";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { REGION_NAME_UPPER } from "../../../constants/region";
 import { db } from "../../../firebaseConfig";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -228,7 +229,7 @@ function EventCard({
     }
   };
 
-  const venueLine = item.venue ?? item.wineryName ?? "MARGARET RIVER REGION";
+  const venueLine = item.venue ?? item.wineryName ?? `${REGION_NAME_UPPER} REGION`;
   const hasLink   = !!(item.sourceUrl || item.winerySlug);
 
   return (

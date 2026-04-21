@@ -1,0 +1,38 @@
+[
+  {
+    "id": "bangor-vineyard-shed",
+    "slug": "bangor-vineyard-shed",
+    "name": "Bangor Vineyard Shed",
+    "sourceType": "website",
+    "description": [
+      "Bangor Vineyard Shed sits on a working farm at Dunalley, about an hour east of Hobart on the Forestier Peninsula. The cellar door is open every day, and the property is operational in every sense — the vineyard shares the land with sheep and cattle, and Blackman Bay is visible from the farm. There is no performance here, no staged rural aesthetic. What you encounter is a place that has been continuously farmed by the Dunbabin family and that now happens to make wine from the same ground.",
+      "The cool, maritime conditions of the Forestier Peninsula push toward aromatic whites and structured reds. Bangor produces Pinot Noir, Riesling, and Sauvignon Blanc, among other varieties suited to Tasmania's short growing season and significant diurnal temperature variation. The cellar door offers tastings across the range, and the wines carry the lean, high-acid profile that defines this corner of the island. Without publicly available tasting notes or critical scores on record, the style is best understood through the place itself: coastal, cool, and unhurried.",
+      "The Dunbabin family has farmed Bangor for generations, and the property carries that continuity in concrete ways. The original farmhouse — Bangor Cottage — was built in 1906 and extended in 1922, and several of the Dunbabin children were born and raised there. The wine operation is a later development, but it grew from the same land rather than being imposed on it. That history is accessible to visitors: Wine Club members can stay in the restored cottage, and the property offers self-guided farm walks to points along the peninsula coast. A 4.8 rating across nearly 600 Google reviews suggests the experience holds up consistently. For visitors making the drive out from Hobart, the combination of cellar door, working farm, and genuine family history makes Bangor worth the trip on its own terms."
+    ],
+    "pullQuote": "The wines make more sense once you've seen the farm they come from."
+  },
+  {
+    "id": "bream-creek-vineyard",
+    "slug": "bream-creek-vineyard",
+    "name": "Bream Creek Vineyard",
+    "sourceType": "website",
+    "description": [
+      "The cellar door at Bream Creek sits on a north-east ridge above Marion Bay, looking out over the same stretch of water where Abel Tasman anchored in 1642. The view is incidental to what's in the glass, but it does tell you something about the site — exposed enough to catch coastal breezes, old enough to have earned its reputation without needing to explain itself.",
+      "The vineyard was planted in 1974, making it one of the oldest commercial plantings in Tasmania. Riesling and Cabernet Sauvignon formed the original five hectares, later joined by Pinot Noir, Chardonnay, Sauvignon Blanc, Gewurztraminer, and Schönburger — one of the earliest commercial plantings of that rare German variety in the Southern Hemisphere. The cool maritime climate and modest yields push intensity into small berries and small bunches. Pruning and picking are done by hand. The wines have been consistent award winners for over thirty years, a record that reflects genuine site suitability rather than winemaking intervention masking a difficult climate.",
+      "Fred Peacock established the Bream Creek label in 1990, when fewer than ten commercial wineries operated in the entire state. He bought the existing vineyard, expanded Pinot Noir plantings, and built a wine program that has helped define what east coast Tasmanian viticulture can produce. The label predates the state's reputation, which means it didn't benefit from the hype — it helped create the conditions for it. Bream Creek is closed on Tuesdays, open six days a week otherwise from 10:30am. It's a working vineyard first, cellar door second, and that order of priorities shows in what ends up in the bottle."
+    ],
+    "pullQuote": "Planted in 1974, Bream Creek has outlasted every trend in Tasmanian wine by simply making good ones."
+  },
+  {
+    "id": "brook-eden-vineyard",
+    "slug": "brook-eden-vineyard",
+    "name": "Brook Eden Vineyard",
+    "sourceType": "website",
+    "description": [
+      "Brook Eden sits at 167 Adams Road, Lebrina, on an ancient volcanic ridge that drops on one side to Pipers Brook and on the other to a spring-fed wetland. The vines grow in deep, gravelly soil that drains hard and fast. It is a specific piece of ground, and you feel that specificity the moment you stand in it.",
+      "The range covers Riesling, Chardonnay, Pinot Gris, Pinot Noir, a Rosato, and sparkling wines — the full cool-climate repertoire for northeast Tasmania. The vines are old and non-irrigated, which means slow, difficult ripening across one of Australia's longest growing seasons. That extended hang time is the whole point: it builds flavour concentration while holding acid, producing wines that are aromatic and structured rather than soft or generous. The cellar door sells award-winning bottles across the range, with the Riesling drawing particular attention for its varietal precision.",
+      "Ed and Annette established Brook Eden in 1988, but the site itself was the product of a five-year search for ground genuinely capable of producing cool-climate still and sparkling wine at a serious level. Northeast Tasmania — anchored by the Pipers Brook appellation — was already earning a reputation as the island's most consistent fine wine corridor, and Brook Eden's positioning along that volcanic ridge placed it at the heart of that argument. The vineyard is family-owned and hand-tended, open every day of the week from 11am to 5pm. For a visitor, that consistency matters. Come here to taste wines made from a single piece of ground that has been understood and worked by the same family for nearly four decades."
+    ],
+    "pullQuote": "The Riesling alone justifies the drive out to Lebrina."
+  }
+]

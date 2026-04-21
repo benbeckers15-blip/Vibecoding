@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
@@ -23,6 +24,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Carousel from "react-native-reanimated-carousel";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { REGION_NAME, REGION_NAME_UPPER } from "../../../constants/region";
 import { db } from "../../../firebaseConfig";
 
 function safeOpenURL(url: string) {
@@ -53,6 +55,7 @@ interface WineryData {
   phone: string;
   website: string;
   hours: HoursEntry[];
+  byAppointmentOnly?: boolean;
   dogFriendly?: boolean;
   hasRestaurant?: boolean;
   isOrganic?: boolean;
@@ -133,6 +136,7 @@ export default function WineryDetailsScreen() {
             website: (data.website || "").trim(),
             // Prefer the new structured field; fall back to the legacy string
             hours: normaliseHours(data.hoursStructured ?? data.hours),
+            byAppointmentOnly: !!data.byAppointmentOnly,
             dogFriendly:   !!data.dogFriendly,
             hasRestaurant: !!data.hasRestaurant,
             isOrganic:     !!data.isOrganic,
@@ -215,7 +219,7 @@ export default function WineryDetailsScreen() {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Check out ${winery.name} — a winery in Margaret River!`,
+        message: `Check out ${winery.name} — a winery in ${REGION_NAME}!`,
         url: winery.website || "",
       });
     } catch (e) {
@@ -286,7 +290,7 @@ export default function WineryDetailsScreen() {
 
           {/* Winery title — fixed, does not move with parallax image */}
           <View style={styles.heroContent}>
-            <Text style={styles.heroRegion}>MARGARET RIVER</Text>
+            <Text style={styles.heroRegion}>{REGION_NAME_UPPER}</Text>
             <Text style={styles.heroTitle}>{winery.name}</Text>
           </View>
 
@@ -309,18 +313,40 @@ export default function WineryDetailsScreen() {
         {/* Info Grid */}
         <View style={styles.infoGrid}>
 
-          {/* Hours cell — tappable, opens modal */}
-          <Pressable style={styles.infoCell} onPress={() => setHoursVisible(true)}>
-            <Text style={styles.infoCellLabel}>HOURS</Text>
-            <Text style={styles.infoCellValue}>
-              {winery.hours[0]?.time ?? "N/A"}
-            </Text>
-            <Text style={styles.infoCellTap}>See all hours ›</Text>
-          </Pressable>
+          {/* Hours cell — by appointment shows website link, otherwise opens modal */}
+          {winery.byAppointmentOnly ? (
+            <Pressable
+              style={styles.infoCell}
+              onPress={() => winery.website ? safeOpenURL(winery.website) : null}
+            >
+              <Text style={styles.infoCellLabel}>HOURS</Text>
+              <View style={styles.valueRow}>
+                <Ionicons name="calendar-outline" size={14} color="#888" />
+                <Text style={styles.appointmentLink}>By Appointment Only</Text>
+              </View>
+              {winery.website ? (
+                <Text style={styles.infoCellTap}>Book via website ›</Text>
+              ) : null}
+            </Pressable>
+          ) : (
+            <Pressable style={styles.infoCell} onPress={() => setHoursVisible(true)}>
+              <Text style={styles.infoCellLabel}>HOURS</Text>
+              <View style={styles.valueRow}>
+                <Ionicons name="time-outline" size={14} color="#888" />
+                <Text style={styles.infoCellValue}>
+                  {winery.hours[0]?.time ?? "N/A"}
+                </Text>
+              </View>
+              <Text style={styles.infoCellTap}>See all hours ›</Text>
+            </Pressable>
+          )}
 
           <View style={[styles.infoCell, styles.infoCellBorderLeft]}>
             <Text style={styles.infoCellLabel}>LOCATION</Text>
-            <Text style={styles.infoCellValue}>Margaret River</Text>
+            <View style={styles.valueRow}>
+              <Ionicons name="location-outline" size={14} color="#888" />
+              <Text style={styles.infoCellValue}>{REGION_NAME}</Text>
+            </View>
           </View>
         </View>
 
@@ -336,7 +362,10 @@ export default function WineryDetailsScreen() {
               }
             >
               <Text style={styles.contactButtonText}>CALL</Text>
-              <Text style={styles.contactButtonSub}>{winery.phone}</Text>
+              <View style={styles.valueRow}>
+                <Ionicons name="call-outline" size={14} color="#888" />
+                <Text style={styles.contactButtonSub}>{winery.phone}</Text>
+              </View>
             </Pressable>
           )}
 
@@ -349,9 +378,12 @@ export default function WineryDetailsScreen() {
               onPress={() => safeOpenURL(winery.website)}
             >
               <Text style={styles.contactButtonText}>WEBSITE</Text>
-              <Text style={styles.contactButtonLink} numberOfLines={1}>
-                {winery.website.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "")}
-              </Text>
+              <View style={styles.valueRow}>
+                <Ionicons name="globe-outline" size={14} color="#888" />
+                <Text style={styles.contactButtonLink} numberOfLines={1}>
+                  {winery.website.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "")}
+                </Text>
+              </View>
             </Pressable>
           ) : null}
         </View>
@@ -591,6 +623,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#1a1a1a",
     fontWeight: "500",
+  },
+  appointmentLink: {
+    fontSize: 13,
+    color: "#940c0c",
+    fontWeight: "500",
+    textDecorationLine: "underline",
+  },
+  valueRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   infoCellTap: {
     fontSize: 10,

@@ -1,0 +1,370 @@
+{
+  "timestamp": "2026-04-20T23:10:48.676376",
+  "totalCount": 91,
+  "wineries": [
+    {
+      "placeId": "ChIJ7dvilXQKbqoRpkieoqW2aZ0",
+      "name": "Frogmore Creek Cellar Door & Restaurant"
+    },
+    {
+      "placeId": "ChIJc5SsIA4JbqoRlX9ueHtMrJE",
+      "name": "Puddleduck Wines"
+    },
+    {
+      "placeId": "ChIJib1YasMJbqoRNLy2o-F56C4",
+      "name": "Caledon Estate"
+    },
+    {
+      "placeId": "ChIJp4TDV8oMbqoRc7krNughhiQ",
+      "name": "Moorilla Winery"
+    },
+    {
+      "placeId": "ChIJRQPygCLybaoRngcV5QzQ0Z4",
+      "name": "Bream Creek Vineyard"
+    },
+    {
+      "placeId": "ChIJA7g_vecIbqoRHbopIrQOdzo",
+      "name": "Pooley Wines"
+    },
+    {
+      "placeId": "ChIJ7VvdjfYSbqoRtk9C6KvZqsk",
+      "name": "Derwent Estate Vineyard"
+    },
+    {
+      "placeId": "ChIJ9w5QvQsPbqoRu1HrKupE30s",
+      "name": "Pressing Matters Cellar Door"
+    },
+    {
+      "placeId": "ChIJ31Jfs10SbqoRINLjDndvq88",
+      "name": "Stefano Lubiana Wines"
+    },
+    {
+      "placeId": "ChIJQ26j58PhbaoRY7UamSyhiJQ",
+      "name": "Coal Valley Vineyard"
+    },
+    {
+      "placeId": "ChIJZToLoTKHcaoRlibe_zXUkA8",
+      "name": "Mayfield Estate"
+    },
+    {
+      "placeId": "ChIJP2oSCpHsbaoR_4Rs4DAVp9c",
+      "name": "Bangor Vineyard Shed"
+    },
+    {
+      "placeId": "ChIJNdfdn01ucaoRVi1MMbCicPw",
+      "name": "Devil's Corner Cellar Door"
+    },
+    {
+      "placeId": "ChIJX2zUH-MxeqoRzI-X0XI707g",
+      "name": "Ghost Rock Wines Tasmania"
+    },
+    {
+      "placeId": "ChIJoXCzVf61e6oRrFELyKdOfnY",
+      "name": "Rusty Roof Vineyard"
+    },
+    {
+      "placeId": "ChIJY0jAowMKbqoRWXUpcA4qQx8",
+      "name": "Riversdale Estate Winery, Cellar Door & French Bistro"
+    },
+    {
+      "placeId": "ChIJyT-9CkMJbqoR3pYnZrFCreE",
+      "name": "Tolpuddle Vineyard"
+    },
+    {
+      "placeId": "ChIJV8mvf4EFbqoROfbAYocqjAk",
+      "name": "Nocton Vineyard"
+    },
+    {
+      "placeId": "ChIJMfN-5bwFbqoRZ4Kkt6Lwo48",
+      "name": "Domaine A Stoney Vineyard"
+    },
+    {
+      "placeId": "ChIJn_4X8CF8bqoRwpHeDR4cYdE",
+      "name": "Home Hill Winery"
+    },
+    {
+      "placeId": "ChIJ81C5j3kPeqoR94nFepnuG-w",
+      "name": "Tamar Ridge Cellar Door"
+    },
+    {
+      "placeId": "ChIJXTXqkp11bqoRtyp7x8JL56Q",
+      "name": "Glaetzer-Dixon Family Winemakers"
+    },
+    {
+      "placeId": "ChIJucOHjQbXbaoRcvJBDQlK8to",
+      "name": "Cathedral Rock Winery Cellar Door"
+    },
+    {
+      "placeId": "ChIJ0SqDbpdxcaoRZluC9zLgFBY",
+      "name": "Craigie Knowe Vineyard & Flora's Restaurant"
+    },
+    {
+      "placeId": "ChIJefq-x35CcaoRM2dQyCv-K3s",
+      "name": "Freycinet Vineyards"
+    },
+    {
+      "placeId": "ChIJ6ejdGOAIbqoR48FAA7qwGJw",
+      "name": "Every Man & His Dog Vineyard"
+    },
+    {
+      "placeId": "ChIJnRjx6Hx1bqoRhiv28OGzR8U",
+      "name": "StelaVino Wine Tours"
+    },
+    {
+      "placeId": "ChIJkZfWJmN3eqoR1seQEn1olMY",
+      "name": "Tamar Valley Wine Tours"
+    },
+    {
+      "placeId": "ChIJXZo4SjP6eaoRhUPcGGFycX8",
+      "name": "Clover Hill Wines"
+    },
+    {
+      "placeId": "ChIJ9zipmvV1bqoR7oUhor24d78",
+      "name": "Sonny"
+    },
+    {
+      "placeId": "ChIJe0SI_8p1bqoRNBN1xzGufjo",
+      "name": "Lucinda Wine Bar"
+    },
+    {
+      "placeId": "ChIJG_W6Wkp1bqoRHoTrpDzc5ic",
+      "name": "South Wine Bar"
+    },
+    {
+      "placeId": "ChIJjWNt-qB1bqoRGWM_CkQowQY",
+      "name": "Willing Wine Bar"
+    },
+    {
+      "placeId": "ChIJ31NuE6d1bqoRyPmQiHkktCw",
+      "name": "Rosie in My Midnight Dreams"
+    },
+    {
+      "placeId": "ChIJnwaKAfR1bqoRSXTyIYVwxm4",
+      "name": "Stone & Flame"
+    },
+    {
+      "placeId": "ChIJR7D4e4h1bqoRXSii6Cl4GtA",
+      "name": "Grape Food and Wine Bar"
+    },
+    {
+      "placeId": "ChIJrUedPgB1bqoRZt0A5uVOLjc",
+      "name": "scholé"
+    },
+    {
+      "placeId": "ChIJnxB34IV1bqoRTzLfofpxiyE",
+      "name": "Institut Polaire"
+    },
+    {
+      "placeId": "ChIJD2SNVIV1bqoRYIdQmLeUM1Q",
+      "name": "Pablos Cocktails and Dreams"
+    },
+    {
+      "placeId": "ChIJXSTXWIh1bqoRyfRtPDP4OJo",
+      "name": "Society Salamanca"
+    },
+    {
+      "placeId": "ChIJN9HJeYh1bqoR9im64ZNVrpQ",
+      "name": "The Den Salamanca"
+    },
+    {
+      "placeId": "ChIJ1YudqU51bqoRXjf3dpzAUSQ",
+      "name": "Trophy Room"
+    },
+    {
+      "placeId": "ChIJPaStu1B1bqoRK1C0Y8Zz8qU",
+      "name": "In The Hanging Garden"
+    },
+    {
+      "placeId": "ChIJ-XdQMi91bqoRh0InZXPZ10Y",
+      "name": "La Sardina Loca"
+    },
+    {
+      "placeId": "ChIJz82snaV1bqoRQFgHNvp3pYQ",
+      "name": "Ogee"
+    },
+    {
+      "placeId": "ChIJtaJyXBijcKoRKPyCV2IC3k0",
+      "name": "Josef Chromy Wines"
+    },
+    {
+      "placeId": "ChIJw9cpAhcZeqoRT1BlHgxOzoc",
+      "name": "Moores Hill Estate"
+    },
+    {
+      "placeId": "ChIJN8z_-G0ZeqoRCpSCZ844mms",
+      "name": "Swinging Gate Vineyard"
+    },
+    {
+      "placeId": "ChIJaUntVGkZeqoRLbbZg9uwXwQ",
+      "name": "Loira Vines"
+    },
+    {
+      "placeId": "ChIJn0Dmk8AfeqoROTswFK4T0P4",
+      "name": "Holm Oak Vineyards"
+    },
+    {
+      "placeId": "ChIJkxoxF2sfeqoRM4XnV1avxTQ",
+      "name": "Small Wonder Wines"
+    },
+    {
+      "placeId": "ChIJ1-7QZ90heqoRNFVfax9AB6M",
+      "name": "Westella Vineyard"
+    },
+    {
+      "placeId": "ChIJT9-xzr0feqoRnod5HwA9U_0",
+      "name": "Iron Pot Bay Vineyard"
+    },
+    {
+      "placeId": "ChIJ-YeOTO4beqoRZ4V3FwsLSTI",
+      "name": "Marion's Vineyard"
+    },
+    {
+      "placeId": "ChIJLegnFMAbeqoRUrbQYYrsdu4",
+      "name": "Tamar Valley Wine Centre"
+    },
+    {
+      "placeId": "ChIJn8YiccEIeqoREt9QZbbTvjs",
+      "name": "Velo Wines"
+    },
+    {
+      "placeId": "ChIJm7pcd9kaeqoRCjIp1pStDJ0",
+      "name": "Stoney Rise Wine Company"
+    },
+    {
+      "placeId": "ChIJbQjmt3YZeqoRAIEtem6U4ZI",
+      "name": "Glendale Vineyard"
+    },
+    {
+      "placeId": "ChIJ2VZayiQybKoR1IJM62wRRbw",
+      "name": "Mewstone Wines"
+    },
+    {
+      "placeId": "ChIJB4lSOHEKbqoR2IASftyYRQM",
+      "name": "Craigow Vineyard"
+    },
+    {
+      "placeId": "ChIJWfcjw0bueaoRCUMFZ5VdRZs",
+      "name": "Pipers Brook Vineyard"
+    },
+    {
+      "placeId": "ChIJWfcjw0bueaoRu9apZiH7g6s",
+      "name": "Jansz Tasmania"
+    },
+    {
+      "placeId": "ChIJlyKfNHnveaoRc8re2a4QoNA",
+      "name": "Pipers Brook Winery"
+    },
+    {
+      "placeId": "ChIJQ9XF8Q7ueaoRzYQWPr9lXDI",
+      "name": "Sinapius Wines"
+    },
+    {
+      "placeId": "ChIJR5nh6AXueaoRc2pmLJIIMow",
+      "name": "Delamere Vineyard"
+    },
+    {
+      "placeId": "ChIJsZ6E3Z_veaoRPoty59Nm19I",
+      "name": "Nadine's @ Piper's Brook"
+    },
+    {
+      "placeId": "ChIJuTHyH2LxeaoRjRB4JHoam9Q",
+      "name": "House Of Arras"
+    },
+    {
+      "placeId": "ChIJ4bcKNk8DcqoR7ArgA6Lox9g",
+      "name": "Darlington Vineyard"
+    },
+    {
+      "placeId": "ChIJxWR3dRMKbqoRrZTJgToNXyE",
+      "name": "Coal River Farm"
+    },
+    {
+      "placeId": "ChIJscRMDgoTbqoRW75tinE5VM8",
+      "name": "Viridian Wines"
+    },
+    {
+      "placeId": "ChIJp4TDV8oMbqoRpOmyvV-sTUg",
+      "name": "Wineries & Vineyards"
+    },
+    {
+      "placeId": "ChIJR6eAyn8SbqoRr5Q3v8XUuxE",
+      "name": "Laurel Bank Vineyard"
+    },
+    {
+      "placeId": "ChIJ_4B2tNx1bqoRm3kwrro0d2g",
+      "name": "Isle Drive U2 Drink"
+    },
+    {
+      "placeId": "ChIJr4V-ydk_bqoRSoGTk-O9iaQ",
+      "name": "Ryelands Farm & Vineyard, Tasmania"
+    },
+    {
+      "placeId": "ChIJSX9MKoV-bqoRkCgdUfz1254",
+      "name": "Kate Hill Wines"
+    },
+    {
+      "placeId": "ChIJ3_YOIPqDbqoRKiWpIcKx3J0",
+      "name": "Heriots Point Vineyard and Boutique Accommodation"
+    },
+    {
+      "placeId": "ChIJu3zoAjssbKoRoN_cchHNGWs",
+      "name": "Hartzview Vineyard"
+    },
+    {
+      "placeId": "ChIJ0T1tuxAqbKoRnvp_vCHRCxI",
+      "name": "Pagan Cider Cellar Door"
+    },
+    {
+      "placeId": "ChIJnTLrMVB5bqoR5IGfidL31d4",
+      "name": "Willie Smith's Apple Shed"
+    },
+    {
+      "placeId": "ChIJNSnQyVTWbaoR1GddGeXcKjg",
+      "name": "Nandroya Vineyard"
+    },
+    {
+      "placeId": "ChIJfS5dwMc4bKoRVmx-Vy8M6gg",
+      "name": "Bruny Island Premium Wines"
+    },
+    {
+      "placeId": "ChIJ9as7d0_6eaoRTjpJETpu0D4",
+      "name": "Brook Eden Vineyard"
+    },
+    {
+      "placeId": "ChIJ6fVZu4v6eaoRC8xKo9BhxGc",
+      "name": "Dalrymple Vineyards"
+    },
+    {
+      "placeId": "ChIJYRXMYJ29cKoR2yBgbvejXFI",
+      "name": "Sen Vineyard"
+    },
+    {
+      "placeId": "ChIJVed4z5kPeqoR2s-gcpvYa38",
+      "name": "Evenfall Winery and Restaurant"
+    },
+    {
+      "placeId": "ChIJPUMWB8EIeqoRfayyQSlVcJM",
+      "name": "Timbre Kitchen"
+    },
+    {
+      "placeId": "ChIJuQUthCuncKoRQNVRtE7JAw8",
+      "name": "Cataract Gorge Reserve"
+    },
+    {
+      "placeId": "ChIJfR0VC9WmcKoROJLh72UU7OE",
+      "name": "Gorge Scenic Chairlift"
+    },
+    {
+      "placeId": "ChIJ4aBZ1dqncKoRurM7Svrw8GI",
+      "name": "Highclare Estate Wine Room"
+    },
+    {
+      "placeId": "ChIJS2rKuahleqoRL-9_-XwSNm8",
+      "name": "Meander Valley Vineyard"
+    },
+    {
+      "placeId": "ChIJL9pfQ491bqoRCGbeBrR8HOQ",
+      "name": "LARK Cellar Door, Hobart"
+    }
+  ]
+}

@@ -1,30 +1,30 @@
 // app/(tabs)/home/index.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Location from "expo-location";
 import { useRouter } from "expo-router";
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { useEffect, useRef, useState } from "react";
+import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Animated,
-  Dimensions,
-  GestureResponderEvent,
+  Alert,
   Image,
   ImageBackground,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
-import Carousel from "react-native-reanimated-carousel";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import SkeletonBox from "../../../components/SkeletonBox";
+import { REGION_NAME, REGION_NAME_UPPER } from "../../../constants/region";
 import { db } from "../../../firebaseConfig";
 
-const { width } = Dimensions.get("window");
+// ─── Static assets ───────────────────────────────────────────────────────────
+const HERO_IMAGE_FALLBACK =
+  "https://images.unsplash.com/photo-1734517648070-2e8d4ed686ac?q=80&w=1035&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
 
-// ─── Explore card background images ──────────────────────────────────────────
 const CARD_IMAGES = {
   events:
     "https://images.unsplash.com/photo-1528823872057-9c018a7a7553?w=800&q=80",
@@ -36,15 +36,59 @@ const CARD_IMAGES = {
     "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&q=80",
 };
 
-type CarouselSlide = {
-  id: string;
-  title: string;
-  description: string;
-  imageUrl: string;
-  linkTo: string;
-  order: number;
-  active: boolean;
+// ─── Editorial tiles configuration ───────────────────────────────────────────
+type FilterKey =
+  | "dogFriendly"
+  | "hasRestaurant"
+  | "isOrganic"
+  | "isBiodynamic"
+  | "walkinWelcome";
+
+type EditorialTile = {
+  key: FilterKey | "nearMe";
+  label: string;
+  headline: string;
+  image: string;
 };
+
+const EDITORIAL_TILES: EditorialTile[] = [
+  {
+    key: "hasRestaurant",
+    label: "DINING",
+    headline: "Best for\nLunch",
+    image: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=80",
+  },
+  {
+    key: "dogFriendly",
+    label: "OUTDOORS",
+    headline: "Dog-Friendly\nEstates",
+    image: "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=400&q=80",
+  },
+  {
+    key: "walkinWelcome",
+    label: "CASUAL",
+    headline: "Walk In,\nNo Booking",
+    image: "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=400&q=80",
+  },
+  {
+    key: "isOrganic",
+    label: "SUSTAINABLE",
+    headline: "Organic\nProducers",
+    image: "https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?w=400&q=80",
+  },
+  {
+    key: "isBiodynamic",
+    label: "NATURAL",
+    headline: "Biodynamic\nWines",
+    image: "https://images.unsplash.com/photo-1474722883778-792e7990302f?w=400&q=80",
+  },
+  {
+    key: "nearMe",
+    label: "LOCATION",
+    headline: "Wineries\nNear Me",
+    image: "https://images.unsplash.com/photo-1528823872057-9c018a7a7553?w=400&q=80",
+  },
+];
 
 type FeaturedWinery = {
   id: string;
@@ -57,40 +101,32 @@ type FeaturedWinery = {
   userRatingsTotal?: number;
 };
 
-// ─── Carousel skeleton ────────────────────────────────────────────────────────
-function CarouselSkeleton() {
-  return (
-    <View style={skeletonStyles.carouselWrapper}>
-      <SkeletonBox style={skeletonStyles.carouselBlock} />
-    </View>
-  );
-}
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const touchStartX = useRef(0);
-  const [slides, setSlides] = useState<CarouselSlide[]>([]);
-  const [loadingSlides, setLoadingSlides] = useState(true);
-  const [featuredWinery, setFeaturedWinery] = useState<FeaturedWinery | null>(null);
+  const [search, setSearch] = useState("");
+  const [heroImageUrl, setHeroImageUrl] = useState<string>(HERO_IMAGE_FALLBACK);
+  const [featuredWinery, setFeaturedWinery] = useState<FeaturedWinery | null>(
+    null
+  );
 
   useEffect(() => {
-    async function fetchSlides() {
+    async function fetchHeroImage() {
       try {
-        const snapshot = await getDocs(collection(db, "homepage_carousel"));
-        const data: CarouselSlide[] = snapshot.docs
-          .map((doc) => ({ id: doc.id, ...(doc.data() as Omit<CarouselSlide, "id">) }))
-          .filter((slide) => slide.active)
-          .sort((a, b) => a.order - b.order);
-        setSlides(data);
+        const snap = await getDoc(doc(db, "config", "homepage"));
+        if (snap.exists() && snap.data().heroImageUrl) {
+          setHeroImageUrl(snap.data().heroImageUrl);
+        }
       } catch (err) {
-        console.error("Error fetching carousel:", err);
-      } finally {
-        setLoadingSlides(false);
+        console.error("Error fetching hero image:", err);
+        // Falls back to HERO_IMAGE_FALLBACK
       }
     }
+    fetchHeroImage();
+  }, []);
 
+  useEffect(() => {
     async function fetchFeatured() {
       try {
         const q = query(
@@ -101,66 +137,154 @@ export default function HomeScreen() {
         const snapshot = await getDocs(q);
         if (!snapshot.empty) {
           const doc = snapshot.docs[0];
-          setFeaturedWinery({ id: doc.id, ...(doc.data() as Omit<FeaturedWinery, "id">) });
+          setFeaturedWinery({
+            id: doc.id,
+            ...(doc.data() as Omit<FeaturedWinery, "id">),
+          });
         }
       } catch (err) {
         console.error("Error fetching featured winery:", err);
       }
     }
-
-    fetchSlides();
     fetchFeatured();
   }, []);
 
-  const handlePressIn = (e: GestureResponderEvent) => {
-    touchStartX.current = e.nativeEvent.pageX;
+  const handleSearchSubmit = () => {
+    const trimmed = search.trim();
+    const t = Date.now();
+    const url =
+      trimmed.length > 0
+        ? `/wineries?search=${encodeURIComponent(trimmed)}&t=${t}`
+        : `/wineries?t=${t}`;
+    router.push(url as any);
   };
 
-  const handleSlidePress = (e: GestureResponderEvent, linkTo: string) => {
-    const distance = Math.abs(e.nativeEvent.pageX - touchStartX.current);
-    if (distance < 10) router.push(linkTo as any);
+  const [nearMeLoading, setNearMeLoading] = useState(false);
+
+  const handleFilterCardPress = async (key: EditorialTile["key"]) => {
+    const t = Date.now();
+
+    if (key === "nearMe") {
+      if (nearMeLoading) return;
+      setNearMeLoading(true);
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert(
+            "Location needed",
+            "Enable location access to see wineries near you."
+          );
+          return;
+        }
+        const loc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        router.push(
+          `/wineries?near=1&lat=${loc.coords.latitude}&lng=${loc.coords.longitude}&t=${t}` as any
+        );
+      } catch (err) {
+        console.error("Location error:", err);
+        Alert.alert(
+          "Location unavailable",
+          "We couldn't get your location. Please try again."
+        );
+      } finally {
+        setNearMeLoading(false);
+      }
+      return;
+    }
+
+    router.push(`/wineries?filter=${key}&t=${t}` as any);
   };
 
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={[
-        styles.contentContainer,
-        { paddingTop: insets.top + 16 },
-      ]}
+      contentContainerStyle={styles.contentContainer}
       showsVerticalScrollIndicator={false}
     >
-      {/* Carousel */}
-      <View style={styles.carouselWrapper}>
-        {loadingSlides ? (
-          <CarouselSkeleton />
-        ) : slides.length > 0 ? (
-          <Carousel
-            loop
-            width={width * 0.92}
-            height={280}
-            autoPlay
-            data={slides}
-            scrollAnimationDuration={3000}
-            renderItem={({ item }) => (
-              <Pressable
-                style={styles.carouselCard}
-                onPressIn={handlePressIn}
-                onPress={(e) => handleSlidePress(e, item.linkTo)}
-              >
-                <Image source={{ uri: item.imageUrl }} style={styles.image} />
-                <LinearGradient
-                  colors={["transparent", "rgba(0,0,0,0.75)"]}
-                  style={styles.gradient}
-                />
-                <View style={styles.captionBox}>
-                  <Text style={styles.captionTitle}>{item.title}</Text>
-                  <Text style={styles.captionText}>{item.description}</Text>
-                </View>
-              </Pressable>
-            )}
+      {/* Logo header */}
+      <View style={[styles.logoHeader, { paddingTop: insets.top + 8 }]}>
+        <Text style={styles.logoText}>
+          <Text style={styles.logoSip}>sip</Text>
+          <Text style={styles.logoLocal}>Local</Text>
+        </Text>
+      </View>
+
+      {/* Hero with search bar */}
+      <View style={styles.hero}>
+        <Image source={{ uri: heroImageUrl }} style={styles.heroImage} />
+        <LinearGradient
+          colors={["transparent", "rgba(0,0,0,0.65)"]}
+          style={styles.heroGradient}
+        />
+        <View style={styles.heroCaption}>
+          <Text style={styles.heroLabel}>{REGION_NAME_UPPER}</Text>
+          <Text style={styles.heroTitle}>Discover the region</Text>
+        </View>
+        <View style={styles.heroSearchWrapper}>
+          <Ionicons
+            name="search"
+            size={16}
+            color="#888"
+            style={styles.heroSearchIcon}
           />
-        ) : null}
+          <TextInput
+            style={styles.heroSearch}
+            placeholder={`Search ${REGION_NAME} wineries...`}
+            placeholderTextColor="#999"
+            value={search}
+            onChangeText={setSearch}
+            returnKeyType="search"
+            onSubmitEditing={handleSearchSubmit}
+          />
+        </View>
+      </View>
+
+      {/* Editorial strip */}
+      <View style={styles.editorialSection}>
+        <View style={styles.editorialHeader}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerLabel}>EXPLORE BY</Text>
+          <View style={styles.dividerLine} />
+        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.editorialStrip}
+        >
+          {EDITORIAL_TILES.map((tile) => {
+            const isLoading = tile.key === "nearMe" && nearMeLoading;
+            return (
+              <Pressable
+                key={tile.key}
+                style={styles.editorialTile}
+                onPress={() => handleFilterCardPress(tile.key)}
+                disabled={isLoading}
+              >
+                <ImageBackground
+                  source={{ uri: tile.image }}
+                  style={styles.editorialTileBg}
+                  imageStyle={styles.editorialTileImage}
+                >
+                  <LinearGradient
+                    colors={["transparent", "rgba(0,0,0,0.78)"]}
+                    style={styles.editorialTileGradient}
+                  >
+                    <Text style={styles.editorialTileLabel}>{tile.label}</Text>
+                    {isLoading ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.editorialTileHeadline}>
+                        {tile.headline}
+                      </Text>
+                    )}
+                  </LinearGradient>
+                </ImageBackground>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       </View>
 
       {/* Featured Winery */}
@@ -176,7 +300,9 @@ export default function HomeScreen() {
 
           <Pressable
             style={styles.featuredCard}
-            onPress={() => router.push(`/wineries/${featuredWinery.slug}?from=home` as any)}
+            onPress={() =>
+              router.push(`/wineries/${featuredWinery.slug}?from=home` as any)
+            }
           >
             {featuredWinery.images && featuredWinery.images.length > 0 ? (
               <View style={styles.featuredImageWrapper}>
@@ -189,7 +315,7 @@ export default function HomeScreen() {
                   style={styles.featuredGradient}
                 />
                 <View style={styles.featuredOverlay}>
-                  <Text style={styles.featuredRegion}>MARGARET RIVER</Text>
+                  <Text style={styles.featuredRegion}>{REGION_NAME_UPPER}</Text>
                   <Text style={styles.featuredName}>{featuredWinery.name}</Text>
                   {featuredWinery.rating && (
                     <View style={styles.ratingRow}>
@@ -207,8 +333,10 @@ export default function HomeScreen() {
               </View>
             ) : (
               <View style={styles.featuredNoImage}>
-                <Text style={styles.featuredRegion}>MARGARET RIVER</Text>
-                <Text style={styles.featuredNameDark}>{featuredWinery.name}</Text>
+                <Text style={styles.featuredRegion}>{REGION_NAME_UPPER}</Text>
+                <Text style={styles.featuredNameDark}>
+                  {featuredWinery.name}
+                </Text>
                 {featuredWinery.rating && (
                   <View style={styles.ratingRowDark}>
                     <Ionicons name="star" size={11} color="#C8860A" />
@@ -233,7 +361,6 @@ export default function HomeScreen() {
 
       {/* Explore Cards */}
       <View style={styles.cardsWrapper}>
-
         <Pressable style={styles.card} onPress={() => router.push("/events")}>
           <ImageBackground
             source={{ uri: CARD_IMAGES.events }}
@@ -313,23 +440,10 @@ export default function HomeScreen() {
             </ImageBackground>
           </Pressable>
         </View>
-
       </View>
     </ScrollView>
   );
 }
-
-const skeletonStyles = StyleSheet.create({
-  carouselWrapper: {
-    width: width * 0.92,
-    alignItems: "center",
-  },
-  carouselBlock: {
-    width: "100%",
-    height: 280,
-    borderRadius: 16,
-  },
-});
 
 const styles = StyleSheet.create({
   container: {
@@ -338,53 +452,147 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingBottom: 120,
-    alignItems: "center",
   },
 
-  // Carousel
-  carouselWrapper: {
+  // Logo header
+  logoHeader: {
+    paddingHorizontal: 24,
+    paddingBottom: 14,
+  },
+  logoText: {
+    fontSize: 24,
+    fontFamily: "Georgia",
+    letterSpacing: -0.5,
+  },
+  logoSip: {
+    fontStyle: "italic",
+    color: "#1a1a1a",
+  },
+  logoLocal: {
+    fontWeight: "700",
+    color: "#940c0c",
+  },
+
+  // Hero
+  hero: {
     width: "100%",
-    alignItems: "center",
+    height: 340,
+    position: "relative",
     marginBottom: 28,
   },
-  carouselCard: {
-    borderRadius: 16,
-    overflow: "hidden",
-  },
-  image: {
+  heroImage: {
     width: "100%",
-    height: 280,
+    height: "100%",
     resizeMode: "cover",
   },
-  gradient: {
+  heroGradient: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    height: 160,
+    height: 260,
   },
-  captionBox: {
+  heroCaption: {
     position: "absolute",
-    bottom: 20,
+    top: 28,
+    left: 24,
+    right: 24,
+  },
+  heroLabel: {
+    fontSize: 9,
+    letterSpacing: 3,
+    color: "rgba(255,255,255,0.85)",
+    marginBottom: 6,
+    fontWeight: "600",
+  },
+  heroTitle: {
+    fontSize: 28,
+    fontFamily: "Georgia",
+    fontWeight: "700",
+    color: "#fff",
+    textShadowColor: "rgba(0,0,0,0.35)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  heroSearchWrapper: {
+    position: "absolute",
     left: 20,
     right: 20,
+    bottom: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    height: 48,
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
   },
-  captionTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    fontFamily: "Georgia",
-    color: "#fff",
-    marginBottom: 4,
+  heroSearchIcon: {
+    marginRight: 10,
   },
-  captionText: {
-    fontSize: 13,
-    color: "rgba(255,255,255,0.85)",
+  heroSearch: {
+    flex: 1,
+    fontSize: 14,
+    color: "#1a1a1a",
     letterSpacing: 0.3,
+    paddingVertical: 0,
+  },
+
+  // Editorial strip
+  editorialSection: {
+    marginBottom: 28,
+  },
+  editorialHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "90%",
+    alignSelf: "center",
+    marginBottom: 16,
+  },
+  editorialStrip: {
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  editorialTile: {
+    width: 148,
+    height: 196,
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  editorialTileBg: {
+    flex: 1,
+  },
+  editorialTileImage: {
+    borderRadius: 4,
+  },
+  editorialTileGradient: {
+    flex: 1,
+    justifyContent: "flex-end",
+    padding: 14,
+  },
+  editorialTileLabel: {
+    fontSize: 9,
+    letterSpacing: 2.5,
+    color: "rgba(255,255,255,0.7)",
+    marginBottom: 5,
+    fontWeight: "600",
+  },
+  editorialTileHeadline: {
+    fontSize: 18,
+    fontFamily: "Georgia",
+    fontWeight: "700",
+    color: "#fff",
+    lineHeight: 22,
   },
 
   // Featured winery
   featuredWrapper: {
     width: "90%",
+    alignSelf: "center",
     marginBottom: 28,
   },
   featuredDividerRow: {
@@ -492,6 +700,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     width: "90%",
+    alignSelf: "center",
     marginBottom: 24,
   },
   dividerLine: {
@@ -509,6 +718,7 @@ const styles = StyleSheet.create({
   // Explore cards
   cardsWrapper: {
     width: "90%",
+    alignSelf: "center",
     gap: 16,
   },
   card: {
