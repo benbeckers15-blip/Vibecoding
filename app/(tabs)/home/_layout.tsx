@@ -7,6 +7,10 @@ export default function HomeLayout() {
         name="index"
         options={{ title: "Home", headerShown: false }}
       />
+      <Stack.Screen
+        name="pour"
+        options={{ title: "The Tassie Pour", headerShown: false }}
+      />
     </Stack>
   );
 }

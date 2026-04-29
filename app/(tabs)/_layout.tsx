@@ -15,6 +15,7 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
+import { colors } from "../../constants/theme";
 
 const { width } = Dimensions.get("window");
 const BAR_WIDTH_FALLBACK = Math.min(520, width * 0.92);
@@ -58,10 +59,10 @@ const TabButton = React.memo(function TabButton({
   }));
 
   const iconName =
-    route.name === "events"
-      ? "calendar"
-      : route.name === "specials"
-      ? "star"
+    route.name === "explore"
+      ? "compass"
+      : route.name === "profile"
+      ? "person"
       : route.name === "wineries"
       ? "wine"
       : "home";
@@ -77,7 +78,7 @@ const TabButton = React.memo(function TabButton({
         <Ionicons
           name={iconName as any}
           size={20}
-          color={isFocused ? "#1a1a1a" : "rgba(255,255,255,0.45)"}
+          color={isFocused ? colors.background : colors.textMuted}
         />
       </Animated.View>
       {!isFocused && (
@@ -186,9 +187,9 @@ export default function TabLayout() {
       screenOptions={{ headerShown: false }}
     >
       <Tabs.Screen name="home" options={{ title: "Home", tabBarLabel: "Home" }} />
-      <Tabs.Screen name="events" options={{ title: "Events", tabBarLabel: "Events" }} />
-      <Tabs.Screen name="specials" options={{ title: "Specials", tabBarLabel: "Specials" }} />
+      <Tabs.Screen name="explore" options={{ title: "Explore", tabBarLabel: "Explore" }} />
       <Tabs.Screen name="wineries" options={{ title: "Wineries", tabBarLabel: "Wineries" }} />
+      <Tabs.Screen name="profile" options={{ title: "Profile", tabBarLabel: "Profile" }} />
     </Tabs>
   );
 }
@@ -203,16 +204,16 @@ const styles = StyleSheet.create({
     zIndex: 2000,
   },
   shadowWrapper: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 12,
+    shadowColor: colors.textPrimary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    elevation: 10,
   },
   floatingBar: {
     flexDirection: "row",
     height: 64,
-    backgroundColor: "#1a1a1a",
+    backgroundColor: colors.background,
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "space-around",
@@ -228,11 +229,11 @@ const styles = StyleSheet.create({
     top: 8,
     bottom: 8,
     borderRadius: 999,
-    backgroundColor: "#faf9f6",
+    backgroundColor: colors.accent,   // warm gold pill for active tab
   },
   label: {
     fontSize: 11,
-    color: "rgba(255,255,255,0.45)",
+    color: colors.textMuted,
     marginTop: 2,
   },
 });

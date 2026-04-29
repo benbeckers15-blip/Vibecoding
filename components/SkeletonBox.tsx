@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Animated, StyleProp, ViewStyle } from "react-native";
+import { colors } from "../constants/theme";
 
 interface Props {
   style?: StyleProp<ViewStyle>;
@@ -29,7 +30,7 @@ export default function SkeletonBox({ style }: Props) {
 
   return (
     <Animated.View
-      style={[{ backgroundColor: "#dedad4", borderRadius: 4, opacity }, style]}
+      style={[{ backgroundColor: colors.surfaceDeep, borderRadius: 4, opacity }, style]}
     />
   );
 }

@@ -1,5 +1,7 @@
 // firebaseConfig.js
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { initializeApp } from "firebase/app";
+import { getReactNativePersistence, initializeAuth } from "firebase/auth";
 import { initializeFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -15,7 +17,12 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// 👇 Fix: use long polling for Expo + non-US regions
+// Auth — AsyncStorage persistence keeps the user logged in across app restarts
+export const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage),
+});
+
+// Firestore — long polling required for Expo + non-US regions
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
 });
