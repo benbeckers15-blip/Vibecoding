@@ -20,7 +20,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors, fonts } from "../../../constants/theme";
+import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
 import { db } from "../../../firebaseConfig";
 
 const { width } = Dimensions.get("window");
@@ -359,12 +359,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xxl,           // standardised 20 → 24
   },
   iconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: spacing.hitTarget,                 // 44pt — Apple HIG
+    height: spacing.hitTarget,
+    borderRadius: spacing.hitTarget / 2,
     backgroundColor: colors.photoChrome,
     borderWidth: 1,
     borderColor: colors.borderOnDark,
@@ -372,29 +372,24 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerKicker: {
-    fontFamily: fonts.mono,
-    fontSize: 9.5,
+    ...type.kicker,                           // bumped 9.5 → 10 (kicker minimum)
     letterSpacing: 2,
     color: colors.accentSoft,
   },
   heroCopy: {
-    paddingHorizontal: 22,
-    paddingBottom: 24,
+    paddingHorizontal: spacing.xxl,           // standardised 22 → 24
+    paddingBottom: spacing.xxl,
   },
   heroArticleKicker: {
-    fontFamily: fonts.mono,
-    fontSize: 10,
-    letterSpacing: 2.5,
+    ...type.kicker,
     color: colors.accentSoft,
-    marginBottom: 10,
+    marginBottom: spacing.md,
   },
   heroHeadline: {
-    fontFamily: "Georgia",
-    fontSize: 28,
+    ...type.h2,                               // 28 / Georgia / bold
     fontStyle: "italic",
-    fontWeight: "500",
+    fontWeight: weights.body,                 // override h2's emphasis — italic + body weight reads as editorial
     color: colors.textOnDark,
-    lineHeight: 34,
     letterSpacing: -0.5,
   },
 
@@ -403,15 +398,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 22,
-    paddingVertical: 16,
+    paddingHorizontal: spacing.xxl,           // standardised 22 → 24
+    paddingVertical: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   authorLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: spacing.md,
   },
   avatar: {
     width: 34,
@@ -424,29 +419,29 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarText: {
-    fontFamily: "Georgia",
-    fontSize: 13,
-    fontWeight: "600",
+    fontFamily: fonts.serif,
+    fontSize: type.body.fontSize,             // 13 → 14
+    fontWeight: weights.emphasis,             // 600 → 700 (Fix 4)
     color: colors.accentSoft,
   },
   authorName: {
-    fontSize: 13,
-    fontWeight: "600",
+    ...type.body,                             // 13 → 14
+    fontWeight: weights.emphasis,
     color: colors.textPrimary,
   },
   authorMeta: {
-    fontSize: 11,
+    ...type.caption,                          // 11 → 12
     color: colors.textMuted,
     marginTop: 1,
   },
   authorActions: {
     flexDirection: "row",
-    gap: 8,
+    gap: spacing.sm,
   },
   actionBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: spacing.hitTarget,                 // bumped 32 → 44 (Apple HIG)
+    height: spacing.hitTarget,
+    borderRadius: spacing.hitTarget / 2,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: "center",
@@ -455,57 +450,55 @@ const styles = StyleSheet.create({
 
   // ── Body ────────────────────────────────────────────────────────────────
   body: {
-    paddingHorizontal: 24,
-    paddingTop: 26,
+    paddingHorizontal: spacing.xxl,           // 24
+    paddingTop: spacing.xxxl,                 // bumped 26 → 32 for editorial breathing
   },
   bodyText: {
-    fontFamily: "Georgia",
-    fontSize: 17,
-    lineHeight: 29,
+    ...type.lede,                             // 17 / italic / 400 / Georgia
+    fontStyle: "normal" as const,             // body uses upright Georgia
     color: colors.textSecondary,
-    marginBottom: 20,
+    marginBottom: spacing.xl,
   },
   dropCap: {
-    fontFamily: "Georgia",
+    fontFamily: fonts.serif,
     fontSize: 58,
     lineHeight: 50,
     color: colors.accentSoft,
-    fontWeight: "500",
+    fontWeight: weights.body,
   },
   pullQuote: {
     flexDirection: "row",
     alignItems: "stretch",
-    marginVertical: 28,
-    marginHorizontal: -4,
-    paddingHorizontal: 4,
+    marginVertical: spacing.xxxl,             // bumped 28 → 32
+    marginHorizontal: -spacing.xs,
+    paddingHorizontal: spacing.xs,
   },
   pullQuoteBar: {
     width: 2,
     borderRadius: 1,
     backgroundColor: colors.accent,
-    marginRight: 20,
+    marginRight: spacing.xl,
   },
   pullQuoteText: {
-    fontFamily: "Georgia",
+    fontFamily: fonts.serif,
     fontStyle: "italic",
-    fontSize: 22,
+    fontWeight: weights.body,                  // explicit 400 (Fix 4)
+    fontSize: type.h3.fontSize,                // 22
     lineHeight: 32,
     color: colors.textPrimary,
     letterSpacing: -0.3,
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   pullQuoteAttr: {
-    fontFamily: fonts.mono,
-    fontStyle: "normal",
-    fontSize: 10,
+    ...type.kicker,
     letterSpacing: 1.8,
     color: colors.accentSoft,
   },
 
   // Inline image
   inlineImgWrap: {
-    marginHorizontal: -24,
-    marginBottom: 12,
+    marginHorizontal: -spacing.xxl,
+    marginBottom: spacing.md,
   },
   inlineImg: {
     width,
@@ -513,36 +506,35 @@ const styles = StyleSheet.create({
   },
   imgCaption: {
     fontFamily: fonts.mono,
-    fontSize: 11,
+    fontSize: type.caption.fontSize,           // 11 → 12
     color: colors.textMuted,
     letterSpacing: 0.2,
-    paddingHorizontal: 24,
-    paddingTop: 10,
-    marginBottom: 8,
+    paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.md,
+    marginBottom: spacing.sm,
   },
 
   // ── Sponsored card ───────────────────────────────────────────────────────
   sponsorCard: {
-    marginHorizontal: 22,
-    marginTop: 8,
-    marginBottom: 4,
-    padding: 14,
+    marginHorizontal: spacing.xxl,            // standardised 22 → 24
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+    padding: spacing.xl,                      // card body padding 20 (Fix 3) — was 14
     backgroundColor: colors.surfaceDeep,
-    borderRadius: 4,
+    borderRadius: radius.card,
     borderWidth: 1,
     borderColor: colors.border,
   },
   sponsorLabel: {
-    fontFamily: fonts.mono,
-    fontSize: 9,
+    ...type.kicker,                           // bumped 9 → 10 (kicker minimum)
     letterSpacing: 2,
     color: colors.textMuted,
-    marginBottom: 10,
+    marginBottom: spacing.md,
   },
   sponsorInner: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: spacing.md,
   },
   sponsorImg: {
     width: 60,
@@ -553,41 +545,40 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sponsorTitle: {
-    fontFamily: "Georgia",
-    fontSize: 16,
-    fontWeight: "500",
+    fontFamily: fonts.serif,
+    fontSize: type.lede.fontSize,             // bumped 16 → 17
+    fontWeight: weights.emphasis,             // 500 → 700 (Fix 4)
     color: colors.textPrimary,
-    lineHeight: 21,
+    lineHeight: 22,
     letterSpacing: -0.2,
   },
   sponsorSub: {
-    fontSize: 11.5,
+    ...type.caption,                          // 11.5 → 12 (token-aligned)
     color: colors.textMuted,
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
 
   // ── Continue reading ─────────────────────────────────────────────────────
   continueSection: {
-    paddingHorizontal: 22,
-    paddingTop: 32,
+    paddingHorizontal: spacing.xxl,           // standardised 22 → 24
+    paddingTop: spacing.hero,                  // bumped 32 → 40 (Fix 5 — new section)
   },
   continueKicker: {
-    fontFamily: fonts.mono,
-    fontSize: 10,
+    ...type.kicker,
     letterSpacing: 2,
     color: colors.accentSoft,
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   continueRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
-    paddingVertical: 16,
+    gap: spacing.lg,                          // bumped 14 → 16
+    paddingVertical: spacing.lg,              // 16 row gutter
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
   continueRowFirst: {
-    marginTop: 10,
+    marginTop: spacing.md,
   },
   continueImg: {
     width: 70,
@@ -599,18 +590,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   continueItemKicker: {
-    fontFamily: fonts.mono,
-    fontSize: 9.5,
+    ...type.kicker,                           // bumped 9.5 → 10
     letterSpacing: 1.6,
     color: colors.accentSoft,
-    marginBottom: 5,
+    marginBottom: spacing.xs,
   },
   continueItemTitle: {
-    fontFamily: "Georgia",
-    fontSize: 16,
-    fontWeight: "500",
+    fontFamily: fonts.serif,
+    fontSize: type.lede.fontSize,             // bumped 16 → 17
+    fontWeight: weights.emphasis,             // 500 → 700 (Fix 4)
     color: colors.textPrimary,
-    lineHeight: 21,
+    lineHeight: 22,
     letterSpacing: -0.2,
   },
 });

@@ -35,7 +35,7 @@ import Animated, {
 import Carousel from "react-native-reanimated-carousel";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { REGION_NAME, REGION_NAME_UPPER } from "../../../constants/region";
-import { colors, fonts } from "../../../constants/theme";
+import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
 import { useAuth } from "../../../context/AuthContext";
 import { db } from "../../../firebaseConfig";
 
@@ -78,11 +78,24 @@ interface WineryData {
   userRatingsTotal?: number;
 }
 
-const FEATURE_BADGES: { key: keyof WineryData; label: string; icon: string }[] = [
-  { key: "dogFriendly",   label: "Dog Friendly", icon: "🐕" },
-  { key: "hasRestaurant", label: "Restaurant",   icon: "🍽"  },
-  { key: "isOrganic",     label: "Organic",      icon: "🌿"  },
-  { key: "isBiodynamic",  label: "Biodynamic",   icon: "🌱"  },
+// Feature badges — Ionicon names instead of emoji.
+// Emoji rendered platform-default colors that fought the warm-paper palette
+// and broke VoiceOver ("dog face emoji"). These render in `colors.accent`
+// (forest) so the badges read as part of the brand system.
+//
+// `paw`              — Dog Friendly
+// `restaurant-outline` — Restaurant
+// `leaf-outline`     — Organic / herbal / earth
+// `flower-outline`   — Biodynamic / living-soil
+const FEATURE_BADGES: {
+  key: keyof WineryData;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+  { key: "dogFriendly",   label: "Dog Friendly", icon: "paw"                 },
+  { key: "hasRestaurant", label: "Restaurant",   icon: "restaurant-outline"  },
+  { key: "isOrganic",     label: "Organic",      icon: "leaf-outline"        },
+  { key: "isBiodynamic",  label: "Biodynamic",   icon: "flower-outline"      },
 ];
 
 function normaliseHours(raw: unknown): HoursEntry[] {
@@ -477,8 +490,18 @@ export default function WineryDetailsScreen() {
           <View style={styles.badgesRow}>
             {FEATURE_BADGES.filter(({ key }) => winery[key]).map(
               ({ key, label, icon }) => (
-                <View key={key} style={styles.badge}>
-                  <Text style={styles.badgeIcon}>{icon}</Text>
+                <View
+                  key={key}
+                  style={styles.badge}
+                  accessible
+                  accessibilityLabel={label}
+                >
+                  <Ionicons
+                    name={icon}
+                    size={14}
+                    color={colors.accent}
+                    style={styles.badgeIcon}
+                  />
                   <Text style={styles.badgeText}>{label}</Text>
                 </View>
               )
@@ -575,22 +598,21 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   notFoundLabel: {
-    fontFamily: fonts.mono,
-    fontSize: 9,
+    ...type.kicker,                            // bumped 9 → 10 (kicker minimum)
     letterSpacing: 3,
     color: colors.textMuted,
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   notFoundText: {
-    fontSize: 14,
+    ...type.body,
     color: colors.textMuted,
   },
 
   // ── Header ────────────────────────────────────────────────────────────────
   headerOverlay: {
     position: "absolute",
-    left: 16,
-    right: 16,
+    left: spacing.lg,
+    right: spacing.lg,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -601,28 +623,29 @@ const styles = StyleSheet.create({
   headerBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: spacing.xs,
     backgroundColor: colors.photoChrome,
-    borderRadius: 999,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.borderOnDark,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: spacing.lg,            // bumped 14 → 16
+    paddingVertical: spacing.md,              // bumped 8 → 12 (toward 44pt)
+    minHeight: spacing.hitTarget,
   },
   headerBtnText: {
     color: colors.textOnDark,
-    fontSize: 13,
-    fontWeight: "500",
+    fontSize: type.body.fontSize,             // 13 → 14
+    fontWeight: weights.body,
     letterSpacing: 0.2,
   },
   headerRight: {
     flexDirection: "row",
-    gap: 8,
+    gap: spacing.sm,
   },
   headerIconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: spacing.hitTarget,                 // bumped 38 → 44 (Apple HIG)
+    height: spacing.hitTarget,
+    borderRadius: spacing.hitTarget / 2,
     backgroundColor: colors.photoChrome,
     borderWidth: 1,
     borderColor: colors.borderOnDark,
@@ -652,53 +675,47 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     justifyContent: "center",
     alignItems: "center",
-    gap: 12,
+    gap: spacing.md,
   },
   heroPlaceholderEmoji: {
     fontSize: 48,
   },
   heroPlaceholderName: {
-    fontFamily: "Georgia",
-    fontSize: 22,
+    ...type.h3,
+    fontWeight: weights.body,
     fontStyle: "italic",
     color: colors.textSecondary,
   },
   heroContent: {
     position: "absolute",
-    bottom: 28,
-    left: 24,
-    right: 24,
+    bottom: spacing.xxxl,                     // 32 — was 28
+    left: spacing.xxl,
+    right: spacing.xxl,
   },
   heroRegion: {
-    fontFamily: fonts.mono,
-    fontSize: 10,
+    ...type.kicker,
     letterSpacing: 2,
     color: colors.accentSoft,
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   // Hero text sits over the photo's dark scrim — uses on-dark tokens.
   heroTitle: {
-    fontFamily: "Georgia",
-    fontSize: 34,
-    fontStyle: "italic",
-    fontWeight: "400",
+    ...type.h1,                               // 36 / italic Georgia / 42 line / -0.5
     color: colors.textOnDark,
-    lineHeight: 40,
-    letterSpacing: -0.5,
   },
   heroRatingRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginTop: 10,
+    gap: spacing.xs,
+    marginTop: spacing.md,
   },
   heroRatingStar: {
-    fontSize: 13,
+    ...type.body,                             // 14 — bumped from 13
     color: colors.accentSoft,
-    fontWeight: "600",
+    fontWeight: weights.emphasis,
   },
   heroRatingCount: {
-    fontSize: 12,
+    ...type.caption,
     color: colors.textOnDarkSubtle,
   },
 
@@ -721,7 +738,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
 
-  // ── Info Grid ─────────────────────────────────────────────────────────────
+  // ── Info Grid (Hours | Location) ─────────────────────────────────────────
+  // Fix 7: 16px row gutter (paddingVertical), 12px internal padding between
+  // label / value / tap-hint. Matched on all info + contact cells so the
+  // whole hours-features-contact stack reads as a single visual rhythm.
   infoGrid: {
     flexDirection: "row",
     borderBottomWidth: 1,
@@ -730,44 +750,42 @@ const styles = StyleSheet.create({
   },
   infoCell: {
     flex: 1,
-    paddingVertical: 18,
-    paddingHorizontal: 24,
+    paddingVertical: spacing.lg,              // 16px row gutter (Fix 7)
+    paddingHorizontal: spacing.xl,            // 20px internal — generous for wide cells
+    gap: spacing.md,                          // 12px between label / value / tap (Fix 7)
   },
   infoCellBorderLeft: {
     borderLeftWidth: 1,
     borderLeftColor: colors.border,
   },
   infoCellLabel: {
-    fontFamily: fonts.mono,
-    fontSize: 9,
-    letterSpacing: 2.5,
+    ...type.kicker,                           // bumped 9 → 10 (kicker minimum)
     color: colors.textMuted,
-    marginBottom: 7,
   },
   infoCellValue: {
-    fontSize: 13,
+    ...type.body,                             // 14 — bumped from 13
     color: colors.textPrimary,
-    fontWeight: "500",
+    fontWeight: weights.body,
   },
   appointmentLink: {
-    fontSize: 13,
+    ...type.body,
     color: colors.accentSoft,
-    fontWeight: "500",
+    fontWeight: weights.body,
     textDecorationLine: "underline",
   },
   valueRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: spacing.xs,
   },
   infoCellTap: {
-    fontSize: 11,
+    ...type.caption,                          // bumped 11 → 12
     color: colors.accentSoft,
-    marginTop: 6,
     letterSpacing: 0.2,
   },
 
   // ── Contact Row ───────────────────────────────────────────────────────────
+  // Same rhythm as info grid (Fix 7) — 16 row, 20 internal, 12 stack gap.
   contactRow: {
     flexDirection: "row",
     borderBottomWidth: 1,
@@ -775,121 +793,121 @@ const styles = StyleSheet.create({
   },
   contactBtn: {
     flex: 1,
-    paddingVertical: 18,
-    paddingHorizontal: 24,
+    paddingVertical: spacing.lg,              // 16 row gutter (Fix 7)
+    paddingHorizontal: spacing.xl,
+    gap: spacing.md,                          // 12 internal (Fix 7)
   },
   contactBtnBorderLeft: {
     borderLeftWidth: 1,
     borderLeftColor: colors.border,
   },
   contactLabel: {
-    fontFamily: fonts.mono,
-    fontSize: 9,
-    letterSpacing: 2.5,
+    ...type.kicker,
     color: colors.textMuted,
-    marginBottom: 6,
   },
   contactValue: {
-    fontSize: 13,
+    ...type.body,
     color: colors.textPrimary,
-    fontWeight: "500",
+    fontWeight: weights.body,
   },
   contactLink: {
-    fontSize: 13,
+    ...type.body,
     color: colors.accentSoft,
-    fontWeight: "500",
+    fontWeight: weights.body,
     textDecorationLine: "underline",
   },
 
   // ── Feature Badges ────────────────────────────────────────────────────────
+  // 16 row gutter to match the grid above; emoji ditched in favour of
+  // accent-coloured Ionicons (Fix 4: Color).
   badgesRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xxl,           // standardised 20 → 24
+    paddingVertical: spacing.lg,              // 16 row gutter (Fix 7)
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   badge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    gap: spacing.xs,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,              // bumped 6 → 8 for breathing room
     backgroundColor: colors.surface,
   },
   badgeIcon: {
-    fontSize: 13,
+    // Spacing only — colour and size are passed via props on <Ionicons>
+    marginRight: 2,
   },
   badgeText: {
-    fontSize: 11,
-    fontWeight: "500",
+    ...type.caption,
+    fontWeight: weights.body,
     color: colors.textSecondary,
     letterSpacing: 0.3,
   },
 
   // ── About Section ─────────────────────────────────────────────────────────
   aboutSection: {
-    paddingHorizontal: 24,
-    paddingTop: 32,
-    paddingBottom: 40,
+    paddingHorizontal: spacing.xxl,           // 24 (already standardised)
+    paddingTop: spacing.xxxl,
+    paddingBottom: spacing.hero,
   },
   aboutHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    marginBottom: 28,
+    gap: spacing.md,
+    marginBottom: spacing.xxxl,
   },
   goldLine: {
-    width: 24,
+    width: spacing.xxl,
     height: 1,
     backgroundColor: colors.accent,
   },
   aboutLabel: {
-    fontFamily: fonts.mono,
-    fontSize: 10,
+    ...type.kicker,
     letterSpacing: 3,
     color: colors.accentSoft,
   },
   // First paragraph — editorial lede (italic, slightly larger)
   ledeParagraph: {
-    fontFamily: "Georgia",
-    fontSize: 17,
-    fontStyle: "italic",
+    ...type.lede,                             // 17 / italic / 400 / Georgia
     color: colors.textSecondary,
-    lineHeight: 29,
-    marginBottom: 22,
+    lineHeight: 29,                           // slightly looser for the lede
+    marginBottom: spacing.xxl,
   },
-  // Body paragraphs
+  // Body paragraphs — Georgia at body weight, no 500 drift
   paragraph: {
-    fontFamily: "Georgia",
-    fontSize: 15,
+    fontFamily: fonts.serif,
+    fontSize: 15,                             // body-plus for editorial reading
+    fontWeight: weights.body,
     color: colors.textSecondary,
     lineHeight: 27,
-    marginBottom: 18,
+    marginBottom: spacing.lg,
   },
-  // Pull quote
+  // Pull quote — italic Georgia, body weight, clear forest accent rule
   pullQuoteBlock: {
     flexDirection: "row",
     alignItems: "stretch",
-    marginVertical: 24,
-    marginHorizontal: 4,
+    marginVertical: spacing.xxl,
+    marginHorizontal: spacing.xs,
   },
   pullQuoteBar: {
     width: 2,
     borderRadius: 1,
     backgroundColor: colors.accent,
-    marginRight: 18,
+    marginRight: spacing.lg,
   },
   pullQuoteText: {
     flex: 1,
-    fontFamily: "Georgia",
-    fontSize: 20,
+    fontFamily: fonts.serif,
+    fontSize: type.h3.fontSize,               // 22 (was 20 — toward token scale)
     fontStyle: "italic",
+    fontWeight: weights.body,
     color: colors.textPrimary,
     lineHeight: 32,
     letterSpacing: 0.2,
@@ -903,13 +921,13 @@ const styles = StyleSheet.create({
   },
   modalSheet: {
     backgroundColor: colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: spacing.xl,
+    borderTopRightRadius: spacing.xl,
     borderTopWidth: 1,
     borderColor: colors.border,
-    paddingHorizontal: 28,
-    paddingTop: 16,
-    paddingBottom: 40,
+    paddingHorizontal: spacing.xxl,           // standardised 28 → 24
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.hero,
   },
   modalHandle: {
     width: 36,
@@ -917,54 +935,57 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
     borderRadius: 2,
     alignSelf: "center",
-    marginBottom: 24,
+    marginBottom: spacing.xxl,
   },
   modalTitle: {
-    fontFamily: fonts.mono,
-    fontSize: 10,
+    ...type.kicker,
     letterSpacing: 3,
     color: colors.accentSoft,
-    marginBottom: 20,
+    marginBottom: spacing.xl,
   },
   hoursRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 14,
+    paddingVertical: spacing.lg,              // 16 row gutter (Fix 7)
   },
   hoursRowBorder: {
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   hoursDay: {
-    fontFamily: "Georgia",
-    fontSize: 14,
+    ...type.body,
+    fontFamily: fonts.serif,
     color: colors.textSecondary,
     flex: 1,
   },
   hoursTime: {
-    fontSize: 14,
+    ...type.body,
     color: colors.textPrimary,
-    fontWeight: "500",
+    fontWeight: weights.emphasis,
     textAlign: "right",
   },
   modalClose: {
-    marginTop: 24,
+    marginTop: spacing.xxl,
     alignSelf: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 32,
+    paddingVertical: 12,                      // bumped 10 → 12 (toward 44pt)
+    paddingHorizontal: spacing.xxxl,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 999,
+    borderRadius: radius.pill,
+    minHeight: spacing.hitTarget,
+    justifyContent: "center",
   },
   modalCloseText: {
-    fontSize: 12,
+    ...type.caption,
     letterSpacing: 1,
     color: colors.textMuted,
   },
 });
 
 // ─── Skeleton styles ──────────────────────────────────────────────────────────
+// Mirror the live-data rhythm so the loading state feels structural rather
+// than empty.
 const skeletonStyles = StyleSheet.create({
   infoGrid: {
     flexDirection: "row",
@@ -974,9 +995,9 @@ const skeletonStyles = StyleSheet.create({
   },
   infoCell: {
     flex: 1,
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    gap: 8,
+    paddingVertical: spacing.lg,              // 16 row gutter (Fix 7)
+    paddingHorizontal: spacing.xl,
+    gap: spacing.md,                          // 12 internal (Fix 7)
   },
   infoCellBorderLeft: {
     borderLeftWidth: 1,
@@ -987,27 +1008,27 @@ const skeletonStyles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: colors.border,
   },
-  labelLine:  { height: 8,  width: "40%", borderRadius: 4 },
-  valueLine:  { height: 13, width: "80%", borderRadius: 4 },
-  subLine:    { height: 9,  width: "50%", borderRadius: 4 },
-  textLineLg: { height: 14, borderRadius: 4 },
-  textLineSm: { height: 12, borderRadius: 4 },
+  labelLine:  { height: 8,  width: "40%", borderRadius: radius.card },
+  valueLine:  { height: 13, width: "80%", borderRadius: radius.card },
+  subLine:    { height: 9,  width: "50%", borderRadius: radius.card },
+  textLineLg: { height: 14, borderRadius: radius.card },
+  textLineSm: { height: 12, borderRadius: radius.card },
   aboutSection: {
-    paddingHorizontal: 24,
-    paddingTop: 32,
-    paddingBottom: 40,
-    gap: 14,
+    paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.xxxl,
+    paddingBottom: spacing.hero,
+    gap: spacing.lg,
   },
   dividerSkeleton: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 14,
-    gap: 12,
+    marginBottom: spacing.lg,
+    gap: spacing.md,
   },
   dividerLine: {
     flex: 1,
     height: 1,
     backgroundColor: colors.border,
   },
-  dividerLabel: { height: 8, width: 48, borderRadius: 4 },
+  dividerLabel: { height: 8, width: 48, borderRadius: radius.card },
 });

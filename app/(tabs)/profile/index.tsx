@@ -32,7 +32,7 @@ import {
 } from "firebase/firestore";
 import { useAuth } from "../../../context/AuthContext";
 import { db } from "../../../firebaseConfig";
-import { colors, fonts } from "../../../constants/theme";
+import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
 
 // ─── Firestore-shaped types ───────────────────────────────────────────────────
 
@@ -659,15 +659,15 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 10,
-    paddingHorizontal: 22,
+    paddingHorizontal: spacing.xxl,           // standardised 22 → 24
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
   iconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: spacing.hitTarget,                 // bumped 38 → 44 (Apple HIG)
+    height: spacing.hitTarget,
+    borderRadius: spacing.hitTarget / 2,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -678,7 +678,7 @@ const styles = StyleSheet.create({
   // ── Profile header ────────────────────────────────────────────────────────
   profileHead: {
     paddingTop: 60,
-    paddingHorizontal: 22,
+    paddingHorizontal: spacing.xxl,           // standardised 22 → 24
     alignItems: "center",
   },
   avatar: {
@@ -692,80 +692,76 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarText: {
-    fontFamily: "Georgia",
+    fontFamily: fonts.serif,
     fontStyle: "italic",
     fontSize: 30,
-    fontWeight: "500",
+    fontWeight: weights.body,                 // 500 → 400 (Fix 4)
     color: colors.accentSoft,
   },
   name: {
-    fontFamily: "Georgia",
-    fontSize: 28,
-    fontWeight: "500",
+    ...type.h2,                               // 28 / Georgia / bold
     color: colors.textPrimary,
-    letterSpacing: -0.4,
   },
   meta: {
-    fontFamily: fonts.mono,
-    fontSize: 10,
+    ...type.kicker,
     letterSpacing: 1.8,
     color: colors.textMuted,
-    marginTop: 6,
+    marginTop: spacing.xs,
   },
 
   // ── Stat row ──────────────────────────────────────────────────────────────
   statsRow: {
     flexDirection: "row",
-    gap: 8,
-    marginTop: 24,
-    paddingHorizontal: 22,
+    gap: spacing.sm,
+    marginTop: spacing.xxl,
+    paddingHorizontal: spacing.xxl,           // standardised 22 → 24
   },
   statBox: {
     flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 8,
+    paddingVertical: spacing.lg,              // bumped 14 → 16
+    paddingHorizontal: spacing.sm,
     backgroundColor: colors.surfaceDeep,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 4,
+    borderRadius: radius.card,
     alignItems: "center",
   },
   statValue: {
-    fontFamily: "Georgia",
-    fontSize: 24,
-    fontWeight: "500",
+    ...type.h2,                               // 24 → 28 (token scale)
     color: colors.textPrimary,
   },
   statLabel: {
-    fontFamily: fonts.mono,
-    fontSize: 8.5,
+    ...type.kicker,                           // bumped 8.5 → 10 (kicker minimum)
     letterSpacing: 1.4,
     color: colors.textMuted,
-    marginTop: 4,
+    marginTop: spacing.xs,
     textAlign: "center",
   },
 
   // ── Tabs ──────────────────────────────────────────────────────────────────
   tabStrip: {
     flexDirection: "row",
-    gap: 22,
-    marginTop: 28,
-    paddingHorizontal: 22,
+    gap: spacing.xxl,
+    marginTop: spacing.xxxl,                  // bumped 28 → 32
+    paddingHorizontal: spacing.xxl,           // standardised 22 → 24
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   tabItem: {
-    paddingBottom: 12,
+    paddingBottom: spacing.md,
+    paddingTop: spacing.sm,
     borderBottomWidth: 2,
     borderBottomColor: "transparent",
     marginBottom: -1,
+    minHeight: spacing.hitTarget,             // 44pt floor for tab strip taps
+    justifyContent: "center",
   },
   tabItemActive: {
     borderBottomColor: colors.accent,
   },
   tabLabel: {
-    fontSize: 13,
-    fontWeight: "600",
+    ...type.body,                             // 13 → 14
+    fontWeight: weights.emphasis,             // 600 → 700 (Fix 4)
     color: colors.textMuted,
   },
   tabLabelActive: {
@@ -774,8 +770,8 @@ const styles = StyleSheet.create({
 
   // ── Section blocks ────────────────────────────────────────────────────────
   section: {
-    paddingTop: 14,
-    paddingHorizontal: 22,
+    paddingTop: spacing.lg,
+    paddingHorizontal: spacing.xxl,           // standardised 22 → 24
   },
   sectionHeadRow: {
     flexDirection: "row",
@@ -842,11 +838,10 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   listCardCount: {
-    fontFamily: fonts.mono,
-    fontSize: 9,
+    ...type.kicker,                           // bumped 9 → 10 (kicker minimum)
     letterSpacing: 1.2,
     color: colors.textOnDarkMuted,
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
 
   // ── List rows (wineries / articles) ───────────────────────────────────────
@@ -871,17 +866,16 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   rowKicker: {
-    fontFamily: fonts.mono,
-    fontSize: 9.5,
+    ...type.kicker,                           // bumped 9.5 → 10
     letterSpacing: 1.5,
     color: colors.textMuted,
   },
   rowTitle: {
-    fontFamily: "Georgia",
-    fontSize: 17,
-    fontWeight: "500",
+    fontFamily: fonts.serif,
+    fontSize: type.lede.fontSize,             // 17
+    fontWeight: weights.emphasis,             // 500 → 700 (Fix 4)
     color: colors.textPrimary,
-    marginTop: 4,
+    marginTop: spacing.xs,
     lineHeight: 21,
     letterSpacing: -0.2,
   },
@@ -906,9 +900,9 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   heartBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: spacing.hitTarget,                 // bumped 32 → 44 (Apple HIG)
+    height: spacing.hitTarget,
+    borderRadius: spacing.hitTarget / 2,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -928,14 +922,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   tastingWinery: {
-    fontFamily: fonts.mono,
-    fontSize: 9.5,
+    ...type.kicker,                           // bumped 9.5 → 10
     letterSpacing: 1.5,
     color: colors.textMuted,
   },
   tastingDate: {
-    fontFamily: fonts.mono,
-    fontSize: 10.5,
+    ...type.kicker,                           // 10.5 → 10 (token-aligned)
     color: colors.textMuted,
   },
   tastingTitleLine: {
@@ -992,71 +984,75 @@ const styles = StyleSheet.create({
   },
   editNameSheet: {
     backgroundColor: colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: spacing.xl,
+    borderTopRightRadius: spacing.xl,
     borderTopWidth: 1,
     borderColor: colors.border,
-    paddingHorizontal: 28,
-    paddingTop: 16,
-    paddingBottom: 44,
+    paddingHorizontal: spacing.xxl,           // standardised 28 → 24
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.hitTarget,
   },
   editNameTitle: {
-    fontFamily: fonts.mono,
-    fontSize: 10,
+    ...type.kicker,
     letterSpacing: 3,
     color: colors.accentSoft,
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   editNameInput: {
     backgroundColor: colors.surfaceDeep,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 4,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 17,
-    fontFamily: "Georgia",
+    borderRadius: radius.card,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,              // bumped 14 → 16
+    fontSize: type.lede.fontSize,             // 17
+    fontFamily: fonts.serif,
     color: colors.textPrimary,
+    minHeight: spacing.hitTarget,
   },
   editNameHint: {
-    fontSize: 12,
+    ...type.caption,
     color: colors.textMuted,
-    marginTop: 10,
+    marginTop: spacing.md,
   },
   editNameButtons: {
     flexDirection: "row",
-    gap: 12,
-    marginTop: 24,
+    gap: spacing.md,
+    marginTop: spacing.xxl,
   },
   editNameCancel: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: spacing.lg,              // bumped 14 → 16 (toward 44pt)
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 4,
+    borderRadius: radius.card,
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: spacing.hitTarget,
   },
   editNameCancelText: {
-    fontSize: 13,
+    ...type.body,
     color: colors.textMuted,
     letterSpacing: 0.5,
   },
   editNameSave: {
     flex: 2,
-    paddingVertical: 14,
+    paddingVertical: spacing.lg,
     backgroundColor: colors.accent,
-    borderRadius: 4,
+    borderRadius: radius.card,
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: spacing.hitTarget,
   },
   editNameSaveDisabled: {
     opacity: 0.45,
   },
   editNameSaveText: {
-    fontFamily: fonts.mono,
-    fontSize: 12,
+    ...type.kicker,
+    fontSize: 12,                              // bumped 12pt for "save" CTA legibility
     letterSpacing: 2,
     color: colors.background,
-    fontWeight: "700",
+    fontWeight: weights.emphasis,
   },
 
   // ── Palate ────────────────────────────────────────────────────────────────

@@ -29,7 +29,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { REGION_NAME, REGION_NAME_UPPER } from "../../../constants/region";
-import { colors, fonts } from "../../../constants/theme";
+import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
 import { db } from "../../../firebaseConfig";
 
 // ─── Static assets ────────────────────────────────────────────────────────────
@@ -215,10 +215,16 @@ export default function HomeScreen() {
           style={[StyleSheet.absoluteFill, { opacity: 0.96 }]}
           resizeMode="cover"
         />
-        {/* Subtle warm vignette at the bottom edge only — keeps logo legible */}
+        {/* Double-stop gradient: dark scrim at top (keeps brand + heart legible
+            on bright photos like a sunlit vineyard) AND a soft bottom vignette
+            so the headline overlay below the image edge reads cleanly too. */}
         <LinearGradient
-          colors={["transparent", colors.photoOverlaySoft]}
-          locations={[0.65, 1]}
+          colors={[
+            colors.photoOverlayTop,
+            "transparent",
+            colors.photoOverlayBottom,
+          ]}
+          locations={[0, 0.45, 1]}
           style={StyleSheet.absoluteFill}
         />
 
@@ -369,9 +375,16 @@ export default function HomeScreen() {
                 style={styles.tileImg}
                 resizeMode="cover"
               />
+              {/* Double-stop scrim: top + bottom darkened so kicker AND headline
+                  remain legible regardless of the photo's exposure. */}
               <LinearGradient
-                colors={["transparent", colors.photoOverlayStrong]}
-                style={[StyleSheet.absoluteFill, { borderRadius: 4 }]}
+                colors={[
+                  colors.photoOverlayTop,
+                  "transparent",
+                  colors.photoOverlayBottom,
+                ]}
+                locations={[0, 0.4, 1]}
+                style={[StyleSheet.absoluteFill, { borderRadius: radius.card }]}
               />
               <View style={styles.tileOverlay}>
                 <Text style={styles.tileKicker}>{tile.label}</Text>
@@ -402,7 +415,12 @@ export default function HomeScreen() {
               style={styles.exploreCardBg}
             >
               <LinearGradient
-                colors={["transparent", colors.photoOverlayStrong]}
+                colors={[
+                  colors.photoOverlayTop,
+                  "transparent",
+                  colors.photoOverlayBottom,
+                ]}
+                locations={[0, 0.35, 1]}
                 style={styles.cardGrad}
               >
                 <Text style={styles.cardKicker}>CALENDAR</Text>
@@ -426,7 +444,12 @@ export default function HomeScreen() {
               style={styles.exploreCardBg}
             >
               <LinearGradient
-                colors={["transparent", colors.photoOverlayStrong]}
+                colors={[
+                  colors.photoOverlayTop,
+                  "transparent",
+                  colors.photoOverlayBottom,
+                ]}
+                locations={[0, 0.35, 1]}
                 style={styles.cardGrad}
               >
                 <Text style={styles.cardKicker}>EDITORIAL</Text>
@@ -451,7 +474,12 @@ export default function HomeScreen() {
                 style={styles.exploreCardBg}
               >
                 <LinearGradient
-                  colors={["transparent", colors.photoOverlayStrong]}
+                  colors={[
+                    colors.photoOverlayTop,
+                    "transparent",
+                    colors.photoOverlayBottom,
+                  ]}
+                  locations={[0, 0.35, 1]}
                   style={styles.cardGrad}
                 >
                   <Text style={styles.cardKicker}>CURATED</Text>
@@ -471,7 +499,12 @@ export default function HomeScreen() {
                 style={styles.exploreCardBg}
               >
                 <LinearGradient
-                  colors={["transparent", colors.photoOverlayStrong]}
+                  colors={[
+                    colors.photoOverlayTop,
+                    "transparent",
+                    colors.photoOverlayBottom,
+                  ]}
+                  locations={[0, 0.35, 1]}
                   style={styles.cardGrad}
                 >
                   <Text style={styles.cardKicker}>EXCLUSIVE</Text>
@@ -504,24 +537,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 24,
+    paddingHorizontal: spacing.xxl,
   },
   logo: {
-    fontFamily: "Georgia",
-    fontSize: 22,
+    fontFamily: fonts.serif,
+    fontSize: type.h3.fontSize,
     fontStyle: "italic",
     color: colors.textOnDark,           // hardcoded light — overlaid on photograph
     letterSpacing: 0.3,
   },
   logoAccent: {
     fontStyle: "normal",
-    fontWeight: "700",
+    fontWeight: weights.emphasis,
     color: colors.accentSoft,
   },
   iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: spacing.hitTarget,           // 44pt — Apple HIG minimum touch target
+    height: spacing.hitTarget,
+    borderRadius: spacing.hitTarget / 2,
     backgroundColor: colors.photoChrome,              // dark glass for photo overlay
     borderWidth: 1,
     borderColor: colors.borderOnDark,
@@ -530,30 +563,24 @@ const styles = StyleSheet.create({
   },
   // Editorial copy section — sits on warm paper below the image
   heroCopySection: {
-    paddingHorizontal: 24,
-    paddingTop: 28,
-    paddingBottom: 8,
+    paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.xxxl,
+    paddingBottom: spacing.sm,
   },
   heroKicker: {
-    fontFamily: fonts.mono,
-    fontSize: 10,
-    letterSpacing: 2.5,
+    ...type.kicker,
     color: colors.accent,
   },
   heroHeadline: {
-    fontFamily: "Georgia",
-    fontSize: 42,
-    fontStyle: "italic",
-    color: colors.textPrimary,               // deep aubergine-black on paper — confident
-    lineHeight: 46,
-    marginTop: 12,
-    letterSpacing: -0.8,
+    ...type.display,                          // 44 / 50 / -0.3 / italic Georgia
+    color: colors.textPrimary,                // deep aubergine-black on paper — confident
+    marginTop: spacing.md,
   },
 
   // ── Search + chips ────────────────────────────────────────────────────────
   searchSection: {
-    marginTop: 20,
-    paddingHorizontal: 20,
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.xxl,           // standardised to 24
   },
   searchBar: {
     flexDirection: "row",
@@ -562,56 +589,59 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingHorizontal: 18,
+    paddingHorizontal: spacing.lg,
     paddingVertical: 13,
+    minHeight: spacing.hitTarget,             // 44pt — Apple HIG
   },
   searchInput: {
     flex: 1,
-    fontSize: 14,
+    fontSize: type.body.fontSize,
     color: colors.textPrimary,
     paddingVertical: 0,
   },
   searchBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 36,                                 // bumped from 30 to 36
+    height: 36,
+    borderRadius: 18,
     backgroundColor: colors.accent,
     alignItems: "center",
     justifyContent: "center",
   },
   chipsScroll: {
-    marginTop: 12,
+    marginTop: spacing.md,
   },
   chipsRow: {
-    gap: 8,
-    paddingRight: 4,
+    gap: spacing.sm,
+    paddingRight: spacing.xs,
   },
   chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 999,
+    paddingHorizontal: spacing.lg,             // bumped 14 → 16 for breathing room
+    paddingVertical: 11,                       // bumped 7 → 11 (Fix 4)
+    borderRadius: radius.pill,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     minWidth: 60,
+    minHeight: spacing.hitTarget,              // 44pt floor (Apple HIG)
     alignItems: "center",
+    justifyContent: "center",
   },
   chipText: {
-    fontSize: 12,
-    fontWeight: "500",
+    ...type.caption,                            // 12 / 16 line-height
+    fontWeight: weights.body,
     color: colors.textPrimary,
   },
 
   // ── Section header ────────────────────────────────────────────────────────
   section: {
-    marginTop: 40,
-    paddingHorizontal: 20,
+    marginTop: spacing.hero,                  // 40 — new section rhythm (Fix 5)
+    paddingHorizontal: spacing.xxl,           // standardised 20 → 24 (Fix 2)
   },
   sectionHead: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 16,
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
   },
   goldLine: {
     width: 24,
@@ -619,16 +649,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   sectionKicker: {
-    fontFamily: fonts.mono,
-    fontSize: 10,
-    letterSpacing: 2.5,
+    ...type.kicker,
     color: colors.accentSoft,
   },
 
   // ── Featured winery ───────────────────────────────────────────────────────
   featImgWrap: {
     height: 200,
-    borderRadius: 4,
+    borderRadius: radius.card,
     overflow: "hidden",
   },
   featImg: {
@@ -636,48 +664,44 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   featBody: {
-    padding: 18,
+    padding: spacing.xl,                      // card body padding standardised to 20 (Fix 3)
     backgroundColor: colors.surface,
     borderLeftWidth: 2,
     borderLeftColor: colors.accent,
   },
   featRegion: {
-    fontFamily: fonts.mono,
+    ...type.kicker,
     fontSize: 10,
     letterSpacing: 1.5,
     color: colors.textMuted,
   },
   featName: {
-    fontFamily: "Georgia",
-    fontSize: 24,
-    fontWeight: "500",
+    ...type.h2,                               // 28 / bold / Georgia
     color: colors.textPrimary,
-    marginTop: 6,
-    lineHeight: 28,
-    letterSpacing: -0.3,
+    marginTop: spacing.xs,
   },
   featRating: {
-    fontSize: 12,
+    ...type.caption,
     color: colors.accentSoft,
-    fontWeight: "600",
-    marginTop: 8,
+    fontWeight: weights.emphasis,
+    marginTop: spacing.sm,
   },
   featCta: {
-    fontSize: 12,
+    ...type.caption,
     color: colors.accentSoft,
-    fontWeight: "600",
-    marginTop: 14,
+    fontWeight: weights.emphasis,
+    marginTop: spacing.md,
   },
 
   // ── Editorial tiles ───────────────────────────────────────────────────────
   tilesRow: {
-    paddingHorizontal: 20,
-    gap: 10,
+    paddingHorizontal: spacing.xxl,           // standardised to 24
+    gap: spacing.md,                           // bumped 10 → 12
   },
   tile: {
     width: 140,
     height: 200,
-    borderRadius: 4,
+    borderRadius: radius.card,
     overflow: "hidden",
   },
   tileImg: {
@@ -686,40 +710,38 @@ const styles = StyleSheet.create({
   },
   tileOverlay: {
     position: "absolute",
-    bottom: 14,
-    left: 14,
-    right: 14,
+    bottom: spacing.md,
+    left: spacing.md,
+    right: spacing.md,
   },
   tileKicker: {
-    fontFamily: fonts.mono,
-    fontSize: 9,
-    letterSpacing: 2,
+    ...type.kicker,                           // bumped from 9pt → 10pt (kicker minimum)
     color: colors.accentSoft,
-    marginBottom: 5,
+    marginBottom: spacing.xs,
   },
   tileTitle: {
-    fontFamily: "Georgia",
-    fontSize: 17,
+    fontFamily: fonts.serif,
+    fontSize: type.lede.fontSize,             // 17pt
     color: colors.textOnDark,
-    lineHeight: 21,
+    lineHeight: 22,
   },
 
   // ── Explore cards ─────────────────────────────────────────────────────────
   exploreCards: {
-    gap: 12,
+    gap: spacing.md,
   },
   exploreCard: {
-    borderRadius: 4,
+    borderRadius: radius.card,
     overflow: "hidden",
   },
   exploreSmall: {
     flex: 1,
-    borderRadius: 4,
+    borderRadius: radius.card,
     overflow: "hidden",
   },
   smallRow: {
     flexDirection: "row",
-    gap: 12,
+    gap: spacing.md,
   },
   exploreCardBg: {
     height: 150,
@@ -727,33 +749,28 @@ const styles = StyleSheet.create({
   cardGrad: {
     flex: 1,
     justifyContent: "flex-end",
-    paddingHorizontal: 18,
-    paddingBottom: 18,
+    paddingHorizontal: spacing.xl,            // card body padding 20 (Fix 3)
+    paddingBottom: spacing.xl,
     paddingTop: 50,
   },
   cardKicker: {
-    fontFamily: fonts.mono,
-    fontSize: 9,
-    letterSpacing: 2.5,
+    ...type.kicker,                           // bumped 9 → 10
     color: colors.textOnDarkSubtle,
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   cardTitle: {
-    fontFamily: "Georgia",
-    fontSize: 20,
-    fontWeight: "700",
+    ...type.h3,                               // 22 / bold / Georgia
     color: colors.textOnDark,
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   cardBody: {
-    fontSize: 11,
+    ...type.caption,                          // 12 / 16
     color: colors.textOnDarkMuted,
-    lineHeight: 16,
   },
   smallCardTitle: {
-    fontFamily: "Georgia",
-    fontSize: 17,
-    fontWeight: "700",
+    fontFamily: fonts.serif,
+    fontSize: type.lede.fontSize,             // 17pt
+    fontWeight: weights.emphasis,
     color: colors.textOnDark,
     lineHeight: 22,
   },

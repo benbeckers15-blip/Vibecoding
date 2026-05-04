@@ -21,7 +21,8 @@ import MapView from "react-native-map-clustering";
 import { Callout, Marker } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { REGION_NAME_UPPER } from "../../../constants/region";
-import { colors, fonts } from "../../../constants/theme";
+import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
+import { useSaved } from "../../../context/SavedContext";
 import { db } from "../../../firebaseConfig";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -46,12 +47,16 @@ type Winery = {
 };
 
 // ─── Filter config ────────────────────────────────────────────────────────────
-const BOOLEAN_FILTERS: { key: keyof Winery; label: string }[] = [
-  { key: "dogFriendly",   label: "Dog Friendly" },
-  { key: "hasRestaurant", label: "Restaurant"   },
-  { key: "isOrganic",     label: "Organic"      },
-  { key: "isBiodynamic",  label: "Biodynamic"   },
-  { key: "walkinWelcome", label: "Walk-ins"      },
+const BOOLEAN_FILTERS: {
+  key: keyof Winery;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+  { key: "dogFriendly",   label: "Dog Friendly", icon: "paw"                },
+  { key: "hasRestaurant", label: "Restaurant",   icon: "restaurant-outline" },
+  { key: "isOrganic",     label: "Organic",      icon: "leaf-outline"       },
+  { key: "isBiodynamic",  label: "Biodynamic",   icon: "flower-outline"     },
+  { key: "walkinWelcome", label: "Walk-ins",      icon: "walk-outline"       },
 ];
 
 const VALID_FILTER_KEYS: (keyof Winery)[] = [
@@ -105,6 +110,8 @@ export default function WineriesScreen() {
     t?: string;
   }>();
   const insets = useSafeAreaInsets();
+
+  const { isSaved, toggle: toggleSaved } = useSaved();
 
   const [wineries, setWineries] = useState<Winery[]>([]);
   const [loading, setLoading] = useState(true);
@@ -235,10 +242,21 @@ export default function WineriesScreen() {
                   <Text style={styles.partnerText}>★ PARTNER</Text>
                 </View>
               )}
-              {/* Bookmark button */}
-              <View style={styles.bookmarkBtn}>
-                <Ionicons name="bookmark-outline" size={13} color={colors.textOnDark} />
-              </View>
+              {/* Save / heart button */}
+              <Pressable
+                style={styles.heartBtn}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  toggleSaved(item.id);
+                }}
+                hitSlop={8}
+              >
+                <Ionicons
+                  name={isSaved(item.id) ? "heart" : "heart-outline"}
+                  size={14}
+                  color={isSaved(item.id) ? colors.error : colors.textOnDark}
+                />
+              </Pressable>
             </View>
           )}
 
@@ -321,7 +339,7 @@ export default function WineriesScreen() {
         contentContainerStyle={styles.chipsRow}
         style={styles.chipsScroll}
       >
-        {BOOLEAN_FILTERS.map(({ key, label }) => {
+        {BOOLEAN_FILTERS.map(({ key, label, icon }) => {
           const active = activeFilters.has(key);
           return (
             <Pressable
@@ -329,9 +347,17 @@ export default function WineriesScreen() {
               style={[styles.chip, active && styles.chipActive]}
               onPress={() => toggleFilter(key)}
             >
-              <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                {label}
-              </Text>
+              <View style={styles.chipInner}>
+                <Ionicons
+                  name={icon}
+                  size={13}
+                  color={active ? colors.background : colors.textSecondary}
+                  style={styles.chipIcon}
+                />
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                  {label}
+                </Text>
+              </View>
             </Pressable>
           );
         })}
@@ -433,8 +459,13 @@ export default function WineriesScreen() {
                 latitude: winery.latitude!,
                 longitude: winery.longitude!,
               }}
-              pinColor={colors.accent}
+              anchor={{ x: 0.5, y: 1 }}
             >
+              <Image
+                source={require("../../../assets/images/logo-pin.png")}
+                style={styles.markerPin}
+                resizeMode="contain"
+              />
               <Callout
                 tooltip
                 onPress={() => router.push(`/wineries/${winery.slug}`)}
@@ -471,37 +502,31 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
-    fontFamily: fonts.mono,
-    fontSize: 11,
+    ...type.kicker,
+    fontSize: type.caption.fontSize,           // bumped 11 → 12 (caption token)
     letterSpacing: 2,
     color: colors.textMuted,
   },
 
   // ── Header ──────────────────────────────────────────────────────────────
   header: {
-    paddingHorizontal: 24,
-    paddingBottom: 16,
+    paddingHorizontal: spacing.xxl,           // already 24 — token-ised
+    paddingBottom: spacing.lg,
   },
   headerKicker: {
-    fontFamily: fonts.mono,
-    fontSize: 10,
-    letterSpacing: 2.5,
+    ...type.kicker,
     color: colors.accentSoft,
-    marginBottom: 6,
+    marginBottom: spacing.xs,
   },
   headerTitle: {
-    fontFamily: "Georgia",
-    fontSize: 32,
-    fontStyle: "italic",
-    fontWeight: "400",
+    ...type.h1,                               // 36 / italic / 400 / -0.5
     color: colors.textPrimary,
-    letterSpacing: -0.5,
   },
 
   // ── Search ──────────────────────────────────────────────────────────────
   searchWrap: {
-    paddingHorizontal: 20,
-    marginBottom: 12,
+    paddingHorizontal: spacing.xxl,           // standardised 20 → 24
+    marginBottom: spacing.md,
   },
   searchBar: {
     flexDirection: "row",
@@ -510,12 +535,13 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingHorizontal: 18,
+    paddingHorizontal: spacing.lg,
     paddingVertical: 12,
+    minHeight: spacing.hitTarget,             // 44pt floor
   },
   searchInput: {
     flex: 1,
-    fontSize: 14,
+    fontSize: type.body.fontSize,
     color: colors.textPrimary,
     paddingVertical: 0,
   },
@@ -524,28 +550,37 @@ const styles = StyleSheet.create({
   chipsScroll: {
     flexGrow: 0,
     flexShrink: 0,
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   chipsRow: {
-    paddingHorizontal: 20,
-    gap: 8,
+    paddingHorizontal: spacing.xxl,           // standardised 20 → 24
+    gap: spacing.sm,
     alignItems: "center",
   },
   chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 999,
+    paddingHorizontal: spacing.lg,            // bumped 14 → 16
+    paddingVertical: 11,                      // bumped 7 → 11 (Fix 4)
+    borderRadius: radius.pill,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
+    minHeight: spacing.hitTarget,             // 44pt floor (Apple HIG)
+    justifyContent: "center",
   },
   chipActive: {
     backgroundColor: colors.accent,
     borderColor: colors.accent,
   },
+  chipInner: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  chipIcon: {
+    marginRight: 5,
+  },
   chipText: {
-    fontSize: 12,
-    fontWeight: "500",
+    ...type.caption,
+    fontWeight: weights.body,
     color: colors.textPrimary,
     letterSpacing: 0.3,
   },
@@ -557,34 +592,34 @@ const styles = StyleSheet.create({
   ratingRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
-    gap: 8,
-    marginBottom: 14,
+    paddingHorizontal: spacing.xxl,           // standardised 20 → 24
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
   },
   ratingLabel: {
-    fontFamily: fonts.mono,
-    fontSize: 9,
-    letterSpacing: 2.5,
+    ...type.kicker,                           // bumped 9 → 10
     color: colors.textMuted,
-    marginRight: 4,
+    marginRight: spacing.xs,
   },
   ratingBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,                      // bumped 6 → 10 (toward 44pt)
+    borderRadius: radius.card,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
+    minHeight: spacing.hitTarget,             // 44pt floor
+    justifyContent: "center",
   },
   ratingBtnActive: {
     backgroundColor: colors.accent,
     borderColor: colors.accent,
   },
   ratingBtnText: {
-    fontSize: 11,
+    fontSize: type.caption.fontSize,           // bumped 11 → 12
     letterSpacing: 0.5,
     color: colors.textMuted,
-    fontWeight: "500",
+    fontWeight: weights.body,
   },
   ratingBtnTextActive: {
     color: colors.background,
@@ -595,55 +630,53 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    marginBottom: 14,
+    paddingHorizontal: spacing.xxl,           // standardised 20 → 24
+    marginBottom: spacing.lg,
   },
   resultsLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: spacing.sm,
   },
   goldLine: {
-    width: 20,
+    width: spacing.xl,
     height: 1,
     backgroundColor: colors.accent,
   },
   resultsCount: {
-    fontFamily: fonts.mono,
-    fontSize: 10,
-    letterSpacing: 2.5,
+    ...type.kicker,
     color: colors.accentSoft,
   },
   viewToggle: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: spacing.sm,
   },
   viewToggleText: {
-    fontSize: 12,
-    fontWeight: "500",
+    ...type.caption,
+    fontWeight: weights.body,
     color: colors.textMuted,
   },
   viewToggleActive: {
     color: colors.accentSoft,
   },
   viewToggleSep: {
-    fontSize: 12,
+    fontSize: type.caption.fontSize,
     color: colors.border,
   },
 
   // ── Cards ────────────────────────────────────────────────────────────────
   listContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xxl,           // standardised 20 → 24
     paddingBottom: 120,
   },
   card: {
-    borderRadius: 4,
+    borderRadius: radius.card,
     overflow: "hidden",
     backgroundColor: colors.surface,
   },
   cardSep: {
-    height: 14,
+    height: spacing.lg,                       // bumped 14 → 16
   },
   cardImgWrap: {
     height: 160,
@@ -655,86 +688,80 @@ const styles = StyleSheet.create({
   },
   partnerBadge: {
     position: "absolute",
-    top: 12,
-    left: 12,
+    top: spacing.md,
+    left: spacing.md,
     backgroundColor: colors.accent,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
     borderRadius: 2,
   },
   partnerText: {
-    fontFamily: fonts.mono,
-    fontSize: 9,
+    ...type.kicker,                           // bumped 9 → 10 (kicker minimum)
+    fontSize: 10,
     letterSpacing: 1.5,
     color: colors.background,
-    fontWeight: "700",
+    fontWeight: weights.emphasis,
   },
-  bookmarkBtn: {
+  heartBtn: {
     position: "absolute",
-    top: 12,
-    right: 12,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    top: spacing.md,
+    right: spacing.md,
+    width: spacing.hitTarget,                 // 44pt — Apple HIG
+    height: spacing.hitTarget,
+    borderRadius: spacing.hitTarget / 2,
     backgroundColor: colors.photoChromeAlt,
     alignItems: "center",
     justifyContent: "center",
   },
   cardBody: {
-    padding: 16,
+    padding: spacing.xl,                      // card body padding 20 (Fix 3)
   },
-  // Applied when there's no image — adds left gold accent
+  // Applied when there's no image — adds left forest accent
   cardBodyAccent: {
     borderLeftWidth: 2,
     borderLeftColor: colors.accent,
-    paddingLeft: 14,
+    paddingLeft: spacing.lg,
   },
   cardRegion: {
-    fontFamily: fonts.mono,
-    fontSize: 9,
+    ...type.kicker,                           // bumped 9 → 10
     letterSpacing: 1.8,
     color: colors.textMuted,
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   cardName: {
-    fontFamily: "Georgia",
-    fontSize: 21,
-    fontWeight: "500",
+    ...type.h3,                               // 22 / bold / Georgia
     color: colors.textPrimary,
-    lineHeight: 25,
-    letterSpacing: -0.2,
   },
   cardBlurb: {
-    fontSize: 12.5,
+    ...type.caption,                          // 12 / 16 line-height
     color: colors.textSecondary,
-    marginTop: 6,
+    marginTop: spacing.xs,
     lineHeight: 18,
   },
   cardMeta: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginTop: 12,
+    gap: spacing.sm,
+    marginTop: spacing.md,
   },
   cardRating: {
-    fontSize: 12,
+    ...type.caption,
     color: colors.accentSoft,
-    fontWeight: "600",
+    fontWeight: weights.emphasis,
   },
   cardReviews: {
-    fontSize: 11,
+    ...type.caption,
     color: colors.textMuted,
   },
   badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
   },
   badgeText: {
-    fontFamily: fonts.mono,
-    fontSize: 9,
+    ...type.kicker,
     letterSpacing: 1,
     color: colors.textMuted,
   },
@@ -743,16 +770,15 @@ const styles = StyleSheet.create({
   empty: {
     alignItems: "center",
     paddingTop: 60,
-    gap: 8,
+    gap: spacing.sm,
   },
   emptyLabel: {
-    fontFamily: fonts.mono,
-    fontSize: 10,
+    ...type.kicker,
     letterSpacing: 3,
     color: colors.textMuted,
   },
   emptyText: {
-    fontSize: 14,
+    ...type.body,
     color: colors.textMuted,
   },
 
@@ -761,31 +787,34 @@ const styles = StyleSheet.create({
     flex: 1,
     width: "100%",
   },
+  markerPin: {
+    width: 36,
+    height: 42,
+  },
   callout: {
     backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.accent,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     minWidth: 160,
     alignItems: "center",
   },
   calloutName: {
-    fontFamily: "Georgia",
-    fontSize: 13,
+    fontFamily: fonts.serif,
+    fontSize: type.body.fontSize,             // 13 → 14 (body)
     color: colors.textPrimary,
     marginBottom: 3,
     textAlign: "center",
   },
   calloutRating: {
-    fontSize: 11,
+    ...type.caption,
     color: colors.accent,
-    fontWeight: "600",
-    marginBottom: 5,
+    fontWeight: weights.emphasis,
+    marginBottom: spacing.xs,
   },
   calloutCta: {
-    fontFamily: fonts.mono,
-    fontSize: 9,
+    ...type.kicker,
     letterSpacing: 2,
     color: colors.textMuted,
   },

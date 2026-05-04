@@ -15,7 +15,7 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
-import { colors } from "../../constants/theme";
+import { colors, radius, spacing } from "../../constants/theme";
 
 const { width } = Dimensions.get("window");
 const BAR_WIDTH_FALLBACK = Math.min(520, width * 0.92);
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     height: 64,
     backgroundColor: colors.background,
-    borderRadius: 999,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "space-around",
     paddingHorizontal: H_PADDING,
@@ -223,13 +223,14 @@ const styles = StyleSheet.create({
   tabButton: {
     alignItems: "center",
     justifyContent: "center",
+    minHeight: spacing.hitTarget, // Apple HIG: 44pt minimum touch target
   },
   activeCircle: {
     position: "absolute",
     top: 8,
     bottom: 8,
-    borderRadius: 999,
-    backgroundColor: colors.accent,   // warm gold pill for active tab
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent,   // forest pill for active tab
   },
   label: {
     fontSize: 11,

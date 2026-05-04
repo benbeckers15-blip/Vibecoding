@@ -30,7 +30,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { db } from "../../../firebaseConfig";
-import { colors, fonts } from "../../../constants/theme";
+import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface FeaturedPour {
@@ -307,32 +307,26 @@ const styles = StyleSheet.create({
 
   // ── Header ────────────────────────────────────────────────────────────────
   header: {
-    paddingHorizontal: 24,
-    paddingTop: 18,
-    paddingBottom: 24,
+    paddingHorizontal: spacing.xxl,           // 24
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxl,
   },
   kicker: {
-    fontFamily: fonts.mono,
-    fontSize: 10,
-    letterSpacing: 2.5,
+    ...type.kicker,
     color: colors.accentSoft,
-    marginBottom: 10,
+    marginBottom: spacing.md,
   },
   title: {
-    fontFamily: "Georgia",
-    fontSize: 38,
-    fontStyle: "italic",
-    fontWeight: "500",
+    ...type.h1,                               // 36 / italic / 400 / Georgia
     color: colors.textPrimary,
-    letterSpacing: -0.8,
-    lineHeight: 42,
   },
   subtitle: {
-    fontFamily: "Georgia",
+    fontFamily: fonts.serif,
     fontSize: 15,
     fontStyle: "italic",
+    fontWeight: weights.body,
     color: colors.textSecondary,
-    marginTop: 12,
+    marginTop: spacing.md,
     lineHeight: 22,
     maxWidth: 320,
   },
@@ -341,36 +335,34 @@ const styles = StyleSheet.create({
   sectionHead: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 14,
-    paddingHorizontal: 24,
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.xxl,
   },
   goldLine: {
-    width: 24,
+    width: spacing.xxl,
     height: 1,
     backgroundColor: colors.accent,
   },
   sectionKicker: {
-    fontFamily: fonts.mono,
-    fontSize: 10,
-    letterSpacing: 2.5,
+    ...type.kicker,
     color: colors.accentSoft,
   },
 
   // ── Featured (The Pour) ───────────────────────────────────────────────────
   featuredSection: {
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   featuredLoading: {
     height: 280,
-    marginHorizontal: 20,
+    marginHorizontal: spacing.xxl,            // standardised 20 → 24
     borderRadius: 6,
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
   featuredCard: {
-    marginHorizontal: 20,
+    marginHorizontal: spacing.xxl,            // standardised 20 → 24
     borderRadius: 6,
     overflow: "hidden",
     borderWidth: 1,
@@ -381,21 +373,20 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   featuredOverlay: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingHorizontal: spacing.xl,            // card body padding 20 (Fix 3)
+    paddingBottom: spacing.xl,
   },
   featuredIssue: {
-    fontFamily: fonts.mono,
-    fontSize: 10,
+    ...type.kicker,
     letterSpacing: 2,
     color: colors.accentSoft,
-    marginBottom: 10,
+    marginBottom: spacing.md,
   },
   featuredHeadline: {
-    fontFamily: "Georgia",
+    fontFamily: fonts.serif,
     fontSize: 24,
     fontStyle: "italic",
-    fontWeight: "500",
+    fontWeight: weights.body,                 // 500 → 400 (Fix 4 weights)
     color: colors.textOnDark,
     lineHeight: 30,
     letterSpacing: -0.4,
@@ -404,11 +395,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 16,
+    marginTop: spacing.lg,
   },
   featuredMeta: {
-    fontFamily: fonts.mono,
-    fontSize: 10.5,
+    ...type.kicker,                           // bumped 10.5 → 10 (matched to scale)
     letterSpacing: 1.4,
     color: colors.textOnDarkSubtle,
     flex: 1,
@@ -416,40 +406,40 @@ const styles = StyleSheet.create({
   readBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: spacing.xs,
     backgroundColor: colors.accent,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 11,                      // bumped toward 44pt floor
+    borderRadius: radius.pill,
+    minHeight: spacing.hitTarget,
   },
   readBtnText: {
-    fontFamily: fonts.mono,
-    fontSize: 10,
+    ...type.kicker,
     letterSpacing: 1.8,
-    fontWeight: "700",
+    fontWeight: weights.emphasis,
     color: colors.background,
   },
 
   // ── Directory rows ───────────────────────────────────────────────────────
   directorySection: {
-    marginTop: 40,
+    marginTop: spacing.hero,                  // 40 — new section rhythm (Fix 5)
   },
   articleRow: {
     flexDirection: "row",
-    gap: 14,
-    paddingHorizontal: 24,
-    paddingVertical: 18,
+    gap: spacing.lg,                          // bumped 14 → 16
+    paddingHorizontal: spacing.xxl,           // 24
+    paddingVertical: spacing.lg,              // bumped 18 → 16 row gutter
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
   articleRowFirst: {
     borderTopWidth: 0,
-    paddingTop: 4,
+    paddingTop: spacing.xs,
   },
   articleImg: {
     width: 92,
     height: 92,
-    borderRadius: 4,
+    borderRadius: radius.card,
     backgroundColor: colors.surfaceDeep,
   },
   articleText: {
@@ -458,40 +448,37 @@ const styles = StyleSheet.create({
   articleKickerRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginBottom: 6,
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
   },
   articleKicker: {
-    fontFamily: fonts.mono,
-    fontSize: 9.5,
+    ...type.kicker,                           // bumped 9.5 → 10 (kicker minimum)
     letterSpacing: 1.8,
     color: colors.accentSoft,
   },
   articleCadence: {
-    fontFamily: fonts.mono,
-    fontSize: 9.5,
+    ...type.kicker,
     letterSpacing: 1.4,
     color: colors.textMuted,
   },
   articleTitle: {
-    fontFamily: "Georgia",
-    fontSize: 17,
-    fontWeight: "500",
+    fontFamily: fonts.serif,
+    fontSize: type.lede.fontSize,             // 17
+    fontWeight: weights.emphasis,             // 500 → 700 (Fix 4 weights)
     color: colors.textPrimary,
     lineHeight: 22,
     letterSpacing: -0.2,
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   articleBlurb: {
-    fontSize: 12.5,
+    ...type.caption,                          // 12 / 16 (was 12.5 / 18)
     color: colors.textSecondary,
     lineHeight: 18,
   },
   comingSoon: {
-    fontFamily: fonts.mono,
-    fontSize: 9,
+    ...type.kicker,
     letterSpacing: 1.6,
     color: colors.textMuted,
-    marginTop: 6,
+    marginTop: spacing.xs,
   },
 });
