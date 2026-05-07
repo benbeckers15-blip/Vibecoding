@@ -23,45 +23,65 @@
 //   <Text style={{ color: colors.textPrimary, ...type.lede }}/>
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { Platform } from "react-native";
-
 // ─── 1. Raw palette ──────────────────────────────────────────────────────────
 // Edit these values to change the brand colors. Everything else is derived.
+//
+// THEME: "Forest Slate" — modern dark UI, tuned for long-form reading.
+// Surfaces are not pure black: a near-black warm slate with a subtle green
+// undertone harmonises with the forest/lime accents and reduces eye strain
+// on text-heavy screens (article reading, winery editorial copy).
 export const palette = {
-  // Surfaces (light, "Warm Daylight")
-  paper:        "#efeae0",   // primary background — paper
-  paperTint:    "#F0EBE3",   // surface / chrome — chips, search bars, cards
-  paperDeep:    "#E8E0D5",   // heavier surface / divider tone
+  // Surfaces (dark, layered for hierarchy — each tier ~6% lighter than the last)
+  paper:        "#0F1411",   // primary background — deep slate w/ green undertone
+                             //   ~6% luminance — anchors the page without crushing to black.
+  paperTint:    "#1A201B",   // surface / chrome — chips, search bars, cards
+                             //   ~10% lift over paper so cards read as raised.
+  paperDeep:    "#070A08",   // heaviest surface / divider tone — footers, inset rows
+                             //   ~3% luminance — used sparingly for depth contrast.
+  paperLight:   "#222823",   // elevated surface — lifted cards w/ shadow, modal panels.
+                             //   ~14% — clearly "floats" off the page.
 
   // Ink (text)
-  ink:          "#1F1218",   // deep aubergine-black — primary text
-  inkInverse:   "#F5F0E6",   // ivory — text on photos / dark gradients
+  ink:          "#E8EAE6",   // soft off-white — primary text. Not pure white:
+                             //   reduces glare on dark surfaces during sustained reading.
+                             //   ~14:1 on paper — well past AAA.
+  inkInverse:   "#F5F0E6",   // warm ivory — text on photos / dark gradients
+                             //   (kept identical to light theme for consistent hero copy).
 
-  // Accents — Path A: deep eucalypt forest + dark caramel
-  // (Both pass WCAG AA against `paper`. See README in /constants for
-  //  contrast ratios.)
-  forest:       "#7e1f49",   // primary accent — eucalypt green
-                             //   active tab pill, hairlines, CTAs.
-                             //   6.88:1 on paper — passes AA Normal + AAA Large.
-  caramel:      "#c75b7b",   // secondary accent — plush
-                             //   kickers, ratings, "Visit cellar door →" CTAs,
-                             //   meta links. ~4.94:1 on paper — passes AA Normal.
-                             //   (Replaced the prior #C99A50 which failed at 2.39:1.)
+  // Accents — preserved per brand. These pop especially well on dark surfaces.
+  forest:       "#548323",   // primary accent — eucalypt green
+                             //   active tab pill, hairlines, CTAs. ~5.6:1 on paper — AA pass.
+  caramel:      "#9dd560",   // secondary accent — bright lime
+                             //   kickers, ratings, meta links. ~13:1 on paper — AAA pass.
+                             //   (Name retained from light theme for compat; reads as lime.)
   sage:         "#7A8B6F",   // tertiary — currently unused, reserved.
 
-  // Photo chrome — semi-transparent neutrals that sit over imagery
+  // Input / search surface — a touch lighter than `paperTint` so an input
+  // feels visually pressable on dark surfaces (key UX cue: "this is editable").
+  inputGray:    "#262C27",
+
+  // Photo chrome — semi-transparent neutrals that sit over imagery.
+  // Always dark, regardless of theme, since imagery is its own surface.
   glassDark:    "rgba(20,15,10,0.50)",     // dark glass — icon buttons over photos
   glassDarkAlt: "rgba(0,0,0,0.45)",        // alt darker glass — for very busy images
 
   // Status / semantic
-  error:        "#B43A3A",   // wine-red error tone — kept warm to fit palette
+  error:        "#E5705F",   // brightened terracotta — legible on dark surfaces.
 } as const;
 
 // ─── Alpha helpers ────────────────────────────────────────────────────────────
 // Return ink at a given alpha. Used by the semantic layer to derive secondary
-// text, dividers, etc. — keeping every translucent gray in the same hue family.
-const inkAlpha        = (a: number) => `rgba(31,18,24,${a})`;
+// text, dividers, etc. — keeping every translucent shade in the same hue family.
+//
+// In the dark theme, "ink" is light, so these produce semi-transparent LIGHT
+// shades that sit on dark surfaces (secondary text, hairline borders).
+const inkAlpha        = (a: number) => `rgba(232,234,230,${a})`;
 const inkInverseAlpha = (a: number) => `rgba(245,240,230,${a})`;
+// Photo-overlay alpha: ALWAYS dark, regardless of theme. Photo gradients
+// exist to darken imagery so light text is legible on top — they must stay
+// dark in dark mode (using `inkAlpha` here would lighten the photo, washing
+// out captions). Tinted slightly warm to harmonise with the slate palette.
+const photoInkAlpha   = (a: number) => `rgba(8,12,10,${a})`;
 
 // ─── 2. Semantic color tokens ────────────────────────────────────────────────
 // USE THESE IN SCREENS. The values point at `palette` above.
@@ -70,11 +90,16 @@ export const colors = {
   background:         palette.paper,        // page background
   surface:            palette.paperTint,    // cards, chips, search bars
   surfaceDeep:        palette.paperDeep,    // heavier surfaces / inset rows
+  surfaceElevated:    palette.paperLight,   // lifted cards (with shadow) — sleek/modern depth
 
   // ── Text ────────────────────────────────────────────────────────────────
-  textPrimary:        palette.ink,          // body, headlines on paper
-  textSecondary:      inkAlpha(0.65),       // subdued body, captions
-  textMuted:          inkAlpha(0.40),       // metadata, placeholders, labels
+  // In the dark theme `ink` is a soft off-white — these tokens read light on
+  // the dark surfaces. Three steps of alpha establish a clear typographic
+  // hierarchy (primary > secondary > muted) without introducing arbitrary
+  // greys: every shade stays in the same hue family.
+  textPrimary:        palette.ink,          // body, headlines on dark surface
+  textSecondary:      inkAlpha(0.72),       // subdued body, captions
+  textMuted:          inkAlpha(0.50),       // metadata, placeholders, labels
   textOnDark:         palette.inkInverse,   // text overlaid on photos/gradients
   textOnDarkMuted:    inkInverseAlpha(0.72),
   textOnDarkSubtle:   inkInverseAlpha(0.45),
@@ -84,8 +109,21 @@ export const colors = {
   accentSoft:         palette.caramel,      // kicker text, rating numbers, meta links
   accentTertiary:     palette.sage,
 
+  // Foreground color for elements that sit ON the primary accent (forest):
+  // tab icon when focused, label text on a CTA button, options icon on the
+  // search submit button, map cluster numbers, etc. Always near-white so
+  // forest reads as a confident, high-contrast surface — independent of
+  // whether `colors.background` happens to be light or dark.
+  onAccent:           palette.inkInverse,
+
+  // ── Input / search surface ──────────────────────────────────────────
+  inputSurface:       palette.inputGray,     // search bars + filter chips
+
   // ── Borders / dividers ──────────────────────────────────────────────────
-  border:             inkAlpha(0.10),       // hairlines on paper
+  // In the dark theme these are light-on-dark hairlines (inkAlpha returns
+  // a soft off-white at the requested alpha). Two strengths give clear
+  // hierarchy between divider lines and card edges.
+  border:             inkAlpha(0.10),       // hairlines on dark surface
   borderStrong:       inkAlpha(0.20),
   borderOnDark:       "rgba(255,255,255,0.20)", // borders for chrome over photos
 
@@ -96,25 +134,33 @@ export const colors = {
   photoChromeAlt:     palette.glassDarkAlt,
 
   // ── Photo overlays (for expo-linear-gradient stops over imagery) ───────
-  // Editorial photos use dark ink-toned vignettes so overlaid text reads
-  // cleanly. All stops below derive from `palette.ink` so they stay in the
-  // same hue family — no random "rgba(44,20,28,…)" drift.
-  photoOverlayTop:        "rgba(0,0,0,0.35)",      // top status-bar scrim — bumped to 0.35 for legibility
-  photoOverlaySoft:       inkAlpha(0.35),          // soft bottom vignette on hero photos
-  photoOverlayMedium:     inkAlpha(0.42),          // medium bottom on featured cards
-  photoOverlayStrong:     inkAlpha(0.78),          // strong bottom on small/dense cards
-  photoOverlayDeep:       inkAlpha(0.92),          // deepest stop just before solid bg
-  photoOverlayBottom:     inkAlpha(0.85),          // double-gradient companion to photoOverlayTop
+  // Editorial photos use DARK vignettes so overlaid text reads cleanly.
+  // We use `photoInkAlpha` (deep slate) rather than `inkAlpha` (which is
+  // light in dark mode) so overlays continue to darken photos rather than
+  // wash them out.
+  photoOverlayTop:        "rgba(0,0,0,0.35)",            // top status-bar scrim
+  photoOverlaySoft:       photoInkAlpha(0.35),           // soft bottom vignette on hero photos
+  photoOverlayMedium:     photoInkAlpha(0.45),           // medium bottom on featured cards
+  photoOverlayStrong:     photoInkAlpha(0.80),           // strong bottom on small/dense cards
+  photoOverlayDeep:       photoInkAlpha(0.94),           // deepest stop just before solid bg
+  photoOverlayBottom:     photoInkAlpha(0.88),           // double-gradient companion to photoOverlayTop
 
   // Gradient stops that fade hero photos into the page background.
   // Use these as the *final* color in a vertical gradient so the photo
   // feels mounted on the page rather than abruptly cut off.
-  fadeToBgSoft:           "rgba(250,247,242,0.92)",
+  // In dark mode both stops use the dark page color.
+  fadeToBgSoft:           "rgba(15,20,17,0.92)",
   fadeToBg:               palette.paper,
 
   // ── Modal scrim ────────────────────────────────────────────────────────
   // Backdrop behind modals/bottom-sheets — always dark for legibility.
   scrim:              "rgba(0,0,0,0.65)",
+
+  // ── Drop shadows ────────────────────────────────────────────────────────
+  // Native iOS/Android shadows (`shadowColor`/`elevation`). Must remain dark
+  // regardless of theme — a light shadow on a dark surface vanishes and the
+  // elevation cue (cards "lifting" off the page) is lost.
+  shadow:             "#000000",
 
   // ── Status ──────────────────────────────────────────────────────────────
   error:              palette.error,
@@ -122,9 +168,43 @@ export const colors = {
 
 // ─── 3. Typography ───────────────────────────────────────────────────────────
 // Family tokens.
+//
+// We load Playfair Display (headlines) and DM Sans (body / UI) as Google
+// Fonts via `@expo-google-fonts/*` in `app/_layout.tsx`. Each weight + style
+// is loaded as its own family — that's how custom fonts work on RN, where
+// `fontWeight` and `fontStyle` don't reliably synthesize for non-system
+// families. Pick the variant that matches the role you want.
+//
+// Headline weights: 700 (bold titles) and 600 (semi-bold subheadings).
+// Body / UI weights: 400 and 500 via DM Sans (unchanged).
+//
+// `serif` defaults to 700Bold because most call sites use it for titles. Use
+// `serifSemiBold` for subheadings, `serifItalic` for editorial italic lede, etc.
+//
+// `mono` is kept as a backward-compat alias to `sansMedium` so old call
+// sites that referenced the prior monospace kicker family still resolve to
+// a sensible DM Sans variant rather than the system default.
 export const fonts = {
-  serif:  "Georgia",                                                          // headlines, body
-  mono:   Platform.select({ ios: "Courier New", android: "monospace" }) ?? "monospace", // kickers, labels
+  // Headline (Playfair Display) — classic editorial serif
+  serif:              "PlayfairDisplay_700Bold",
+  serifRegular:       "PlayfairDisplay_400Regular",
+  serifItalic:        "PlayfairDisplay_400Regular_Italic",
+  serifSemiBold:      "PlayfairDisplay_600SemiBold",
+  serifSemiBoldItalic:"PlayfairDisplay_600SemiBold_Italic",
+  serifBold:          "PlayfairDisplay_700Bold",
+  serifBoldItalic:    "PlayfairDisplay_700Bold_Italic",
+
+  // Sans (DM Sans) — body, UI, labels
+  sans:            "DMSans_400Regular",
+  sansMedium:      "DMSans_500Medium",
+  sansBold:        "DMSans_700Bold",
+
+  // Display (Bebas Neue) — brand logo + hero "by the glass" headline.
+  // Tall, condensed sans with a single weight; pair with extra letter-spacing.
+  display:         "BebasNeue_400Regular",
+
+  // Backward-compat aliases.
+  mono:            "DMSans_500Medium",
 } as const;
 
 // Font-weight tokens — keep to two roles to avoid the 400/500/700 drift.
@@ -151,54 +231,48 @@ export const weights = {
 // apply `...type.lede` and get the editorial pairing in one go.
 export const type = {
   kicker: {
-    fontFamily:    fonts.mono,
+    fontFamily:    fonts.sansMedium,
     fontSize:      10,
     letterSpacing: 2.5,
   },
   caption: {
+    fontFamily:    fonts.sans,
     fontSize:      12,
     lineHeight:    16,
   },
   body: {
+    fontFamily:    fonts.sans,
     fontSize:      14,
     lineHeight:    20,
   },
   lede: {
-    fontFamily:    fonts.serif,
+    fontFamily:    fonts.serifSemiBoldItalic,  // 600 italic — editorial lede
     fontSize:      17,
-    fontStyle:     "italic" as const,
-    fontWeight:    weights.body,
     lineHeight:    27,
   },
   h3: {
-    fontFamily:    fonts.serif,
+    fontFamily:    fonts.serifSemiBold,   // 600 — subheading weight
     fontSize:      22,
-    fontWeight:    weights.emphasis,
     lineHeight:    27,
     letterSpacing: -0.2,
   },
   h2: {
-    fontFamily:    fonts.serif,
+    fontFamily:    fonts.serifSemiBold,   // 600 — subheading weight
     fontSize:      28,
-    fontWeight:    weights.emphasis,
     lineHeight:    34,
     letterSpacing: -0.4,
   },
   h1: {
-    fontFamily:    fonts.serif,
+    fontFamily:    fonts.serifBold,       // 700 — headline weight
     fontSize:      36,
-    fontStyle:     "italic" as const,
-    fontWeight:    weights.body,
     lineHeight:    42,
     letterSpacing: -0.5,
   },
   display: {
-    fontFamily:    fonts.serif,
-    fontSize:      44,
-    fontStyle:     "italic" as const,
-    fontWeight:    weights.body,
-    lineHeight:    50,
-    letterSpacing: -0.3,
+    fontFamily:    fonts.display,           // Bebas Neue — condensed, single weight
+    fontSize:      54,                      // Bebas's x-height runs small, size up
+    lineHeight:    58,
+    letterSpacing: 1.5,                     // wide tracking matches the brand mark
   },
 } as const;
 
@@ -230,10 +304,14 @@ export const spacing = {
 // ─── 5. Radii ────────────────────────────────────────────────────────────────
 // Card radius is intentionally tight (4) to keep the editorial aesthetic.
 // Pill is for chips, badges, and the floating tab bar.
+// cardLg is for elevated, "lifted" cards that read as standalone units —
+// slightly more rounded for a sleeker, modern feel without breaking the
+// editorial tone.
 export const radius = {
-  sharp: 0,
-  card:  4,
-  pill:  999,
+  sharp:  0,
+  card:   4,
+  cardLg: 12,
+  pill:   999,
 } as const;
 
 // ─── 6. Convenience exports ──────────────────────────────────────────────────

@@ -65,6 +65,8 @@ const TabButton = React.memo(function TabButton({
       ? "person"
       : route.name === "wineries"
       ? "wine"
+      : route.name === "trips"
+      ? "map"
       : "home";
 
   return (
@@ -78,7 +80,7 @@ const TabButton = React.memo(function TabButton({
         <Ionicons
           name={iconName as any}
           size={20}
-          color={isFocused ? colors.background : colors.textMuted}
+          color={isFocused ? colors.onAccent : colors.textMuted}
         />
       </Animated.View>
       {!isFocused && (
@@ -93,7 +95,24 @@ const TabButton = React.memo(function TabButton({
 });
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
-  const routesCount = state.routes.length;
+  // Routes declared with `href: null` should not appear in the bar. Expo
+  // Router strips `href` from the descriptor and instead sets
+  // `tabBarItemStyle: { display: 'none' }`, so we filter on that. Also remap
+  // the focused index into the visible-routes space so the sliding indicator
+  // lands on the correct slot.
+  const visibleRoutes = state.routes.filter((route: any) => {
+    const itemStyle = descriptors[route.key].options.tabBarItemStyle as
+      | { display?: string }
+      | undefined;
+    return itemStyle?.display !== "none";
+  });
+  const focusedRouteKey = state.routes[state.index]?.key;
+  const focusedVisibleIndex = Math.max(
+    0,
+    visibleRoutes.findIndex((r: any) => r.key === focusedRouteKey)
+  );
+
+  const routesCount = visibleRoutes.length;
   const [measuredBarWidth, setMeasuredBarWidth] = useState<number | null>(null);
   const effectiveBarWidth = measuredBarWidth ?? BAR_WIDTH_FALLBACK;
   const contentWidth = Math.max(0, effectiveBarWidth - H_PADDING * 2);
@@ -109,19 +128,19 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
   useEffect(() => {
     if (measuredBarWidth == null) return;
     if (!initialPositioned.current) {
-      circleLeft.value = targetLeftForIndex(state.index);
+      circleLeft.value = targetLeftForIndex(focusedVisibleIndex);
       initialPositioned.current = true;
     }
   }, [measuredBarWidth]);
 
   useEffect(() => {
     if (!initialPositioned.current) return;
-    circleLeft.value = withSpring(targetLeftForIndex(state.index), {
+    circleLeft.value = withSpring(targetLeftForIndex(focusedVisibleIndex), {
       damping: 18,
       stiffness: 250,
       mass: 1,
     });
-  }, [state.index, slotWidth, circleLeft]);
+  }, [focusedVisibleIndex, slotWidth, circleLeft]);
 
   const animatedCircleStyle = useAnimatedStyle(() => ({
     left: circleLeft.value,
@@ -146,8 +165,8 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
             ]}
           />
 
-          {state.routes.map((route: any, index: number) => {
-            const isFocused = state.index === index;
+          {visibleRoutes.map((route: any, index: number) => {
+            const isFocused = focusedVisibleIndex === index;
 
             const onPress = () => {
               const event = navigation.emit({
@@ -187,9 +206,18 @@ export default function TabLayout() {
       screenOptions={{ headerShown: false }}
     >
       <Tabs.Screen name="home" options={{ title: "Home", tabBarLabel: "Home" }} />
-      <Tabs.Screen name="explore" options={{ title: "Explore", tabBarLabel: "Explore" }} />
       <Tabs.Screen name="wineries" options={{ title: "Wineries", tabBarLabel: "Wineries" }} />
+      <Tabs.Screen name="trips" options={{ title: "Trips", tabBarLabel: "Trips" }} />
       <Tabs.Screen name="profile" options={{ title: "Profile", tabBarLabel: "Profile" }} />
+      {/* `articles` is a (tabs)-nested stack we navigate into from the home
+          screen's relocated article cards. `href: null` flags it as hidden;
+          the CustomTabBar above filters routes whose `options.href === null`
+          out of the rendered bar. */}
+      <Tabs.Screen name="articles" options={{ href: null }} />
+      {/* `explore` is preserved as a route for any existing inbound links,
+          but its article content now lives on the home tab — so it is
+          hidden from the floating nav. */}
+      <Tabs.Screen name="explore" options={{ href: null }} />
     </Tabs>
   );
 }
@@ -204,7 +232,7 @@ const styles = StyleSheet.create({
     zIndex: 2000,
   },
   shadowWrapper: {
-    shadowColor: colors.textPrimary,
+    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
     shadowRadius: 14,

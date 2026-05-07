@@ -2,11 +2,11 @@
 
 ## What This App Is
 
-A hyper-regional mobile tourism app focused on the **Margaret River** wine region of Western Australia. Designed for both tourists and locals. The app is a discovery and editorial hub for the region's wineries, events, and content.
+A hyper-regional mobile tourism app focused on the **.env** wine region of Western Australia. Designed for both tourists and locals. The app is a discovery and editorial hub for the region's wineries, events, and content.
 
 **Owner:** Benjamin (benbeckers15@gmail.com)
 **Goal:** Build and launch this app end-to-end using Claude (Cowork + Claude Code)
-**App name (package):** `winerytourism`
+**App name (package):** `SipLocal`
 
 ---
 

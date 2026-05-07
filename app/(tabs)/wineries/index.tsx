@@ -5,11 +5,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Link, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { collection, getDocs } from "firebase/firestore";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   FlatList,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,6 +17,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Image } from "expo-image";
 import MapView from "react-native-map-clustering";
 import { Callout, Marker } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -131,6 +132,30 @@ export default function WineriesScreen() {
   });
   const [minRating, setMinRating] = useState(0);
 
+  // ── Map transition ────────────────────────────────────────────────────────
+  // activeMapKey drives the MapView key (remount). overlayAnim covers the swap
+  // so the user never sees the white background between unmount and remount.
+  const computedMapKey = `map-${minRating}-${[...activeFilters].sort().join(",")}`;
+  const [activeMapKey, setActiveMapKey] = useState(computedMapKey);
+  const activeMapKeyRef = useRef(computedMapKey);
+  const overlayAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (computedMapKey === activeMapKeyRef.current) return;
+    if (view !== "map") {
+      // Not visible — swap instantly, no animation needed
+      activeMapKeyRef.current = computedMapKey;
+      setActiveMapKey(computedMapKey);
+      return;
+    }
+    // In map view: fade overlay in → swap map → fade overlay out
+    Animated.timing(overlayAnim, { toValue: 1, duration: 120, useNativeDriver: true }).start(() => {
+      activeMapKeyRef.current = computedMapKey;
+      setActiveMapKey(computedMapKey);
+      Animated.timing(overlayAnim, { toValue: 0, duration: 220, useNativeDriver: true }).start();
+    });
+  }, [computedMapKey, view]);
+
   // Sync URL params on focus (e.g. deep-linked from home screen chips)
   useFocusEffect(
     useCallback(() => {
@@ -209,7 +234,7 @@ export default function WineriesScreen() {
     : filtered;
 
   const mappableWineries = filtered.filter(
-    (w) => typeof w.latitude === "number" && typeof w.longitude === "number"
+    (w) => Number.isFinite(w.latitude) && Number.isFinite(w.longitude)
   );
 
   // ── Loading state ──────────────────────────────────────────────────────────
@@ -225,16 +250,44 @@ export default function WineriesScreen() {
   // ── Winery card ────────────────────────────────────────────────────────────
   const renderCard = ({ item }: { item: Winery }) => {
     const hasImage = item.images && item.images.length > 0;
+
+    // Distance chip — only when location is active AND winery has coords.
+    const showDistance =
+      nearActive &&
+      typeof item.latitude === "number" &&
+      typeof item.longitude === "number";
+    const distance = showDistance
+      ? distanceKm(
+          nearLat,
+          nearLng,
+          item.latitude as number,
+          item.longitude as number
+        )
+      : null;
+    const distanceLabel =
+      distance == null
+        ? null
+        : distance < 10
+        ? `${distance.toFixed(1)} km`
+        : `${Math.round(distance)} km`;
+
+    // Feature pills — all boolean attributes that are true on this winery.
+    const featurePills = BOOLEAN_FILTERS.filter((f) => Boolean(item[f.key]));
+
     return (
+      <View style={styles.cardShadow}>
       <Link href={`/wineries/${item.slug}?from=wineries`} asChild>
-        <Pressable style={styles.card}>
+        <Pressable
+          style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+        >
           {/* Hero image */}
           {hasImage && (
             <View style={styles.cardImgWrap}>
               <Image
                 source={{ uri: item.images![0] }}
                 style={styles.cardImg}
-                resizeMode="cover"
+                contentFit="cover"
+                transition={150}
               />
               {/* Partner badge */}
               {item.featured && (
@@ -263,7 +316,9 @@ export default function WineriesScreen() {
           {/* Card body */}
           <View style={[styles.cardBody, !hasImage && styles.cardBodyAccent]}>
             <Text style={styles.cardRegion}>{REGION_NAME_UPPER}</Text>
-            <Text style={styles.cardName}>{item.name}</Text>
+            <Text style={styles.cardName} numberOfLines={2}>
+              {item.name}
+            </Text>
 
             {item.description && item.description.length > 0 && (
               <Text style={styles.cardBlurb} numberOfLines={2}>
@@ -271,31 +326,62 @@ export default function WineriesScreen() {
               </Text>
             )}
 
-            <View style={styles.cardMeta}>
-              {item.rating != null && (
-                <Text style={styles.cardRating}>
-                  ★ {item.rating.toFixed(1)}
-                </Text>
-              )}
-              {item.rating != null && item.userRatingsTotal != null && (
-                <Text style={styles.cardReviews}>
-                  ({item.userRatingsTotal.toLocaleString()})
-                </Text>
-              )}
-              {item.dogFriendly && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>Dog OK</Text>
-                </View>
-              )}
-              {item.hasRestaurant && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>Restaurant</Text>
-                </View>
-              )}
-            </View>
+            {/* Rating + distance row */}
+            {(item.rating != null || distanceLabel) && (
+              <View style={styles.cardMeta}>
+                {item.rating != null && (
+                  <View style={styles.metaItem}>
+                    <Ionicons
+                      name="star"
+                      size={11}
+                      color={colors.accentSoft}
+                    />
+                    <Text style={styles.cardRating}>
+                      {item.rating.toFixed(1)}
+                    </Text>
+                    {item.userRatingsTotal != null && (
+                      <Text style={styles.cardReviews}>
+                        ({item.userRatingsTotal.toLocaleString()})
+                      </Text>
+                    )}
+                  </View>
+                )}
+                {item.rating != null && distanceLabel && (
+                  <View style={styles.metaDot} />
+                )}
+                {distanceLabel && (
+                  <View style={styles.metaItem}>
+                    <Ionicons
+                      name="location"
+                      size={11}
+                      color={colors.accent}
+                    />
+                    <Text style={styles.distanceText}>{distanceLabel}</Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Feature pills — all booleans true on this winery */}
+            {featurePills.length > 0 && (
+              <View style={styles.featurePillsRow}>
+                {featurePills.map(({ key, label, icon }) => (
+                  <View key={String(key)} style={styles.featurePill}>
+                    <Ionicons
+                      name={icon}
+                      size={10}
+                      color={colors.textSecondary}
+                      style={styles.featurePillIcon}
+                    />
+                    <Text style={styles.featurePillText}>{label}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
         </Pressable>
       </Link>
+      </View>
     );
   };
 
@@ -351,7 +437,7 @@ export default function WineriesScreen() {
                 <Ionicons
                   name={icon}
                   size={13}
-                  color={active ? colors.background : colors.textSecondary}
+                  color={active ? colors.onAccent : colors.textSecondary}
                   style={styles.chipIcon}
                 />
                 <Text style={[styles.chipText, active && styles.chipTextActive]}>
@@ -442,47 +528,55 @@ export default function WineriesScreen() {
 
       {/* ── Map ───────────────────────────────────────────────────────────────── */}
       {view === "map" && (
-        <MapView
-          style={styles.map}
-          initialRegion={TASMANIA_REGION}
-          showsUserLocation
-          showsMyLocationButton
-          clusterColor={colors.accent}
-          clusterTextColor={colors.background}
-          clusterFontFamily="Georgia"
-          radius={40}
-        >
-          {mappableWineries.map((winery) => (
-            <Marker
-              key={winery.id}
-              coordinate={{
-                latitude: winery.latitude!,
-                longitude: winery.longitude!,
-              }}
-              anchor={{ x: 0.5, y: 1 }}
-            >
-              <Image
-                source={require("../../../assets/images/logo-pin.png")}
-                style={styles.markerPin}
-                resizeMode="contain"
-              />
-              <Callout
-                tooltip
-                onPress={() => router.push(`/wineries/${winery.slug}`)}
+        <View style={{ flex: 1 }}>
+          <MapView
+            key={activeMapKey}
+            style={styles.map}
+            initialRegion={TASMANIA_REGION}
+            showsUserLocation
+            showsMyLocationButton
+            clusterColor={colors.accent}
+            clusterTextColor={colors.onAccent}
+            clusterFontFamily={fonts.serif}
+            radius={40}
+          >
+            {mappableWineries.map((winery) => (
+              <Marker
+                key={winery.id}
+                coordinate={{
+                  latitude: winery.latitude!,
+                  longitude: winery.longitude!,
+                }}
+                anchor={{ x: 0.5, y: 1 }}
               >
-                <View style={styles.callout}>
-                  <Text style={styles.calloutName}>{winery.name}</Text>
-                  {winery.rating != null && (
-                    <Text style={styles.calloutRating}>
-                      ★ {winery.rating.toFixed(1)}
-                    </Text>
-                  )}
-                  <Text style={styles.calloutCta}>TAP TO VIEW ›</Text>
-                </View>
-              </Callout>
-            </Marker>
-          ))}
-        </MapView>
+                <Image
+                  source={require("../../../assets/images/logo-pin.png")}
+                  style={styles.markerPin}
+                  contentFit="contain"
+                />
+                <Callout
+                  tooltip
+                  onPress={() => router.push(`/wineries/${winery.slug}`)}
+                >
+                  <View style={styles.callout}>
+                    <Text style={styles.calloutName}>{winery.name}</Text>
+                    {winery.rating != null && (
+                      <Text style={styles.calloutRating}>
+                        ★ {winery.rating.toFixed(1)}
+                      </Text>
+                    )}
+                    <Text style={styles.calloutCta}>TAP TO VIEW ›</Text>
+                  </View>
+                </Callout>
+              </Marker>
+            ))}
+          </MapView>
+          {/* Overlay that briefly covers the MapView remount — eliminates white flash */}
+          <Animated.View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, { opacity: overlayAnim, backgroundColor: colors.background }]}
+          />
+        </View>
       )}
     </View>
   );
@@ -531,7 +625,7 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.surface,
+    backgroundColor: colors.inputSurface,
     borderRadius: 32,
     borderWidth: 1,
     borderColor: colors.border,
@@ -561,7 +655,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,            // bumped 14 → 16
     paddingVertical: 11,                      // bumped 7 → 11 (Fix 4)
     borderRadius: radius.pill,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.inputSurface,
     borderWidth: 1,
     borderColor: colors.border,
     minHeight: spacing.hitTarget,             // 44pt floor (Apple HIG)
@@ -585,7 +679,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   chipTextActive: {
-    color: colors.background,
+    color: colors.onAccent,
   },
 
   // ── Rating filter ────────────────────────────────────────────────────────
@@ -622,7 +716,7 @@ const styles = StyleSheet.create({
     fontWeight: weights.body,
   },
   ratingBtnTextActive: {
-    color: colors.background,
+    color: colors.onAccent,
   },
 
   // ── Results row ──────────────────────────────────────────────────────────
@@ -667,20 +761,40 @@ const styles = StyleSheet.create({
 
   // ── Cards ────────────────────────────────────────────────────────────────
   listContent: {
-    paddingHorizontal: spacing.xxl,           // standardised 20 → 24
+    paddingTop: spacing.xs,                    // breathing room for shadows
     paddingBottom: 120,
   },
+  // Shadow host — owns margin, elevation, and background color.
+  // No overflow:hidden here so the shadow can render freely.
+  cardShadow: {
+    marginHorizontal: spacing.xxl,
+    borderRadius: radius.cardLg,
+    backgroundColor: colors.surfaceElevated,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.10,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  // Clip host — clips image to rounded corners.
+  // No shadow here; that lives on cardShadow above.
   card: {
-    borderRadius: radius.card,
+    borderRadius: radius.cardLg,
     overflow: "hidden",
-    backgroundColor: colors.surface,
+  },
+  cardPressed: {
+    opacity: 0.92,
   },
   cardSep: {
-    height: spacing.lg,                       // bumped 14 → 16
+    height: spacing.md,                       // 12 — matched to library card rhythm
   },
   cardImgWrap: {
-    height: 160,
+    height: 150,                              // matched to library card height
     position: "relative",
+    backgroundColor: colors.surfaceDeep,
+    borderTopLeftRadius: radius.cardLg,
+    borderTopRightRadius: radius.cardLg,
+    overflow: "hidden",
   },
   cardImg: {
     width: "100%",
@@ -699,7 +813,7 @@ const styles = StyleSheet.create({
     ...type.kicker,                           // bumped 9 → 10 (kicker minimum)
     fontSize: 10,
     letterSpacing: 1.5,
-    color: colors.background,
+    color: colors.onAccent,
     fontWeight: weights.emphasis,
   },
   heartBtn: {
@@ -744,6 +858,17 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.md,
   },
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  metaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: radius.pill,
+    backgroundColor: colors.textMuted,
+  },
   cardRating: {
     ...type.caption,
     color: colors.accentSoft,
@@ -753,17 +878,37 @@ const styles = StyleSheet.create({
     ...type.caption,
     color: colors.textMuted,
   },
-  badge: {
+  distanceText: {
+    ...type.caption,
+    color: colors.textPrimary,
+    fontWeight: weights.emphasis,
+  },
+  // Display-only pills for the boolean attributes that are true on a winery.
+  // Smaller and quieter than the filter chips above so the card name still leads.
+  featurePillsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+    marginTop: spacing.md,
+  },
+  featurePill: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: radius.pill,
+    backgroundColor: colors.surfaceDeep,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  badgeText: {
-    ...type.kicker,
-    letterSpacing: 1,
-    color: colors.textMuted,
+  featurePillIcon: {
+    marginRight: spacing.xs,
+  },
+  featurePillText: {
+    ...type.caption,
+    color: colors.textSecondary,
+    fontWeight: weights.body,
+    letterSpacing: 0.2,
   },
 
   // ── Empty state ──────────────────────────────────────────────────────────

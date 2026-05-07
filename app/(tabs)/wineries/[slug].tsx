@@ -16,7 +16,6 @@ import React, { useEffect, useState } from "react";
 import SkeletonBox from "../../../components/SkeletonBox";
 import {
   Dimensions,
-  ImageBackground,
   Linking,
   Modal,
   Pressable,
@@ -25,6 +24,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { Image } from "expo-image";
 import Animated, {
   Extrapolation,
   interpolate,
@@ -296,7 +296,16 @@ export default function WineryDetailsScreen() {
 
           {/* Glass header buttons */}
           <View style={[styles.headerOverlay, { top: insets.top + 10 }]}>
-            <Pressable style={styles.headerBtn} onPress={() => router.back()}>
+            <Pressable
+              style={styles.headerBtn}
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace("/(tabs)/wineries");
+                }
+              }}
+            >
               <Ionicons name="chevron-back" size={16} color={colors.textOnDark} />
               <Text style={styles.headerBtnText}>{backLabel}</Text>
             </Pressable>
@@ -339,10 +348,13 @@ export default function WineryDetailsScreen() {
               renderItem={({ item }) => (
                 <View style={styles.heroCardFrame}>
                   <Animated.View style={heroParallaxStyle}>
-                    <ImageBackground
-                      source={{ uri: String(item) }}
-                      style={styles.heroImage}
-                    >
+                    <View style={styles.heroImage}>
+                      <Image
+                        source={{ uri: String(item) }}
+                        style={StyleSheet.absoluteFillObject}
+                        contentFit="cover"
+                        transition={200}
+                      />
                       {/* Gradient fades to dark bg so content below blends */}
                       {/* Dark scrim deepens toward the bottom so the title
                           overlay reads cleanly on any photo. The page below
@@ -356,7 +368,7 @@ export default function WineryDetailsScreen() {
                         locations={[0, 0.5, 1]}
                         style={styles.heroGradient}
                       />
-                    </ImageBackground>
+                    </View>
                   </Animated.View>
                 </View>
               )}

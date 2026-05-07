@@ -164,7 +164,7 @@ export default function AuthScreen() {
             accessibilityRole="button"
           >
             {submitting ? (
-              <ActivityIndicator color={colors.background} size="small" />
+              <ActivityIndicator color={colors.onAccent} size="small" />
             ) : (
               <Text style={styles.submitLabel}>
                 {isSignUp ? "Create account" : "Sign in"}
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   title: {
-    fontFamily: "Georgia",
+    fontFamily: fonts.serif,
     fontStyle: "italic",
     fontSize: 34,
     fontWeight: "500",
@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.mono,
     fontSize: 12,
     letterSpacing: 2,
-    color: colors.background,
+    color: colors.onAccent,
     fontWeight: "700",
   },
 

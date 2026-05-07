@@ -4,22 +4,21 @@
 
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import {
   collection,
   doc,
   getDoc,
   getDocs,
+  limit,
+  orderBy,
   query,
   where,
 } from "firebase/firestore";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
-  Image,
-  ImageBackground,
+  Animated,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -27,32 +26,25 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { REGION_NAME, REGION_NAME_UPPER } from "../../../constants/region";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
 import { db } from "../../../firebaseConfig";
 
+// Wrap expo-image so it can be driven by React Native's Animated values
+// (used for the parallax hero photo on the homepage).
+const AnimatedImage = Animated.createAnimatedComponent(Image);
+
 // ─── Static assets ────────────────────────────────────────────────────────────
 const HERO_FALLBACK =
   "https://images.unsplash.com/photo-1734517648070-2e8d4ed686ac?q=80&w=1035&auto=format&fit=crop";
 
-// ─── Filter chip config ───────────────────────────────────────────────────────
-type FilterKey =
-  | "dogFriendly"
-  | "hasRestaurant"
-  | "isOrganic"
-  | "isBiodynamic"
-  | "walkinWelcome"
-  | "nearMe";
+// ─── Hero parallax constants ──────────────────────────────────────────────────
+const HERO_HEIGHT = 440;          // taller than the original 340
+const PARALLAX_EXTRA = 100;       // extra px the image extends beyond the container (50 each side)
+const PARALLAX_TRANSLATE = 60;    // max px the image translates as the hero scrolls away
 
-const CHIPS: { key: FilterKey; label: string }[] = [
-  { key: "hasRestaurant", label: "Restaurant" },
-  { key: "dogFriendly",   label: "Dog OK"     },
-  { key: "walkinWelcome", label: "Walk-ins"   },
-  { key: "isOrganic",     label: "Organic"    },
-  { key: "isBiodynamic",  label: "Biodynamic" },
-  { key: "nearMe",        label: "Near me"    },
-];
 
 // ─── Editorial tiles ──────────────────────────────────────────────────────────
 const EXPLORE_TILES: {
@@ -105,6 +97,27 @@ type FeaturedWinery = {
   userRatingsTotal?: number;
 };
 
+interface FeaturedPour {
+  issueLabel: string;
+  kicker: string;
+  headline: string;
+  author: string;
+  date: string;
+  readTime: string;
+  heroImage: string;
+}
+
+type ArticleEntry = {
+  key: string;
+  kicker: string;
+  title: string;
+  blurb: string;
+  image: string;
+  cadence: string;            // e.g. "Weekly", "Monthly", "Series"
+  href?: string;              // tap target — undefined ⇒ shows "Coming soon"
+  order: number;
+};
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export default function HomeScreen() {
   const router = useRouter();
@@ -113,7 +126,17 @@ export default function HomeScreen() {
   const [heroImageUrl, setHeroImageUrl] = useState<string>(HERO_FALLBACK);
   const [featuredWinery, setFeaturedWinery] = useState<FeaturedWinery | null>(null);
   const [wineryCount, setWineryCount] = useState<number>(0);
-  const [nearMeLoading, setNearMeLoading] = useState(false);
+  const [pour, setPour] = useState<FeaturedPour | null>(null);
+  const [loadingPour, setLoadingPour] = useState(true);
+  const [articles, setArticles] = useState<ArticleEntry[]>([]);
+
+  // Parallax scroll driver
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const heroImageTranslate = scrollY.interpolate({
+    inputRange: [0, HERO_HEIGHT],
+    outputRange: [0, -PARALLAX_TRANSLATE],
+    extrapolate: "clamp",
+  });
 
   // Fetch hero image
   useEffect(() => {
@@ -158,6 +181,68 @@ export default function HomeScreen() {
     })();
   }, []);
 
+  // Fetch explore_articles directory (relocated from the explore tab)
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const q = query(
+          collection(db, "explore_articles"),
+          orderBy("order", "asc")
+        );
+        const snap = await getDocs(q);
+        if (cancelled) return;
+        setArticles(
+          snap.docs
+            .filter((d) => d.data().active !== false)
+            .map((d) => ({ key: d.id, ...(d.data() as Omit<ArticleEntry, "key">) }))
+        );
+      } catch {
+        // Silently fail — article list stays empty.
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
+
+  // Fetch latest active Pour issue (relocated from the explore tab)
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const q = query(
+          collection(db, "pour_articles"),
+          orderBy("issueNumber", "desc"),
+          limit(10)
+        );
+        const snap = await getDocs(q);
+        if (cancelled || snap.empty) return;
+
+        const active = snap.docs.find((d) => d.data().active !== false);
+        if (active) {
+          const d = active.data() as FeaturedPour;
+          setPour({
+            issueLabel: d.issueLabel,
+            kicker:     d.kicker,
+            headline:   d.headline,
+            author:     d.author,
+            date:       d.date,
+            readTime:   d.readTime,
+            heroImage:  d.heroImage,
+          });
+        }
+      } catch {
+        // Silently fail — featured card just won't render.
+      } finally {
+        if (!cancelled) setLoadingPour(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
+
   const handleSearchSubmit = () => {
     const trimmed = search.trim();
     const t = Date.now();
@@ -168,85 +253,53 @@ export default function HomeScreen() {
     );
   };
 
-  const handleChipPress = async (key: FilterKey) => {
-    const t = Date.now();
-    if (key === "nearMe") {
-      if (nearMeLoading) return;
-      setNearMeLoading(true);
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") {
-          Alert.alert(
-            "Location needed",
-            "Enable location access to see wineries near you."
-          );
-          return;
-        }
-        const loc = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        router.push(
-          `/wineries?near=1&lat=${loc.coords.latitude}&lng=${loc.coords.longitude}&t=${t}` as any
-        );
-      } catch {
-        Alert.alert(
-          "Location unavailable",
-          "We couldn't get your location. Please try again."
-        );
-      } finally {
-        setNearMeLoading(false);
-      }
-      return;
-    }
-    router.push(`/wineries?filter=${key}&t=${t}` as any);
-  };
 
   return (
-    <ScrollView
+    <Animated.ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
+      scrollEventThrottle={16}
+      onScroll={Animated.event(
+        [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+        { useNativeDriver: true }
+      )}
     >
       {/* ── Daylight hero — image only, full saturation ───────────────────────── */}
       <View style={styles.hero}>
-        {/* Hero image — full saturation, landscape does the heavy lifting */}
-        <Image
+        {/* Hero image with subtle parallax — image extends beyond the container
+            so it never shows gaps as it translates upward on scroll. */}
+        <AnimatedImage
           source={{ uri: heroImageUrl }}
-          style={[StyleSheet.absoluteFill, { opacity: 0.96 }]}
-          resizeMode="cover"
-        />
-        {/* Double-stop gradient: dark scrim at top (keeps brand + heart legible
-            on bright photos like a sunlit vineyard) AND a soft bottom vignette
-            so the headline overlay below the image edge reads cleanly too. */}
-        <LinearGradient
-          colors={[
-            colors.photoOverlayTop,
-            "transparent",
-            colors.photoOverlayBottom,
+          style={[
+            {
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: -(PARALLAX_EXTRA / 2),
+              height: HERO_HEIGHT + PARALLAX_EXTRA,
+              opacity: 0.96,
+            },
+            { transform: [{ translateY: heroImageTranslate }] },
           ]}
-          locations={[0, 0.45, 1]}
-          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          transition={200}
         />
-
         {/* Brand header overlaid on photo */}
         <View style={[styles.heroHeader, { paddingTop: insets.top + 10 }]}>
           <Text style={styles.logo}>
-            Cellar<Text style={styles.logoAccent}>Door</Text>
+            Sip<Text style={styles.logoAccent}>Local</Text>
           </Text>
-          <View style={styles.iconBtn}>
-            <Ionicons name="heart-outline" size={15} color={colors.textOnDark} />
-          </View>
         </View>
       </View>
 
       {/* ── Hero editorial copy — on warm paper below the image ──────────────── */}
       <View style={styles.heroCopySection}>
-        <Text style={styles.heroKicker}>
-          {REGION_NAME_UPPER}
-          {wineryCount > 0 ? ` · ${wineryCount} CELLAR DOORS` : ""}
+        <Text style={[styles.heroKicker, { textAlign: "right" }]}>
+          Issue No. 1
         </Text>
         <Text style={styles.heroHeadline}>
-          {"The region,\nby the glass."}
+          {"Tasmania,\nby the glass."}
         </Text>
       </View>
 
@@ -270,35 +323,10 @@ export default function HomeScreen() {
             onSubmitEditing={handleSearchSubmit}
           />
           <Pressable onPress={handleSearchSubmit} style={styles.searchBtn}>
-            <Ionicons name="options-outline" size={14} color={colors.background} />
+            <Ionicons name="options-outline" size={14} color={colors.onAccent} />
           </Pressable>
         </View>
 
-        {/* Scrollable filter chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipsRow}
-          style={styles.chipsScroll}
-        >
-          {CHIPS.map((chip) => {
-            const loading = chip.key === "nearMe" && nearMeLoading;
-            return (
-              <Pressable
-                key={chip.key}
-                style={styles.chip}
-                onPress={() => handleChipPress(chip.key)}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator size="small" color={colors.textPrimary} />
-                ) : (
-                  <Text style={styles.chipText}>{chip.label}</Text>
-                )}
-              </Pressable>
-            );
-          })}
-        </ScrollView>
       </View>
 
       {/* ── Featured winery card ─────────────────────────────────────────────── */}
@@ -321,7 +349,8 @@ export default function HomeScreen() {
                 <Image
                   source={{ uri: featuredWinery.images[0] }}
                   style={styles.featImg}
-                  resizeMode="cover"
+                  contentFit="cover"
+                  transition={150}
                 />
                 <LinearGradient
                   colors={["transparent", colors.photoOverlayMedium]}
@@ -373,7 +402,8 @@ export default function HomeScreen() {
               <Image
                 source={{ uri: tile.image }}
                 style={styles.tileImg}
-                resizeMode="cover"
+                contentFit="cover"
+                transition={150}
               />
               {/* Double-stop scrim: top + bottom darkened so kicker AND headline
                   remain legible regardless of the photo's exposure. */}
@@ -395,127 +425,154 @@ export default function HomeScreen() {
         </ScrollView>
       </View>
 
-      {/* ── Explore cards — Events / Specials / Curated ──────────────────────── */}
-      <View style={styles.section}>
+      {/* ── Featured: The Pour (live from Firestore) ──────────────────────────
+          Relocated from the former Explore tab. Same layout & data source. */}
+      <View style={styles.featuredSection}>
         <View style={styles.sectionHead}>
           <View style={styles.goldLine} />
-          <Text style={styles.sectionKicker}>CURATED</Text>
+          <Text style={styles.sectionKicker}>THIS WEEK</Text>
         </View>
 
-        <View style={styles.exploreCards}>
-          {/* Events */}
+        {loadingPour ? (
+          <View style={styles.featuredLoading}>
+            <ActivityIndicator color={colors.accentSoft} size="small" />
+          </View>
+        ) : pour ? (
           <Pressable
-            style={styles.exploreCard}
-            onPress={() => router.push("/explore" as any)}
-          >
-            <ImageBackground
-              source={{
-                uri: "https://images.unsplash.com/photo-1528823872057-9c018a7a7553?w=800&q=80",
-              }}
-              style={styles.exploreCardBg}
-            >
-              <LinearGradient
-                colors={[
-                  colors.photoOverlayTop,
-                  "transparent",
-                  colors.photoOverlayBottom,
-                ]}
-                locations={[0, 0.35, 1]}
-                style={styles.cardGrad}
-              >
-                <Text style={styles.cardKicker}>CALENDAR</Text>
-                <Text style={styles.cardTitle}>Upcoming Events</Text>
-                <Text style={styles.cardBody}>
-                  Wine festivals, tastings & more
-                </Text>
-              </LinearGradient>
-            </ImageBackground>
-          </Pressable>
-
-          {/* The Tassie Pour */}
-          <Pressable
-            style={styles.exploreCard}
+            style={styles.featuredCard}
             onPress={() => router.push("/(tabs)/home/pour" as any)}
           >
-            <ImageBackground
-              source={{
-                uri: "https://images.unsplash.com/photo-1505252585461-04db1eb84625?w=800&q=80",
-              }}
-              style={styles.exploreCardBg}
-            >
+            <View style={styles.featuredImg}>
+              <Image
+                source={{ uri: pour.heroImage }}
+                style={StyleSheet.absoluteFillObject}
+                contentFit="cover"
+                transition={150}
+              />
               <LinearGradient
                 colors={[
                   colors.photoOverlayTop,
                   "transparent",
-                  colors.photoOverlayBottom,
+                  colors.photoOverlayDeep,
                 ]}
-                locations={[0, 0.35, 1]}
-                style={styles.cardGrad}
-              >
-                <Text style={styles.cardKicker}>EDITORIAL</Text>
-                <Text style={styles.cardTitle}>The Tassie Pour</Text>
-                <Text style={styles.cardBody}>
-                  A weekly taste of local vineyards, vintages, and voices
+                locations={[0, 0.4, 1]}
+                style={StyleSheet.absoluteFill}
+              />
+              <View style={styles.featuredOverlay}>
+                <Text style={styles.featuredIssue}>
+                  {pour.issueLabel} · {pour.kicker}
                 </Text>
-              </LinearGradient>
-            </ImageBackground>
+                <Text style={styles.featuredHeadline} numberOfLines={3}>
+                  {pour.headline}
+                </Text>
+                <View style={styles.featuredMetaRow}>
+                  <Text style={styles.featuredMeta}>
+                    {pour.author} · {pour.readTime}
+                  </Text>
+                  <View style={styles.readBtn}>
+                    <Text style={styles.readBtnText}>READ</Text>
+                    <Ionicons name="arrow-forward" size={12} color={colors.onAccent} />
+                  </View>
+                </View>
+              </View>
+            </View>
           </Pressable>
-
-          {/* Small pair */}
-          <View style={styles.smallRow}>
-            <Pressable
-              style={styles.exploreSmall}
-              onPress={() => router.push("/wineries")}
-            >
-              <ImageBackground
+        ) : (
+          // Fallback card if Firestore is unreachable — still routes to reader
+          <Pressable
+            style={styles.featuredCard}
+            onPress={() => router.push("/(tabs)/home/pour" as any)}
+          >
+            <View style={styles.featuredImg}>
+              <Image
                 source={{
-                  uri: "https://images.unsplash.com/photo-1474722883778-792e7990302f?w=400&q=80",
+                  uri: "https://images.unsplash.com/photo-1505252585461-04db1eb84625?w=900&q=80",
                 }}
-                style={styles.exploreCardBg}
-              >
-                <LinearGradient
-                  colors={[
-                    colors.photoOverlayTop,
-                    "transparent",
-                    colors.photoOverlayBottom,
-                  ]}
-                  locations={[0, 0.35, 1]}
-                  style={styles.cardGrad}
-                >
-                  <Text style={styles.cardKicker}>CURATED</Text>
-                  <Text style={styles.smallCardTitle}>{"Somm's\nPicks"}</Text>
-                </LinearGradient>
-              </ImageBackground>
-            </Pressable>
-
-            <Pressable
-              style={styles.exploreSmall}
-              onPress={() => router.push("/wineries")}
-            >
-              <ImageBackground
-                source={{
-                  uri: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=80",
-                }}
-                style={styles.exploreCardBg}
-              >
-                <LinearGradient
-                  colors={[
-                    colors.photoOverlayTop,
-                    "transparent",
-                    colors.photoOverlayBottom,
-                  ]}
-                  locations={[0, 0.35, 1]}
-                  style={styles.cardGrad}
-                >
-                  <Text style={styles.cardKicker}>EXCLUSIVE</Text>
-                  <Text style={styles.smallCardTitle}>{"Private\nDinners"}</Text>
-                </LinearGradient>
-              </ImageBackground>
-            </Pressable>
-          </View>
-        </View>
+                style={StyleSheet.absoluteFillObject}
+                contentFit="cover"
+                transition={150}
+              />
+              <LinearGradient
+                colors={[
+                  colors.photoOverlayTop,
+                  "transparent",
+                  colors.photoOverlayDeep,
+                ]}
+                locations={[0, 0.4, 1]}
+                style={StyleSheet.absoluteFill}
+              />
+              <View style={styles.featuredOverlay}>
+                <Text style={styles.featuredIssue}>THE POUR · WEEKLY</Text>
+                <Text style={styles.featuredHeadline}>
+                  A weekly taste of local vineyards, vintages, and voices.
+                </Text>
+                <View style={styles.featuredMetaRow}>
+                  <Text style={styles.featuredMeta}>Read the latest issue</Text>
+                  <View style={styles.readBtn}>
+                    <Text style={styles.readBtnText}>READ</Text>
+                    <Ionicons name="arrow-forward" size={12} color={colors.onAccent} />
+                  </View>
+                </View>
+              </View>
+            </View>
+          </Pressable>
+        )}
       </View>
-    </ScrollView>
+
+      {/* ── Article directory ──────────────────────────────────────────────
+          Relocated from the former Explore tab. Same cards, same routes. */}
+      <View style={styles.directorySection}>
+        <View style={styles.sectionHead}>
+          <View style={styles.goldLine} />
+          <Text style={styles.sectionKicker}>THE LIBRARY</Text>
+        </View>
+
+        {articles.map((item) => (
+          <Pressable
+            key={item.key}
+            style={({ pressed }) => [
+              styles.articleCard,
+              pressed && styles.articleCardPressed,
+            ]}
+            onPress={() => {
+              if (item.href) {
+                router.push(item.href as any);
+              }
+              // No-op for placeholders. Swap for navigation when each
+              // article's detail screen / collection is ready.
+            }}
+          >
+            <Image source={{ uri: item.image }} style={styles.articleCardImg} contentFit="cover" transition={150} />
+            <View style={styles.articleCardBody}>
+              <View style={styles.articleKickerRow}>
+                <Text style={styles.articleKicker}>{item.kicker}</Text>
+                <Text style={styles.articleCadence}>· {item.cadence}</Text>
+              </View>
+              <Text style={styles.articleTitle} numberOfLines={2}>
+                {item.title}
+              </Text>
+              <Text style={styles.articleBlurb} numberOfLines={2}>
+                {item.blurb}
+              </Text>
+              <View style={styles.articleFooter}>
+                {item.href ? (
+                  <View style={styles.readMore}>
+                    <Text style={styles.readMoreText}>READ</Text>
+                    <Ionicons
+                      name="arrow-forward"
+                      size={11}
+                      color={colors.accent}
+                    />
+                  </View>
+                ) : (
+                  <Text style={styles.comingSoon}>COMING SOON</Text>
+                )}
+              </View>
+            </View>
+          </Pressable>
+        ))}
+      </View>
+    </Animated.ScrollView>
   );
 }
 
@@ -531,7 +588,8 @@ const styles = StyleSheet.create({
 
   // ── Hero ──────────────────────────────────────────────────────────────────
   hero: {
-    height: 340,                // image-only; copy moves below
+    height: HERO_HEIGHT,        // taller hero; copy stays below
+    overflow: "hidden",         // clip the parallax image extension
   },
   heroHeader: {
     flexDirection: "row",
@@ -540,29 +598,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xxl,
   },
   logo: {
-    fontFamily: fonts.serif,
-    fontSize: type.h3.fontSize,
-    fontStyle: "italic",
+    fontFamily: fonts.display,          // Bebas Neue — tall condensed brand mark
+    fontSize: 28,                       // bumped slightly — Bebas reads smaller per-pt
     color: colors.textOnDark,           // hardcoded light — overlaid on photograph
-    letterSpacing: 0.3,
+    letterSpacing: 1.2,                 // wide tracking suits Bebas's narrow letterforms
   },
   logoAccent: {
-    fontStyle: "normal",
-    fontWeight: weights.emphasis,
+    fontFamily: fonts.display,          // keep the same family so the wordmark reads as one
     color: colors.accentSoft,
   },
-  iconBtn: {
-    width: spacing.hitTarget,           // 44pt — Apple HIG minimum touch target
-    height: spacing.hitTarget,
-    borderRadius: spacing.hitTarget / 2,
-    backgroundColor: colors.photoChrome,              // dark glass for photo overlay
-    borderWidth: 1,
-    borderColor: colors.borderOnDark,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  // Editorial copy section — sits on warm paper below the image
+  // Editorial copy section — sits on the dark slate page below the photo.
+  // Pulled up over the hero with rounded top corners so the page surface reads
+  // as a card overlaid on the photograph (rather than a hard horizontal seam).
   heroCopySection: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    marginTop: -20,                          // overlap the hero image
     paddingHorizontal: spacing.xxl,
     paddingTop: spacing.xxxl,
     paddingBottom: spacing.sm,
@@ -572,8 +624,8 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
   heroHeadline: {
-    ...type.display,                          // 44 / 50 / -0.3 / italic Georgia
-    color: colors.textPrimary,                // deep aubergine-black on paper — confident
+    ...type.display,                          // 54 / 58 / 1.5 / Bebas Neue
+    color: colors.textPrimary,                // soft off-white on dark slate — pops confidently
     marginTop: spacing.md,
   },
 
@@ -585,7 +637,7 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.surface,
+    backgroundColor: colors.inputSurface,
     borderRadius: 32,
     borderWidth: 1,
     borderColor: colors.border,
@@ -606,30 +658,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     alignItems: "center",
     justifyContent: "center",
-  },
-  chipsScroll: {
-    marginTop: spacing.md,
-  },
-  chipsRow: {
-    gap: spacing.sm,
-    paddingRight: spacing.xs,
-  },
-  chip: {
-    paddingHorizontal: spacing.lg,             // bumped 14 → 16 for breathing room
-    paddingVertical: 11,                       // bumped 7 → 11 (Fix 4)
-    borderRadius: radius.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    minWidth: 60,
-    minHeight: spacing.hitTarget,              // 44pt floor (Apple HIG)
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  chipText: {
-    ...type.caption,                            // 12 / 16 line-height
-    fontWeight: weights.body,
-    color: colors.textPrimary,
   },
 
   // ── Section header ────────────────────────────────────────────────────────
@@ -773,5 +801,153 @@ const styles = StyleSheet.create({
     fontWeight: weights.emphasis,
     color: colors.textOnDark,
     lineHeight: 22,
+  },
+
+  // ── Featured (The Pour) — relocated from the explore tab ────────────────
+  featuredSection: {
+    marginTop: spacing.hero,                  // 40 — section rhythm
+  },
+  featuredLoading: {
+    height: 280,
+    marginHorizontal: spacing.xxl,            // 24
+    borderRadius: 6,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  featuredCard: {
+    marginHorizontal: spacing.xxl,
+    borderRadius: 6,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  featuredImg: {
+    height: 320,
+    justifyContent: "flex-end",
+  },
+  featuredOverlay: {
+    paddingHorizontal: spacing.xl,            // 20
+    paddingBottom: spacing.xl,
+  },
+  featuredIssue: {
+    ...type.kicker,
+    letterSpacing: 2,
+    color: colors.accentSoft,
+    marginBottom: spacing.md,
+  },
+  featuredHeadline: {
+    fontFamily: fonts.serif,
+    fontSize: 24,
+    fontStyle: "italic",
+    fontWeight: weights.body,
+    color: colors.textOnDark,
+    lineHeight: 30,
+    letterSpacing: -0.4,
+  },
+  featuredMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: spacing.lg,
+  },
+  featuredMeta: {
+    ...type.kicker,
+    letterSpacing: 1.4,
+    color: colors.textOnDarkSubtle,
+    flex: 1,
+  },
+  readBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    backgroundColor: colors.accent,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 11,
+    borderRadius: radius.pill,
+    minHeight: spacing.hitTarget,
+  },
+  readBtnText: {
+    ...type.kicker,
+    letterSpacing: 1.8,
+    fontWeight: weights.emphasis,
+    color: colors.onAccent,
+  },
+
+  // ── Article directory — relocated from the explore tab ─────────────────
+  directorySection: {
+    marginTop: spacing.hero,                  // 40
+  },
+  articleCard: {
+    marginHorizontal: spacing.xxl,            // 24 — matches featured card
+    marginBottom: spacing.md,
+    borderRadius: radius.cardLg,
+    overflow: "hidden",
+    backgroundColor: colors.surfaceElevated,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.10,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  articleCardPressed: {
+    opacity: 0.92,
+  },
+  articleCardImg: {
+    width: "100%",
+    height: 150,
+    backgroundColor: colors.surfaceDeep,
+  },
+  articleCardBody: {
+    padding: spacing.xl,                      // 20
+  },
+  articleKickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  articleKicker: {
+    ...type.kicker,
+    letterSpacing: 1.8,
+    color: colors.accentSoft,
+  },
+  articleCadence: {
+    ...type.kicker,
+    letterSpacing: 1.4,
+    color: colors.textMuted,
+  },
+  articleTitle: {
+    fontFamily: fonts.serif,
+    fontSize: type.lede.fontSize,             // 17
+    fontWeight: weights.emphasis,
+    color: colors.textPrimary,
+    lineHeight: 23,
+    letterSpacing: -0.2,
+    marginBottom: spacing.sm,
+  },
+  articleBlurb: {
+    ...type.caption,                          // 12 / 16
+    color: colors.textSecondary,
+    lineHeight: 18,
+  },
+  articleFooter: {
+    marginTop: spacing.md,
+  },
+  readMore: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  readMoreText: {
+    ...type.kicker,
+    letterSpacing: 1.8,
+    fontWeight: weights.emphasis,
+    color: colors.accent,
+  },
+  comingSoon: {
+    ...type.kicker,
+    letterSpacing: 1.6,
+    color: colors.textMuted,
   },
 });

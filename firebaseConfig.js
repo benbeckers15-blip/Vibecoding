@@ -2,7 +2,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { initializeApp } from "firebase/app";
 import { getReactNativePersistence, initializeAuth } from "firebase/auth";
-import { initializeFirestore } from "firebase/firestore";
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentSingleTabManager,
+} from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -22,9 +26,17 @@ export const auth = initializeAuth(app, {
   persistence: getReactNativePersistence(AsyncStorage),
 });
 
-// Firestore — long polling required for Expo + non-US regions
+// Firestore
+//   • experimentalForceLongPolling — required for Expo + non-US regions
+//   • localCache: persistentLocalCache(...) — every read first hits the local
+//     cache and returns instantly, then revalidates against the server in the
+//     background. Cache survives app restarts. Mobile-only app, so the
+//     single-tab manager is correct (no web build).
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
+  localCache: persistentLocalCache({
+    tabManager: persistentSingleTabManager(),
+  }),
 });
 
 export const storage = getStorage(app);

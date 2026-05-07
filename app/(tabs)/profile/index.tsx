@@ -10,7 +10,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -21,6 +20,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   collection,
@@ -421,7 +421,7 @@ export default function ProfileScreen() {
                   {lists.map((l) => (
                     <Pressable key={l.id} style={styles.listCard}>
                       {l.image ? (
-                        <Image source={{ uri: l.image }} style={styles.listCardImg} />
+                        <Image source={{ uri: l.image }} style={styles.listCardImg} contentFit="cover" transition={150} />
                       ) : (
                         <View style={[styles.listCardImg, { backgroundColor: colors.surfaceDeep }]} />
                       )}
@@ -446,7 +446,7 @@ export default function ProfileScreen() {
                 savedWineries.map((w, idx) => (
                   <View key={w.id} style={[styles.row, idx === 0 && styles.rowFirst]}>
                     {w.image ? (
-                      <Image source={{ uri: w.image }} style={styles.rowImg} />
+                      <Image source={{ uri: w.image }} style={styles.rowImg} contentFit="cover" transition={150} />
                     ) : (
                       <View style={[styles.rowImg, { backgroundColor: colors.surfaceDeep }]} />
                     )}
@@ -486,7 +486,7 @@ export default function ProfileScreen() {
                 savedArticles.map((a, idx) => (
                   <View key={a.id} style={[styles.row, idx === 0 && styles.rowFirst]}>
                     {a.image ? (
-                      <Image source={{ uri: a.image }} style={styles.rowImg} />
+                      <Image source={{ uri: a.image }} style={styles.rowImg} contentFit="cover" transition={150} />
                     ) : (
                       <View style={[styles.rowImg, { backgroundColor: colors.surfaceDeep }]} />
                     )}
@@ -621,7 +621,7 @@ export default function ProfileScreen() {
                   disabled={!editNameValue.trim() || editNameSaving}
                 >
                   {editNameSaving ? (
-                    <ActivityIndicator color={colors.background} size="small" />
+                    <ActivityIndicator color={colors.onAccent} size="small" />
                   ) : (
                     <Text style={styles.editNameSaveText}>Save</Text>
                   )}
@@ -830,7 +830,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   listCardName: {
-    fontFamily: "Georgia",
+    fontFamily: fonts.serif,
     fontSize: 16,
     fontWeight: "500",
     color: colors.textOnDark,
@@ -937,7 +937,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   tastingWine: {
-    fontFamily: "Georgia",
+    fontFamily: fonts.serif,
     fontSize: 17,
     fontWeight: "500",
     color: colors.textPrimary,
@@ -1051,13 +1051,13 @@ const styles = StyleSheet.create({
     ...type.kicker,
     fontSize: 12,                              // bumped 12pt for "save" CTA legibility
     letterSpacing: 2,
-    color: colors.background,
+    color: colors.onAccent,
     fontWeight: weights.emphasis,
   },
 
   // ── Palate ────────────────────────────────────────────────────────────────
   palateHeadline: {
-    fontFamily: "Georgia",
+    fontFamily: fonts.serif,
     fontStyle: "italic",
     fontSize: 22,
     fontWeight: "500",

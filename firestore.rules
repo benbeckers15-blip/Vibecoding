@@ -1,0 +1,65 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Public read-only collections ─────────────────────────────────────────
+    // Editorial / reference data anyone can browse, even unauthenticated.
+    // No write access from the client — all writes go through Admin SDK scripts.
+
+    match /wineries/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /events/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /homepage_carousel/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /premade_trips/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /explore_articles/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /pour_articles/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // App-wide config (e.g. config/homepage.heroImageUrl). Public read so the
+    // home screen can fetch the current hero image; writes only via Admin SDK.
+    match /config/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ── Per-user collections ─────────────────────────────────────────────────
+    // Only the signed-in user may read or write their own document.
+
+    // Top-level user doc + all subcollections (savedWineries, savedArticles,
+    // lists, tastings, etc.) — owner-only access.
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+
+      match /{subcollection=**} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    // ── Deny everything else ─────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

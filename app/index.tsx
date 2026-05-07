@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
 import { REGION_NAME_UPPER } from "../constants/region";
 import { useAuth } from "../context/AuthContext";
-import { colors } from "../constants/theme";
+import { colors, fonts } from "../constants/theme";
 
 function FadingDots() {
   const dot1 = useRef(new Animated.Value(0.2)).current;
@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
-    fontFamily: "Georgia",
+    fontFamily: fonts.serif,
     fontWeight: "700",
     color: colors.textPrimary,
     marginBottom: 24,

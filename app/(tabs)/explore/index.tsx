@@ -20,14 +20,13 @@ import {
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
-  ImageBackground,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { db } from "../../../firebaseConfig";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
@@ -51,58 +50,8 @@ type ArticleEntry = {
   image: string;
   cadence: string;            // e.g. "Weekly", "Monthly", "Series"
   href?: string;              // tap target — undefined ⇒ shows "Coming soon"
+  order: number;
 };
-
-// ─── Static directory ─────────────────────────────────────────────────────────
-// The Pour is rendered separately as a featured hero. Everything else is
-// pulled from this list — easy to extend or migrate to Firestore later.
-const ARTICLES: ArticleEntry[] = [
-  {
-    key:     "sommelier-recommendations",
-    kicker:  "TASTING NOTES",
-    title:   "Sommelier Recommendations",
-    blurb:   "Hand-picked bottles from the region's leading wine professionals.",
-    image:
-      "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=900&q=80",
-    cadence: "Monthly",
-  },
-  {
-    key:     "hidden-gems",
-    kicker:  "DISCOVERY",
-    title:   "Hidden Gems",
-    blurb:   "Small-batch producers and tasting rooms most visitors never find.",
-    image:
-      "https://images.unsplash.com/photo-1474722883778-792e7990302f?w=900&q=80",
-    cadence: "Series",
-  },
-  {
-    key:     "vintage-reports",
-    kicker:  "REGION",
-    title:   "Vintage Reports",
-    blurb:   "How the season shaped this year's release — variety by variety.",
-    image:
-      "https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?w=900&q=80",
-    cadence: "Annual",
-  },
-  {
-    key:     "behind-the-cellar-door",
-    kicker:  "INTERVIEW",
-    title:   "Behind the Cellar Door",
-    blurb:   "Conversations with the winemakers, growers and sommeliers behind the bottle.",
-    image:
-      "https://images.unsplash.com/photo-1528823872057-9c018a7a7553?w=900&q=80",
-    cadence: "Series",
-  },
-  {
-    key:     "pairings",
-    kicker:  "AT THE TABLE",
-    title:   "Food & Wine Pairings",
-    blurb:   "Local kitchens and cellars on what pours best with what plate.",
-    image:
-      "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80",
-    cadence: "Monthly",
-  },
-];
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export default function ExploreScreen() {
@@ -111,6 +60,32 @@ export default function ExploreScreen() {
 
   const [pour, setPour] = useState<FeaturedPour | null>(null);
   const [loadingPour, setLoadingPour] = useState(true);
+  const [articles, setArticles] = useState<ArticleEntry[]>([]);
+
+  // Fetch explore_articles directory
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const q = query(
+          collection(db, "explore_articles"),
+          orderBy("order", "asc")
+        );
+        const snap = await getDocs(q);
+        if (cancelled) return;
+        setArticles(
+          snap.docs
+            .filter((d) => d.data().active !== false)
+            .map((d) => ({ key: d.id, ...(d.data() as Omit<ArticleEntry, "key">) }))
+        );
+      } catch {
+        // Silently fail — article list stays empty.
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
 
   // Fetch latest active Pour issue
   useEffect(() => {
@@ -180,10 +155,13 @@ export default function ExploreScreen() {
             style={styles.featuredCard}
             onPress={() => router.push("/(tabs)/home/pour" as any)}
           >
-            <ImageBackground
-              source={{ uri: pour.heroImage }}
-              style={styles.featuredImg}
-            >
+            <View style={styles.featuredImg}>
+              <Image
+                source={{ uri: pour.heroImage }}
+                style={StyleSheet.absoluteFillObject}
+                contentFit="cover"
+                transition={150}
+              />
               <LinearGradient
                 colors={[
                   colors.photoOverlayTop,
@@ -206,11 +184,11 @@ export default function ExploreScreen() {
                   </Text>
                   <View style={styles.readBtn}>
                     <Text style={styles.readBtnText}>READ</Text>
-                    <Ionicons name="arrow-forward" size={12} color={colors.background} />
+                    <Ionicons name="arrow-forward" size={12} color={colors.onAccent} />
                   </View>
                 </View>
               </View>
-            </ImageBackground>
+            </View>
           </Pressable>
         ) : (
           // Fallback card if Firestore is unreachable — still routes to reader
@@ -218,12 +196,15 @@ export default function ExploreScreen() {
             style={styles.featuredCard}
             onPress={() => router.push("/(tabs)/home/pour" as any)}
           >
-            <ImageBackground
-              source={{
-                uri: "https://images.unsplash.com/photo-1505252585461-04db1eb84625?w=900&q=80",
-              }}
-              style={styles.featuredImg}
-            >
+            <View style={styles.featuredImg}>
+              <Image
+                source={{
+                  uri: "https://images.unsplash.com/photo-1505252585461-04db1eb84625?w=900&q=80",
+                }}
+                style={StyleSheet.absoluteFillObject}
+                contentFit="cover"
+                transition={150}
+              />
               <LinearGradient
                 colors={[
                   colors.photoOverlayTop,
@@ -242,11 +223,11 @@ export default function ExploreScreen() {
                   <Text style={styles.featuredMeta}>Read the latest issue</Text>
                   <View style={styles.readBtn}>
                     <Text style={styles.readBtnText}>READ</Text>
-                    <Ionicons name="arrow-forward" size={12} color={colors.background} />
+                    <Ionicons name="arrow-forward" size={12} color={colors.onAccent} />
                   </View>
                 </View>
               </View>
-            </ImageBackground>
+            </View>
           </Pressable>
         )}
       </View>
@@ -258,10 +239,13 @@ export default function ExploreScreen() {
           <Text style={styles.sectionKicker}>THE LIBRARY</Text>
         </View>
 
-        {ARTICLES.map((item, i) => (
+        {articles.map((item) => (
           <Pressable
             key={item.key}
-            style={[styles.articleRow, i === 0 && styles.articleRowFirst]}
+            style={({ pressed }) => [
+              styles.articleCard,
+              pressed && styles.articleCardPressed,
+            ]}
             onPress={() => {
               if (item.href) {
                 router.push(item.href as any);
@@ -270,8 +254,8 @@ export default function ExploreScreen() {
               // article's detail screen / collection is ready.
             }}
           >
-            <Image source={{ uri: item.image }} style={styles.articleImg} />
-            <View style={styles.articleText}>
+            <Image source={{ uri: item.image }} style={styles.articleCardImg} contentFit="cover" transition={150} />
+            <View style={styles.articleCardBody}>
               <View style={styles.articleKickerRow}>
                 <Text style={styles.articleKicker}>{item.kicker}</Text>
                 <Text style={styles.articleCadence}>· {item.cadence}</Text>
@@ -282,9 +266,20 @@ export default function ExploreScreen() {
               <Text style={styles.articleBlurb} numberOfLines={2}>
                 {item.blurb}
               </Text>
-              {!item.href && (
-                <Text style={styles.comingSoon}>COMING SOON</Text>
-              )}
+              <View style={styles.articleFooter}>
+                {item.href ? (
+                  <View style={styles.readMore}>
+                    <Text style={styles.readMoreText}>READ</Text>
+                    <Ionicons
+                      name="arrow-forward"
+                      size={11}
+                      color={colors.accent}
+                    />
+                  </View>
+                ) : (
+                  <Text style={styles.comingSoon}>COMING SOON</Text>
+                )}
+              </View>
             </View>
           </Pressable>
         ))}
@@ -417,42 +412,49 @@ const styles = StyleSheet.create({
     ...type.kicker,
     letterSpacing: 1.8,
     fontWeight: weights.emphasis,
-    color: colors.background,
+    color: colors.onAccent,
   },
 
-  // ── Directory rows ───────────────────────────────────────────────────────
+  // ── Directory cards ──────────────────────────────────────────────────────
+  // Full-width image-on-top cards. Sit on the same paper as the Pour card
+  // above and share its border/radius treatment, but at smaller scale so the
+  // hierarchy reads featured → directory.
   directorySection: {
     marginTop: spacing.hero,                  // 40 — new section rhythm (Fix 5)
   },
-  articleRow: {
-    flexDirection: "row",
-    gap: spacing.lg,                          // bumped 14 → 16
-    paddingHorizontal: spacing.xxl,           // 24
-    paddingVertical: spacing.lg,              // bumped 18 → 16 row gutter
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+  // Smaller, lifted cards on warm paper. Lighter fill + softer shadow gives
+  // a sleek, floating feel; generous internal padding preserves whitespace.
+  articleCard: {
+    marginHorizontal: spacing.xxl,            // 24 — matches featured card
+    marginBottom: spacing.md,                  // tighter rhythm than wineries
+    borderRadius: radius.cardLg,
+    overflow: "hidden",
+    backgroundColor: colors.surfaceElevated,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.10,
+    shadowRadius: 16,
+    elevation: 4,
   },
-  articleRowFirst: {
-    borderTopWidth: 0,
-    paddingTop: spacing.xs,
+  articleCardPressed: {
+    opacity: 0.92,
   },
-  articleImg: {
-    width: 92,
-    height: 92,
-    borderRadius: radius.card,
+  articleCardImg: {
+    width: "100%",
+    height: 150,                               // shorter — keeps card compact
     backgroundColor: colors.surfaceDeep,
   },
-  articleText: {
-    flex: 1,
+  articleCardBody: {
+    padding: spacing.xl,                      // 20 — generous interior whitespace
   },
   articleKickerRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
   },
   articleKicker: {
-    ...type.kicker,                           // bumped 9.5 → 10 (kicker minimum)
+    ...type.kicker,
     letterSpacing: 1.8,
     color: colors.accentSoft,
   },
@@ -464,21 +466,34 @@ const styles = StyleSheet.create({
   articleTitle: {
     fontFamily: fonts.serif,
     fontSize: type.lede.fontSize,             // 17
-    fontWeight: weights.emphasis,             // 500 → 700 (Fix 4 weights)
+    fontWeight: weights.emphasis,
     color: colors.textPrimary,
-    lineHeight: 22,
+    lineHeight: 23,
     letterSpacing: -0.2,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
   },
   articleBlurb: {
-    ...type.caption,                          // 12 / 16 (was 12.5 / 18)
+    ...type.caption,                          // 12 / 16
     color: colors.textSecondary,
     lineHeight: 18,
+  },
+  articleFooter: {
+    marginTop: spacing.md,
+  },
+  readMore: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  readMoreText: {
+    ...type.kicker,
+    letterSpacing: 1.8,
+    fontWeight: weights.emphasis,
+    color: colors.accent,
   },
   comingSoon: {
     ...type.kicker,
     letterSpacing: 1.6,
     color: colors.textMuted,
-    marginTop: spacing.xs,
   },
 });

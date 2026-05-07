@@ -10,8 +10,6 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
-  Image,
-  ImageBackground,
   Pressable,
   ScrollView,
   Share,
@@ -19,6 +17,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
 import { db } from "../../../firebaseConfig";
@@ -89,15 +88,29 @@ export default function PourScreen() {
 
     async function fetchLatest() {
       try {
-        const q = query(
-          collection(db, "pour_articles"),
-          orderBy("issueNumber", "desc"),
-          limit(10)
-        );
-        const snap = await getDocs(q);
-        if (!cancelled && !snap.empty) {
-          // Pick the first active article (avoids needing a composite index)
-          const active = snap.docs.find((d) => d.data().active !== false);
+        // First try ordered query (requires issueNumber field on all docs)
+        let docs: any[] = [];
+        try {
+          const q = query(
+            collection(db, "pour_articles"),
+            orderBy("issueNumber", "desc"),
+            limit(10)
+          );
+          const snap = await getDocs(q);
+          docs = snap.docs;
+        } catch {
+          // Fallback: unordered fetch — works even if issueNumber is missing
+          const snap = await getDocs(collection(db, "pour_articles"));
+          docs = snap.docs.sort((a, b) => {
+            const aNum = (a.data().issueNumber as number) ?? 0;
+            const bNum = (b.data().issueNumber as number) ?? 0;
+            return bNum - aNum;
+          });
+        }
+
+        if (!cancelled && docs.length > 0) {
+          // Pick the first active article (active field missing = treated as active)
+          const active = docs.find((d) => d.data().active !== false);
           if (active) setArticle(active.data() as PourArticle);
         }
       } catch {
@@ -177,7 +190,8 @@ export default function PourScreen() {
             <Image
               source={{ uri: block.url }}
               style={styles.inlineImg}
-              resizeMode="cover"
+              contentFit="cover"
+              transition={150}
             />
             <Text style={styles.imgCaption}>{block.caption}</Text>
           </View>
@@ -197,10 +211,13 @@ export default function PourScreen() {
     >
       {/* ── Cinematic hero ─────────────────────────────────────────────── */}
       <View style={styles.hero}>
-        <ImageBackground
-          source={{ uri: article.heroImage }}
-          style={styles.heroImg}
-        >
+        <View style={styles.heroImg}>
+          <Image
+            source={{ uri: article.heroImage }}
+            style={StyleSheet.absoluteFillObject}
+            contentFit="cover"
+            transition={150}
+          />
           <LinearGradient
             colors={[
               colors.photoOverlayTop,
@@ -230,7 +247,7 @@ export default function PourScreen() {
             <Text style={styles.heroArticleKicker}>{article.kicker}</Text>
             <Text style={styles.heroHeadline}>{article.headline}</Text>
           </View>
-        </ImageBackground>
+        </View>
       </View>
 
       {/* ── Author row ─────────────────────────────────────────────────── */}
@@ -269,7 +286,8 @@ export default function PourScreen() {
             <Image
               source={{ uri: article.sponsor.image }}
               style={styles.sponsorImg}
-              resizeMode="cover"
+              contentFit="cover"
+              transition={150}
             />
             <View style={styles.sponsorText}>
               <Text style={styles.sponsorTitle}>{article.sponsor.title}</Text>
@@ -294,7 +312,8 @@ export default function PourScreen() {
               <Image
                 source={{ uri: item.image }}
                 style={styles.continueImg}
-                resizeMode="cover"
+                contentFit="cover"
+                transition={150}
               />
               <View style={styles.continueText}>
                 <Text style={styles.continueItemKicker}>{item.kicker}</Text>
