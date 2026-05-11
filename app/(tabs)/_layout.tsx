@@ -206,14 +206,9 @@ export default function TabLayout() {
       screenOptions={{ headerShown: false }}
     >
       <Tabs.Screen name="home" options={{ title: "Home", tabBarLabel: "Home" }} />
-      <Tabs.Screen name="wineries" options={{ title: "Wineries", tabBarLabel: "Wineries" }} />
       <Tabs.Screen name="trips" options={{ title: "Trips", tabBarLabel: "Trips" }} />
+      <Tabs.Screen name="wineries" options={{ title: "Wineries", tabBarLabel: "Wineries" }} />
       <Tabs.Screen name="profile" options={{ title: "Profile", tabBarLabel: "Profile" }} />
-      {/* `articles` is a (tabs)-nested stack we navigate into from the home
-          screen's relocated article cards. `href: null` flags it as hidden;
-          the CustomTabBar above filters routes whose `options.href === null`
-          out of the rendered bar. */}
-      <Tabs.Screen name="articles" options={{ href: null }} />
       {/* `explore` is preserved as a route for any existing inbound links,
           but its article content now lives on the home tab — so it is
           hidden from the floating nav. */}

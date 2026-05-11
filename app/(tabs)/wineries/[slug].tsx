@@ -18,6 +18,7 @@ import {
   Dimensions,
   Linking,
   Modal,
+  Platform,
   Pressable,
   Share,
   StyleSheet,
@@ -51,6 +52,26 @@ function safeOpenURL(url: string) {
   );
 }
 
+// Open the user's native maps app with directions to a winery.
+// On iOS we use Apple Maps; on Android we use a `geo:` URI so the system
+// chooser picks Google Maps (or the user's default). We fall back to the
+// universal Google Maps URL if the platform-specific scheme fails to open.
+function openDirections(lat: number, lng: number, name: string) {
+  const label = encodeURIComponent(name);
+  const universal = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  const url = Platform.select({
+    ios: `http://maps.apple.com/?daddr=${lat},${lng}&q=${label}`,
+    android: `geo:${lat},${lng}?q=${lat},${lng}(${label})`,
+    default: universal,
+  }) as string;
+
+  Linking.openURL(url).catch(() =>
+    Linking.openURL(universal).catch(() =>
+      console.warn("Could not open directions for", name)
+    )
+  );
+}
+
 const { width } = Dimensions.get("window");
 const HERO_HEIGHT = 400;
 const PARALLAX_EXTRA = 80;
@@ -76,6 +97,9 @@ interface WineryData {
   isBiodynamic?: boolean;
   rating?: number;
   userRatingsTotal?: number;
+  region?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 // Feature badges — Ionicon names instead of emoji.
@@ -107,11 +131,17 @@ function normaliseHours(raw: unknown): HoursEntry[] {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export default function WineryDetailsScreen() {
-  const { slug, from } = useLocalSearchParams<{ slug: string; from?: string }>();
+  const { slug, from, tripId, kind } = useLocalSearchParams<{
+    slug: string;
+    from?: string;
+    tripId?: string;
+    kind?: string;
+  }>();
   const backLabel =
-    from === "events"   ? "‹ Events"   :
-    from === "wineries" ? "‹ Wineries" :
-    from === "home"     ? "‹ Home"     : "‹ Back";
+    from === "events"   ? "Events"   :
+    from === "wineries" ? "Wineries" :
+    from === "home"     ? "Home"     :
+    from === "trip"     ? "Trip"     : "Back";
 
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -169,6 +199,10 @@ export default function WineryDetailsScreen() {
             rating:          typeof data.rating === "number" ? data.rating : undefined,
             userRatingsTotal: typeof data.userRatingsTotal === "number"
                                ? data.userRatingsTotal : undefined,
+            region:          typeof data.region === "string" && data.region.trim()
+                               ? data.region.trim() : undefined,
+            latitude:        typeof data.latitude === "number" ? data.latitude : undefined,
+            longitude:       typeof data.longitude === "number" ? data.longitude : undefined,
           });
         } else {
           console.warn("No such winery found!");
@@ -301,6 +335,13 @@ export default function WineryDetailsScreen() {
               onPress={() => {
                 if (router.canGoBack()) {
                   router.back();
+                } else if (from === "trip" && tripId) {
+                  // Fallback when the stack was reset (e.g. after a deep link):
+                  // route the user back to the originating trip itinerary.
+                  const kindQS = kind ? `?kind=${kind}` : "";
+                  router.replace(
+                    `/trips/${encodeURIComponent(tripId)}${kindQS}` as any
+                  );
                 } else {
                   router.replace("/(tabs)/wineries");
                 }
@@ -447,13 +488,39 @@ export default function WineryDetailsScreen() {
           )}
 
           {/* Location cell */}
-          <View style={[styles.infoCell, styles.infoCellBorderLeft]}>
-            <Text style={styles.infoCellLabel}>LOCATION</Text>
-            <View style={styles.valueRow}>
-              <Ionicons name="location-outline" size={14} color={colors.textMuted} />
-              <Text style={styles.infoCellValue}>{REGION_NAME}</Text>
-            </View>
-          </View>
+          {(() => {
+            const hasCoords =
+              typeof winery.latitude === "number" &&
+              typeof winery.longitude === "number" &&
+              Number.isFinite(winery.latitude) &&
+              Number.isFinite(winery.longitude);
+            const locationLabel = winery.region || REGION_NAME;
+            const Wrapper: React.ComponentType<any> = hasCoords ? Pressable : View;
+            return (
+              <Wrapper
+                style={[styles.infoCell, styles.infoCellBorderLeft]}
+                onPress={
+                  hasCoords
+                    ? () =>
+                        openDirections(
+                          winery.latitude as number,
+                          winery.longitude as number,
+                          winery.name
+                        )
+                    : undefined
+                }
+              >
+                <Text style={styles.infoCellLabel}>LOCATION</Text>
+                <View style={styles.valueRow}>
+                  <Ionicons name="location-outline" size={14} color={colors.textMuted} />
+                  <Text style={styles.infoCellValue}>{locationLabel}</Text>
+                </View>
+                {hasCoords ? (
+                  <Text style={styles.infoCellTap}>Get directions ›</Text>
+                ) : null}
+              </Wrapper>
+            );
+          })()}
         </View>
 
         {/* ── Contact Row — Call | Website ──────────────────────────────────── */}

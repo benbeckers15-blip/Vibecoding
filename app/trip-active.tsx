@@ -17,22 +17,27 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Location from "expo-location";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { MAP_STYLE } from "../constants/mapStyle";
 import { colors, fonts, radius, spacing, type, weights } from "../constants/theme";
 import { useTrips } from "../context/TripContext";
 import { distanceKm } from "../utils/routePlanner";
+import { fetchRoutePolyline, type LatLng } from "../utils/fetchRoutePolyline";
 import { openExternalDirections } from "../utils/openExternalDirections";
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -95,6 +100,105 @@ export default function TripActiveScreen() {
     };
   }, []);
 
+  // ── Driving route polyline ────────────────────────────────────────────────
+  // Fetched once from Google Directions when the trip's stop list is known.
+  // Falls back to straight (dashed) lines if the API request fails so the
+  // map is never left empty.
+  const [routeCoords, setRouteCoords] = useState<LatLng[]>([]);
+  const [routeLoading, setRouteLoading] = useState(false);
+
+  useEffect(() => {
+    if (!trip || trip.stops.length < 2) {
+      setRouteCoords([]);
+      return;
+    }
+    // Strip non-finite coords before handing to Directions — otherwise we'd
+    // build a request like `origin=NaN,NaN&waypoints=…` and waste the round
+    // trip (Google returns INVALID_REQUEST).
+    const safeStops = trip.stops.filter(
+      (s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude)
+    );
+    if (safeStops.length < 2) {
+      setRouteCoords([]);
+      return;
+    }
+    let cancelled = false;
+    setRouteLoading(true);
+    fetchRoutePolyline(safeStops).then((coords) => {
+      if (!cancelled) {
+        setRouteCoords(coords ?? []);
+        setRouteLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Re-fetch only if the actual stop set / order changes — not on
+    // visited-flag changes (the planned route stays the same as you progress).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    trip?.stops.map((s) => s.wineryId).join("|"),
+  ]);
+
+  // ── Polyline coords — compute once per render. We avoid wrapping Polyline
+  // children in an IIFE / Fragment inside <MapView>: react-native-maps
+  // traverses the children to register native overlays, and Fragment wrappers
+  // can prevent the polyline from being picked up at all (which manifested
+  // as a blank route preview).
+  //
+  // Defensive filter: a single non-finite coord handed to the native side is
+  // enough to crash react-native-maps with PROVIDER_GOOGLE on iOS. Trip stops
+  // can carry NaN coords if they were persisted to AsyncStorage before the
+  // upstream filters were tightened to Number.isFinite — strip them here so
+  // a stale on-disk trip doesn't take the screen down.
+  const routeDisplayCoords: LatLng[] = useMemo(() => {
+    if (!trip) return [];
+    const source =
+      routeCoords.length > 1
+        ? routeCoords
+        : trip.stops.map((s) => ({
+            latitude: s.latitude,
+            longitude: s.longitude,
+          }));
+    return source.filter(
+      (c) => Number.isFinite(c.latitude) && Number.isFinite(c.longitude)
+    );
+  }, [routeCoords, trip?.stops]);
+  const usingRealRoute = routeCoords.length > 1;
+
+  // ── Map region — center on stops with sensible padding ───────────────────
+  // Compute over only stops with finite coords. Without this filter, a single
+  // NaN coord turns Math.min/max into NaN and produces an initialRegion of
+  // {NaN, NaN, NaN, NaN}, which silently hard-crashes Google Maps on iOS.
+  const initialRegion = useMemo(() => {
+    const safeStops = trip
+      ? trip.stops.filter(
+          (s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude)
+        )
+      : [];
+    if (safeStops.length === 0) {
+      // Tasmania-wide fallback (matches the wineries map default).
+      return {
+        latitude: -42.2,
+        longitude: 146.8,
+        latitudeDelta: 5.0,
+        longitudeDelta: 4.5,
+      };
+    }
+    const lats = safeStops.map((s) => s.latitude);
+    const lngs = safeStops.map((s) => s.longitude);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+    return {
+      latitude: (minLat + maxLat) / 2,
+      longitude: (minLng + maxLng) / 2,
+      latitudeDelta: Math.max(0.05, (maxLat - minLat) * 1.7),
+      longitudeDelta: Math.max(0.05, (maxLng - minLng) * 1.7),
+    };
+  }, [trip?.stops]);
+
   // ── Progress bar animation ────────────────────────────────────────────────
   const progress = useSharedValue(0);
   useEffect(() => {
@@ -131,6 +235,14 @@ export default function TripActiveScreen() {
 
   const distanceToNextKm = useMemo(() => {
     if (!userLoc || !nextStop) return null;
+    // Skip the haversine if the stop has bad coords — the result would just
+    // be NaN and render as "NaN km away".
+    if (
+      !Number.isFinite(nextStop.latitude) ||
+      !Number.isFinite(nextStop.longitude)
+    ) {
+      return null;
+    }
     return distanceKm(userLoc, nextStop);
   }, [userLoc, nextStop]);
 
@@ -212,6 +324,95 @@ export default function TripActiveScreen() {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
+        {/* ── Map preview — driving route + stops ─────────────────────────
+            Shows the actual road polyline returned by Google Directions so
+            the user can see where they'll be driving. Falls back to dashed
+            straight lines while the route is loading or if the request
+            failed (no key, no network, etc.). */}
+        {trip.stops.length > 0 && (
+          <View style={styles.mapWrap}>
+            <MapView
+              style={styles.map}
+              provider={PROVIDER_GOOGLE}
+              customMapStyle={MAP_STYLE}
+              initialRegion={initialRegion}
+              showsUserLocation
+              showsMyLocationButton={false}
+              pitchEnabled={false}
+              rotateEnabled={false}
+              toolbarEnabled={false}
+              // Match the loading splash to the dark theme so the map area
+              // doesn't flash white before tiles arrive.
+              loadingEnabled
+              loadingBackgroundColor={colors.surface}
+              loadingIndicatorColor={colors.accent}
+            >
+              {/* Polylines listed FIRST and as direct children of <MapView>
+                  (no Fragment / IIFE wrapper). react-native-maps walks the
+                  children list to register native overlays — Fragment wrappers
+                  can prevent the polyline from being picked up, which is why
+                  the route was previously invisible. */}
+              {routeDisplayCoords.length > 1 && usingRealRoute && (
+                <Polyline
+                  key="route-casing"
+                  coordinates={routeDisplayCoords}
+                  strokeColor={colors.background}
+                  strokeWidth={10}
+                  zIndex={1}
+                  geodesic
+                />
+              )}
+              {routeDisplayCoords.length > 1 && (
+                <Polyline
+                  key={usingRealRoute ? "route-line" : "route-fallback"}
+                  coordinates={routeDisplayCoords}
+                  strokeColor={colors.accentSoft}
+                  strokeWidth={usingRealRoute ? 6 : 3}
+                  lineDashPattern={usingRealRoute ? undefined : [8, 6]}
+                  zIndex={2}
+                  geodesic
+                />
+              )}
+              {trip.stops.map((s, idx) => {
+                // Skip any stop with non-finite coords — same reasoning as the
+                // initialRegion filter: react-native-maps + PROVIDER_GOOGLE on
+                // iOS crashes silently if a Marker is given NaN.
+                if (
+                  !Number.isFinite(s.latitude) ||
+                  !Number.isFinite(s.longitude)
+                ) {
+                  return null;
+                }
+                const visited = trip.visitedStopIds.includes(s.wineryId);
+                const isCurrent = idx === trip.currentStopIndex;
+                return (
+                  <Marker
+                    key={s.wineryId}
+                    coordinate={{
+                      latitude: s.latitude,
+                      longitude: s.longitude,
+                    }}
+                    title={`${idx + 1}. ${s.name}`}
+                    // visited → muted, current target → bright lime, upcoming → forest
+                    pinColor={
+                      visited
+                        ? colors.textMuted
+                        : isCurrent
+                        ? colors.accentSoft
+                        : colors.accent
+                    }
+                  />
+                );
+              })}
+            </MapView>
+            {routeLoading && (
+              <View style={styles.mapLoadingOverlay}>
+                <ActivityIndicator size="small" color={colors.accent} />
+              </View>
+            )}
+          </View>
+        )}
+
         {/* ── Next stop card ─────────────────────────────────────────────── */}
         {nextStop ? (
           <View style={styles.nextCard}>
@@ -398,6 +599,26 @@ const styles = StyleSheet.create({
   },
 
   scroll: { paddingBottom: spacing.hero },
+
+  // Map preview
+  mapWrap: {
+    height: 220,
+    marginHorizontal: spacing.xxl,
+    marginBottom: spacing.lg,
+    borderRadius: radius.card,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  map: { width: "100%", height: "100%" },
+  mapLoadingOverlay: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
+    backgroundColor: colors.surfaceDeep,
+    borderRadius: 12,
+    padding: 6,
+  },
 
   // Next stop card
   nextCard: {

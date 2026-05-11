@@ -17,10 +17,12 @@ import {
   TextInput,
   View,
 } from "react-native";
+import * as Location from "expo-location";
 import { Image } from "expo-image";
 import MapView from "react-native-map-clustering";
-import { Callout, Marker } from "react-native-maps";
+import { Callout, Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { MAP_STYLE } from "../../../constants/mapStyle";
 import { REGION_NAME_UPPER } from "../../../constants/region";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
 import { useSaved } from "../../../context/SavedContext";
@@ -40,12 +42,17 @@ type Winery = {
   isOrganic?: boolean;
   isBiodynamic?: boolean;
   walkinWelcome?: boolean;
+  awardWinning?: boolean;
+  hasTours?: boolean;
   rating?: number;
   userRatingsTotal?: number;
   latitude?: number;
   longitude?: number;
   featured?: boolean;
+  region?: string;
 };
+
+type SortMode = "featured" | "nearMe" | "az";
 
 // ─── Filter config ────────────────────────────────────────────────────────────
 const BOOLEAN_FILTERS: {
@@ -53,11 +60,13 @@ const BOOLEAN_FILTERS: {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
 }[] = [
-  { key: "dogFriendly",   label: "Dog Friendly", icon: "paw"                },
-  { key: "hasRestaurant", label: "Restaurant",   icon: "restaurant-outline" },
-  { key: "isOrganic",     label: "Organic",      icon: "leaf-outline"       },
-  { key: "isBiodynamic",  label: "Biodynamic",   icon: "flower-outline"     },
   { key: "walkinWelcome", label: "Walk-ins",      icon: "walk-outline"       },
+  { key: "awardWinning",  label: "Award-Winning", icon: "trophy-outline"     },
+  { key: "hasTours",      label: "Tours Offered", icon: "map-outline"        },
+  { key: "isOrganic",     label: "Organic",       icon: "leaf-outline"       },
+  { key: "isBiodynamic",  label: "Biodynamic",    icon: "flower-outline"     },
+  { key: "hasRestaurant", label: "Restaurant",    icon: "restaurant-outline" },
+  { key: "dogFriendly",   label: "Dog Friendly",  icon: "paw"                },
 ];
 
 const VALID_FILTER_KEYS: (keyof Winery)[] = [
@@ -66,20 +75,37 @@ const VALID_FILTER_KEYS: (keyof Winery)[] = [
   "isOrganic",
   "isBiodynamic",
   "walkinWelcome",
+  "awardWinning",
+  "hasTours",
 ];
 
 const RATING_OPTIONS = [
-  { label: "All", value: 0   },
+  { label: "All",  value: 0   },
   { label: "4.0+", value: 4.0 },
   { label: "4.3+", value: 4.3 },
   { label: "4.5+", value: 4.5 },
 ];
 
+const REGION_OPTIONS: string[] = [
+  "Tamar Valley",
+  "Pipers River",
+  "North West",
+  "East Coast",
+  "Coal River Valley",
+  "Derwent Valley",
+  "Huon Valley",
+];
+
+// Tasmania extents (approx):
+//   lat   -40.6 (north)  →  -43.65 (south)   span ~3.05°
+//   lng  144.6 (west)    →  148.4  (east)    span ~3.8°
+// We center slightly south of the geographic mid-point and use generous
+// deltas so the whole island fits with breathing room on every aspect ratio.
 const TASMANIA_REGION = {
-  latitude: -42.0,
-  longitude: 147.0,
-  latitudeDelta: 3.0,
-  longitudeDelta: 2.0,
+  latitude: -42.2,
+  longitude: 146.8,
+  latitudeDelta: 5.0,
+  longitudeDelta: 4.5,
 };
 
 // ─── Haversine distance ───────────────────────────────────────────────────────
@@ -131,11 +157,56 @@ export default function WineriesScreen() {
     return set;
   });
   const [minRating, setMinRating] = useState(0);
+  const [selectedRegions, setSelectedRegions] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy] = useState<SortMode>("featured");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersAnim = useRef(new Animated.Value(0)).current;
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationDenied, setLocationDenied] = useState(false);
+
+  // Animate the collapsible filter panel open/closed
+  useEffect(() => {
+    Animated.timing(filtersAnim, {
+      toValue: filtersOpen ? 1 : 0,
+      duration: 240,
+      useNativeDriver: false,
+    }).start();
+  }, [filtersOpen, filtersAnim]);
+
+  // Request location — called when the user selects "Near Me" sort
+  const ensureUserLocation = useCallback(async () => {
+    if (userLocation || locationDenied) return;
+    try {
+      const perm = await Location.requestForegroundPermissionsAsync();
+      if (perm.status !== "granted") {
+        setLocationDenied(true);
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      setUserLocation({
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+      });
+    } catch {
+      setLocationDenied(true);
+    }
+  }, [userLocation, locationDenied]);
+
+  // Handle sort mode changes — requests location when "Near Me" is selected
+  const handleSortBy = useCallback(
+    (mode: SortMode) => {
+      setSortBy(mode);
+      if (mode === "nearMe") {
+        ensureUserLocation();
+      }
+    },
+    [ensureUserLocation]
+  );
 
   // ── Map transition ────────────────────────────────────────────────────────
-  // activeMapKey drives the MapView key (remount). overlayAnim covers the swap
-  // so the user never sees the white background between unmount and remount.
-  const computedMapKey = `map-${minRating}-${[...activeFilters].sort().join(",")}`;
+  const computedMapKey = `map-${minRating}-${[...activeFilters].sort().join(",")}-${[...selectedRegions].sort().join(",")}`;
   const [activeMapKey, setActiveMapKey] = useState(computedMapKey);
   const activeMapKeyRef = useRef(computedMapKey);
   const overlayAnim = useRef(new Animated.Value(0)).current;
@@ -143,12 +214,10 @@ export default function WineriesScreen() {
   useEffect(() => {
     if (computedMapKey === activeMapKeyRef.current) return;
     if (view !== "map") {
-      // Not visible — swap instantly, no animation needed
       activeMapKeyRef.current = computedMapKey;
       setActiveMapKey(computedMapKey);
       return;
     }
-    // In map view: fade overlay in → swap map → fade overlay out
     Animated.timing(overlayAnim, { toValue: 1, duration: 120, useNativeDriver: true }).start(() => {
       activeMapKeyRef.current = computedMapKey;
       setActiveMapKey(computedMapKey);
@@ -177,6 +246,15 @@ export default function WineriesScreen() {
         const data = snapshot.docs
           .map((d) => ({ id: d.id, ...(d.data() as Omit<Winery, "id">) }))
           .sort((a, b) => a.name.localeCompare(b.name));
+
+        // Demo: if no winery in Firestore has featured:true yet, mark the
+        // first alphabetical one so the Featured sort is demonstrable.
+        // Remove this block once you've set featured:true on the correct
+        // winery document(s) in Firestore.
+        if (data.length > 0 && !data.some((w) => w.featured)) {
+          data[0] = { ...data[0], featured: true };
+        }
+
         setWineries(data);
       } catch (err) {
         console.error("Error fetching wineries:", err);
@@ -194,7 +272,28 @@ export default function WineriesScreen() {
     });
   };
 
-  // Filter logic (unchanged from original)
+  const toggleRegion = (region: string) => {
+    setSelectedRegions((prev) => {
+      const next = new Set(prev);
+      next.has(region) ? next.delete(region) : next.add(region);
+      return next;
+    });
+  };
+
+  // Resolve reference location for Near Me sort
+  const paramLat =
+    typeof params.lat === "string" ? parseFloat(params.lat) : NaN;
+  const paramLng =
+    typeof params.lng === "string" ? parseFloat(params.lng) : NaN;
+  const hasParamLoc =
+    params.near === "1" && !isNaN(paramLat) && !isNaN(paramLng);
+  const refLat = hasParamLoc ? paramLat : userLocation?.lat ?? NaN;
+  const refLng = hasParamLoc ? paramLng : userLocation?.lng ?? NaN;
+  const hasRefLoc = !isNaN(refLat) && !isNaN(refLng);
+
+  const nearActive = sortBy === "nearMe";
+
+  // Filter logic
   const filtered = wineries.filter((w) => {
     if (
       search.trim() &&
@@ -206,36 +305,54 @@ export default function WineriesScreen() {
       if (!w[key]) return false;
     }
     if (minRating > 0 && (!w.rating || w.rating < minRating)) return false;
+    if (selectedRegions.size > 0) {
+      if (!w.region || !selectedRegions.has(w.region)) return false;
+    }
     return true;
   });
 
-  // Near-me sort
-  const nearLat =
-    typeof params.lat === "string" ? parseFloat(params.lat) : NaN;
-  const nearLng =
-    typeof params.lng === "string" ? parseFloat(params.lng) : NaN;
-  const nearActive =
-    params.near === "1" && !isNaN(nearLat) && !isNaN(nearLng);
-
-  const displayed = nearActive
-    ? [...filtered].sort((a, b) => {
+  // Sort logic based on sortBy mode
+  const displayed = (() => {
+    const list = [...filtered];
+    if (sortBy === "featured") {
+      // Featured wineries first (alphabetical within group), then rest alphabetically
+      return list.sort((a, b) => {
+        if (a.featured && !b.featured) return -1;
+        if (!a.featured && b.featured) return 1;
+        return a.name.localeCompare(b.name);
+      });
+    } else if (sortBy === "nearMe" && hasRefLoc) {
+      return list.sort((a, b) => {
+        // Number.isFinite — `typeof NaN === "number"` is true, so the looser
+        // check would let NaN-coord wineries (from failed geocoding) through
+        // and produce a NaN distance, which sorts unpredictably.
         const aHas =
-          typeof a.latitude === "number" && typeof a.longitude === "number";
+          Number.isFinite(a.latitude) && Number.isFinite(a.longitude);
         const bHas =
-          typeof b.latitude === "number" && typeof b.longitude === "number";
+          Number.isFinite(b.latitude) && Number.isFinite(b.longitude);
         if (!aHas && !bHas) return 0;
         if (!aHas) return 1;
         if (!bHas) return -1;
         return (
-          distanceKm(nearLat, nearLng, a.latitude!, a.longitude!) -
-          distanceKm(nearLat, nearLng, b.latitude!, b.longitude!)
+          distanceKm(refLat, refLng, a.latitude!, a.longitude!) -
+          distanceKm(refLat, refLng, b.latitude!, b.longitude!)
         );
-      })
-    : filtered;
+      });
+    } else {
+      // "az" or nearMe without location — pure alphabetical
+      return list.sort((a, b) => a.name.localeCompare(b.name));
+    }
+  })();
 
   const mappableWineries = filtered.filter(
     (w) => Number.isFinite(w.latitude) && Number.isFinite(w.longitude)
   );
+
+  // Count active filters for the badge on the filter button
+  const activeFilterCount =
+    activeFilters.size +
+    selectedRegions.size +
+    (minRating > 0 ? 1 : 0);
 
   // ── Loading state ──────────────────────────────────────────────────────────
   if (loading) {
@@ -251,18 +368,16 @@ export default function WineriesScreen() {
   const renderCard = ({ item }: { item: Winery }) => {
     const hasImage = item.images && item.images.length > 0;
 
-    // Distance chip — only when location is active AND winery has coords.
+    // Distance chip — only when Near Me is active AND winery has finite coords.
+    // `typeof NaN === "number"` is true, so the looser check here would render
+    // a "NaN km" distance chip on any winery whose lat/lng was stored as NaN.
     const showDistance =
       nearActive &&
-      typeof item.latitude === "number" &&
-      typeof item.longitude === "number";
+      hasRefLoc &&
+      Number.isFinite(item.latitude) &&
+      Number.isFinite(item.longitude);
     const distance = showDistance
-      ? distanceKm(
-          nearLat,
-          nearLng,
-          item.latitude as number,
-          item.longitude as number
-        )
+      ? distanceKm(refLat, refLng, item.latitude as number, item.longitude as number)
       : null;
     const distanceLabel =
       distance == null
@@ -271,119 +386,159 @@ export default function WineriesScreen() {
         ? `${distance.toFixed(1)} km`
         : `${Math.round(distance)} km`;
 
-    // Feature pills — all boolean attributes that are true on this winery.
+    // Feature pills — all boolean attributes that are true on this winery
     const featurePills = BOOLEAN_FILTERS.filter((f) => Boolean(item[f.key]));
 
     return (
       <View style={styles.cardShadow}>
-      <Link href={`/wineries/${item.slug}?from=wineries`} asChild>
-        <Pressable
-          style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-        >
-          {/* Hero image */}
-          {hasImage && (
-            <View style={styles.cardImgWrap}>
-              <Image
-                source={{ uri: item.images![0] }}
-                style={styles.cardImg}
-                contentFit="cover"
-                transition={150}
-              />
-              {/* Partner badge */}
-              {item.featured && (
-                <View style={styles.partnerBadge}>
-                  <Text style={styles.partnerText}>★ PARTNER</Text>
+        <Link href={`/wineries/${item.slug}?from=wineries`} asChild>
+          <Pressable
+            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+          >
+            {/* Hero image */}
+            {hasImage && (
+              <View style={styles.cardImgWrap}>
+                <Image
+                  source={{ uri: item.images![0] }}
+                  style={styles.cardImg}
+                  contentFit="cover"
+                  transition={150}
+                />
+                {/* Featured badge overlay */}
+                {item.featured && (
+                  <View style={styles.featuredBadge}>
+                    <View style={styles.featuredDot} />
+                    <Text style={styles.featuredBadgeText}>FEATURED</Text>
+                  </View>
+                )}
+                {/* Save / heart button */}
+                <Pressable
+                  style={styles.heartBtn}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    toggleSaved(item.id);
+                  }}
+                  hitSlop={8}
+                >
+                  <Ionicons
+                    name={isSaved(item.id) ? "heart" : "heart-outline"}
+                    size={14}
+                    color={isSaved(item.id) ? colors.error : colors.textOnDark}
+                  />
+                </Pressable>
+              </View>
+            )}
+
+            {/* Card body */}
+            <View style={[styles.cardBody, !hasImage && styles.cardBodyAccent]}>
+              {/* Featured chip in card body (for cards without an image) */}
+              {item.featured && !hasImage && (
+                <View style={styles.featuredChip}>
+                  <View style={styles.featuredDot} />
+                  <Text style={styles.featuredChipText}>FEATURED</Text>
                 </View>
               )}
-              {/* Save / heart button */}
-              <Pressable
-                style={styles.heartBtn}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  toggleSaved(item.id);
-                }}
-                hitSlop={8}
-              >
-                <Ionicons
-                  name={isSaved(item.id) ? "heart" : "heart-outline"}
-                  size={14}
-                  color={isSaved(item.id) ? colors.error : colors.textOnDark}
-                />
-              </Pressable>
-            </View>
-          )}
 
-          {/* Card body */}
-          <View style={[styles.cardBody, !hasImage && styles.cardBodyAccent]}>
-            <Text style={styles.cardRegion}>{REGION_NAME_UPPER}</Text>
-            <Text style={styles.cardName} numberOfLines={2}>
-              {item.name}
-            </Text>
-
-            {item.description && item.description.length > 0 && (
-              <Text style={styles.cardBlurb} numberOfLines={2}>
-                {item.description[0]}
+              <Text style={styles.cardRegion}>{REGION_NAME_UPPER}</Text>
+              <Text style={styles.cardName} numberOfLines={2}>
+                {item.name}
               </Text>
-            )}
 
-            {/* Rating + distance row */}
-            {(item.rating != null || distanceLabel) && (
-              <View style={styles.cardMeta}>
-                {item.rating != null && (
-                  <View style={styles.metaItem}>
-                    <Ionicons
-                      name="star"
-                      size={11}
-                      color={colors.accentSoft}
-                    />
-                    <Text style={styles.cardRating}>
-                      {item.rating.toFixed(1)}
-                    </Text>
-                    {item.userRatingsTotal != null && (
-                      <Text style={styles.cardReviews}>
-                        ({item.userRatingsTotal.toLocaleString()})
+              {item.description && item.description.length > 0 && (
+                <Text style={styles.cardBlurb} numberOfLines={2}>
+                  {item.description[0]}
+                </Text>
+              )}
+
+              {/* Rating + distance row */}
+              {(item.rating != null || distanceLabel) && (
+                <View style={styles.cardMeta}>
+                  {item.rating != null && (
+                    <View style={styles.metaItem}>
+                      <Ionicons name="star" size={11} color={colors.accentSoft} />
+                      <Text style={styles.cardRating}>
+                        {item.rating.toFixed(1)}
                       </Text>
-                    )}
-                  </View>
-                )}
-                {item.rating != null && distanceLabel && (
-                  <View style={styles.metaDot} />
-                )}
-                {distanceLabel && (
-                  <View style={styles.metaItem}>
-                    <Ionicons
-                      name="location"
-                      size={11}
-                      color={colors.accent}
-                    />
-                    <Text style={styles.distanceText}>{distanceLabel}</Text>
-                  </View>
-                )}
-              </View>
-            )}
+                      {item.userRatingsTotal != null && (
+                        <Text style={styles.cardReviews}>
+                          ({item.userRatingsTotal.toLocaleString()})
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                  {item.rating != null && distanceLabel && (
+                    <View style={styles.metaDot} />
+                  )}
+                  {distanceLabel && (
+                    <View style={styles.metaItem}>
+                      <Ionicons name="location" size={11} color={colors.accent} />
+                      <Text style={styles.distanceText}>{distanceLabel}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
 
-            {/* Feature pills — all booleans true on this winery */}
-            {featurePills.length > 0 && (
-              <View style={styles.featurePillsRow}>
-                {featurePills.map(({ key, label, icon }) => (
-                  <View key={String(key)} style={styles.featurePill}>
-                    <Ionicons
-                      name={icon}
-                      size={10}
-                      color={colors.textSecondary}
-                      style={styles.featurePillIcon}
-                    />
-                    <Text style={styles.featurePillText}>{label}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        </Pressable>
-      </Link>
+              {/* Feature pills — all booleans true on this winery */}
+              {featurePills.length > 0 && (
+                <View style={styles.featurePillsRow}>
+                  {featurePills.map(({ key, label, icon }) => (
+                    <View key={String(key)} style={styles.featurePill}>
+                      <Ionicons
+                        name={icon}
+                        size={10}
+                        color={colors.textSecondary}
+                        style={styles.featurePillIcon}
+                      />
+                      <Text style={styles.featurePillText}>{label}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          </Pressable>
+        </Link>
       </View>
     );
   };
+
+  // Results count + List/Map toggle. Hoisted out of the conditional view
+  // branches so TypeScript doesn't narrow `view` to a single literal inside
+  // them — and so we don't duplicate this JSX between the list and map paths.
+  const resultsRow = (
+    <View style={styles.resultsRow}>
+      <View style={styles.resultsLeft}>
+        <View style={styles.goldLine} />
+        <Text style={styles.resultsCount}>
+          {nearActive && hasRefLoc ? "NEAREST · " : ""}
+          {displayed.length}{" "}
+          {displayed.length === 1 ? "WINERY" : "WINERIES"}
+        </Text>
+      </View>
+      <View style={styles.viewToggle}>
+        <Pressable onPress={() => setView("list")}>
+          <Text
+            style={[
+              styles.viewToggleText,
+              view === "list" && styles.viewToggleActive,
+            ]}
+          >
+            List
+          </Text>
+        </Pressable>
+        <Text style={styles.viewToggleSep}>·</Text>
+        <Pressable onPress={() => setView("map")}>
+          <Text
+            style={[
+              styles.viewToggleText,
+              view === "map" && styles.viewToggleActive,
+            ]}
+          >
+            Map
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
 
   return (
     <View style={styles.container}>
@@ -394,7 +549,7 @@ export default function WineriesScreen() {
         <Text style={styles.headerTitle}>Our Wineries</Text>
       </View>
 
-      {/* ── Glass search bar ──────────────────────────────────────────────────── */}
+      {/* ── Glass search bar + filter button ──────────────────────────────────── */}
       <View style={styles.searchWrap}>
         <View style={styles.searchBar}>
           <Ionicons
@@ -411,99 +566,25 @@ export default function WineriesScreen() {
             onChangeText={setSearch}
           />
           {search.length > 0 && (
-            <Pressable onPress={() => setSearch("")}>
+            <Pressable onPress={() => setSearch("")} style={{ marginRight: 8 }}>
               <Ionicons name="close-circle" size={16} color={colors.textMuted} />
             </Pressable>
           )}
-        </View>
-      </View>
-
-      {/* ── Boolean filter chips ──────────────────────────────────────────────── */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chipsRow}
-        style={styles.chipsScroll}
-      >
-        {BOOLEAN_FILTERS.map(({ key, label, icon }) => {
-          const active = activeFilters.has(key);
-          return (
-            <Pressable
-              key={String(key)}
-              style={[styles.chip, active && styles.chipActive]}
-              onPress={() => toggleFilter(key)}
-            >
-              <View style={styles.chipInner}>
-                <Ionicons
-                  name={icon}
-                  size={13}
-                  color={active ? colors.onAccent : colors.textSecondary}
-                  style={styles.chipIcon}
-                />
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                  {label}
-                </Text>
-              </View>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      {/* ── Rating filter ─────────────────────────────────────────────────────── */}
-      <View style={styles.ratingRow}>
-        <Text style={styles.ratingLabel}>RATING</Text>
-        {RATING_OPTIONS.map(({ label, value }) => (
           <Pressable
-            key={value}
-            style={[
-              styles.ratingBtn,
-              minRating === value && styles.ratingBtnActive,
-            ]}
-            onPress={() => setMinRating(minRating === value ? 0 : value)}
+            onPress={() => setFiltersOpen((v) => !v)}
+            style={[styles.filterBtn, filtersOpen && styles.filterBtnActive]}
+            hitSlop={6}
           >
-            <Text
-              style={[
-                styles.ratingBtnText,
-                minRating === value && styles.ratingBtnTextActive,
-              ]}
-            >
-              {label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-
-      {/* ── Results count + List/Map toggle ──────────────────────────────────── */}
-      <View style={styles.resultsRow}>
-        <View style={styles.resultsLeft}>
-          <View style={styles.goldLine} />
-          <Text style={styles.resultsCount}>
-            {nearActive ? "NEAREST · " : ""}
-            {displayed.length}{" "}
-            {displayed.length === 1 ? "WINERY" : "WINERIES"}
-          </Text>
-        </View>
-        <View style={styles.viewToggle}>
-          <Pressable onPress={() => setView("list")}>
-            <Text
-              style={[
-                styles.viewToggleText,
-                view === "list" && styles.viewToggleActive,
-              ]}
-            >
-              List
-            </Text>
-          </Pressable>
-          <Text style={styles.viewToggleSep}>·</Text>
-          <Pressable onPress={() => setView("map")}>
-            <Text
-              style={[
-                styles.viewToggleText,
-                view === "map" && styles.viewToggleActive,
-              ]}
-            >
-              Map
-            </Text>
+            <Ionicons
+              name="options-outline"
+              size={14}
+              color={colors.onAccent}
+            />
+            {activeFilterCount > 0 && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+              </View>
+            )}
           </Pressable>
         </View>
       </View>
@@ -517,6 +598,175 @@ export default function WineriesScreen() {
           contentContainerStyle={styles.listContent}
           renderItem={renderCard}
           ItemSeparatorComponent={() => <View style={styles.cardSep} />}
+          ListHeaderComponent={
+            <>
+              {/* ── Collapsible filter panel ──────────────────────────────── */}
+              {filtersOpen && (
+                <Animated.View
+                  style={[
+                    styles.filterPanel,
+                    {
+                      opacity: filtersAnim,
+                      transform: [
+                        {
+                          translateY: filtersAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-8, 0],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  {/* ── Panel header + close button ────────────────────── */}
+                  <View style={styles.filterHeader}>
+                    <Text style={styles.filterHeaderLabel}>FILTERS</Text>
+                    <Pressable
+                      onPress={() => setFiltersOpen(false)}
+                      style={styles.filterCloseBtn}
+                      hitSlop={10}
+                    >
+                      <Text style={styles.filterCloseText}>Close</Text>
+                      <Ionicons name="chevron-up" size={15} color={colors.textSecondary} />
+                    </Pressable>
+                  </View>
+
+                  {/* ── Sort By ───────────────────────────────────────── */}
+                  <View style={styles.categoryBlock}>
+                    <Text style={styles.categoryLabel}>SORT BY</Text>
+                    <View style={styles.sortRow}>
+                      {(["featured", "nearMe", "az"] as const).map((mode) => (
+                        <Pressable
+                          key={mode}
+                          style={[styles.sortBtn, sortBy === mode && styles.sortBtnActive]}
+                          onPress={() => handleSortBy(mode)}
+                        >
+                          <Text
+                            style={[
+                              styles.sortBtnText,
+                              sortBy === mode && styles.sortBtnTextActive,
+                            ]}
+                          >
+                            {mode === "featured"
+                              ? "Featured"
+                              : mode === "nearMe"
+                              ? "Near Me"
+                              : "A–Z"}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                    {sortBy === "nearMe" && locationDenied && (
+                      <Text style={styles.locationHint}>
+                        Location access is off — enable it in Settings.
+                      </Text>
+                    )}
+                    {sortBy === "nearMe" && !hasRefLoc && !locationDenied && (
+                      <Text style={styles.locationHint}>
+                        Fetching your location…
+                      </Text>
+                    )}
+                  </View>
+
+                  {/* ── Region ────────────────────────────────────────── */}
+                  <View style={styles.categoryBlock}>
+                    <Text style={styles.categoryLabel}>REGION</Text>
+                    <View style={styles.regionRow}>
+                      {REGION_OPTIONS.map((region) => {
+                        const active = selectedRegions.has(region);
+                        return (
+                          <Pressable
+                            key={region}
+                            style={[
+                              styles.regionChip,
+                              active && styles.regionChipActive,
+                            ]}
+                            onPress={() => toggleRegion(region)}
+                          >
+                            <Text
+                              style={[
+                                styles.regionChipText,
+                                active && styles.regionChipTextActive,
+                              ]}
+                            >
+                              {region}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+
+                  {/* ── Features (boolean chips) ──────────────────────── */}
+                  <View style={styles.categoryBlock}>
+                    <Text style={styles.categoryLabel}>FEATURES</Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.chipsRow}
+                    >
+                      {BOOLEAN_FILTERS.map(({ key, label, icon }) => {
+                        const active = activeFilters.has(key);
+                        return (
+                          <Pressable
+                            key={String(key)}
+                            style={[styles.chip, active && styles.chipActive]}
+                            onPress={() => toggleFilter(key)}
+                          >
+                            <View style={styles.chipInner}>
+                              <Ionicons
+                                name={icon}
+                                size={13}
+                                color={active ? colors.onAccent : colors.textSecondary}
+                                style={styles.chipIcon}
+                              />
+                              <Text
+                                style={[
+                                  styles.chipText,
+                                  active && styles.chipTextActive,
+                                ]}
+                              >
+                                {label}
+                              </Text>
+                            </View>
+                          </Pressable>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+
+                  {/* ── Rating ────────────────────────────────────────── */}
+                  <View style={styles.categoryBlock}>
+                    <Text style={styles.categoryLabel}>RATING</Text>
+                    <View style={styles.ratingBtnsRow}>
+                      {RATING_OPTIONS.map(({ label, value }) => (
+                        <Pressable
+                          key={value}
+                          style={[
+                            styles.ratingBtn,
+                            minRating === value && styles.ratingBtnActive,
+                          ]}
+                          onPress={() => setMinRating(minRating === value ? 0 : value)}
+                        >
+                          <Text
+                            style={[
+                              styles.ratingBtnText,
+                              minRating === value && styles.ratingBtnTextActive,
+                            ]}
+                          >
+                            {label}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                </Animated.View>
+              )}
+
+              {/* ── Results count + List/Map toggle ──────────────────── */}
+              {resultsRow}
+            </>
+          }
           ListEmptyComponent={() => (
             <View style={styles.empty}>
               <Text style={styles.emptyLabel}>NO RESULTS</Text>
@@ -526,12 +776,17 @@ export default function WineriesScreen() {
         />
       )}
 
+      {/* ── Map view results header (only shown in map mode) ──────────────────── */}
+      {view === "map" && resultsRow}
+
       {/* ── Map ───────────────────────────────────────────────────────────────── */}
       {view === "map" && (
         <View style={{ flex: 1 }}>
           <MapView
             key={activeMapKey}
             style={styles.map}
+            provider={PROVIDER_GOOGLE}
+            customMapStyle={MAP_STYLE}
             initialRegion={TASMANIA_REGION}
             showsUserLocation
             showsMyLocationButton
@@ -539,6 +794,11 @@ export default function WineriesScreen() {
             clusterTextColor={colors.onAccent}
             clusterFontFamily={fonts.serif}
             radius={40}
+            // Match the load splash to the dark theme so we don't flash a
+            // bright white panel before the tiles paint in.
+            loadingEnabled
+            loadingBackgroundColor={colors.surface}
+            loadingIndicatorColor={colors.accent}
           >
             {mappableWineries.map((winery) => (
               <Marker
@@ -597,14 +857,14 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     ...type.kicker,
-    fontSize: type.caption.fontSize,           // bumped 11 → 12 (caption token)
+    fontSize: type.caption.fontSize,
     letterSpacing: 2,
     color: colors.textMuted,
   },
 
   // ── Header ──────────────────────────────────────────────────────────────
   header: {
-    paddingHorizontal: spacing.xxl,           // already 24 — token-ised
+    paddingHorizontal: spacing.xxl,
     paddingBottom: spacing.lg,
   },
   headerKicker: {
@@ -613,13 +873,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   headerTitle: {
-    ...type.h1,                               // 36 / italic / 400 / -0.5
+    ...type.h1,
     color: colors.textPrimary,
   },
 
   // ── Search ──────────────────────────────────────────────────────────────
   searchWrap: {
-    paddingHorizontal: spacing.xxl,           // standardised 20 → 24
+    paddingHorizontal: spacing.xxl,
     marginBottom: spacing.md,
   },
   searchBar: {
@@ -631,7 +891,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     paddingHorizontal: spacing.lg,
     paddingVertical: 12,
-    minHeight: spacing.hitTarget,             // 44pt floor
+    minHeight: spacing.hitTarget,
   },
   searchInput: {
     flex: 1,
@@ -640,25 +900,162 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
 
-  // ── Chips ───────────────────────────────────────────────────────────────
-  chipsScroll: {
-    flexGrow: 0,
-    flexShrink: 0,
+  // ── Filter button ────────────────────────────────────────────────────────
+  filterBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterBtnActive: {
+    backgroundColor: colors.accentSoft ?? colors.accent,
+  },
+  filterBadge: {
+    position: "absolute",
+    top: -3,
+    right: -3,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+    backgroundColor: colors.error ?? "#c0392b",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: colors.background,
+  },
+  filterBadgeText: {
+    color: colors.onAccent,
+    fontSize: 10,
+    fontWeight: "700",
+    lineHeight: 12,
+  },
+
+  // ── Collapsible filter panel ────────────────────────────────────────────
+  filterPanel: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+
+  // ── Filter panel header ─────────────────────────────────────────────────
+  filterHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.xxl,
     marginBottom: spacing.md,
   },
+  filterHeaderLabel: {
+    ...type.kicker,
+    color: colors.textMuted,
+    letterSpacing: 2,
+  },
+  filterCloseBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingLeft: spacing.md,
+  },
+  filterCloseText: {
+    ...type.caption,
+    color: colors.textSecondary,
+    fontWeight: weights.emphasis,
+  },
+
+  // ── Category blocks ─────────────────────────────────────────────────────
+  categoryBlock: {
+    paddingHorizontal: spacing.xxl,
+    marginBottom: spacing.lg,
+  },
+  categoryLabel: {
+    ...type.kicker,
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
+  },
+
+  // ── Sort By ─────────────────────────────────────────────────────────────
+  sortRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  sortBtn: {
+    flex: 1,
+    paddingVertical: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    minHeight: spacing.hitTarget,
+  },
+  sortBtnActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  sortBtnText: {
+    ...type.caption,
+    color: colors.textMuted,
+    fontWeight: weights.emphasis,
+    letterSpacing: 0.3,
+  },
+  sortBtnTextActive: {
+    color: colors.onAccent,
+  },
+  locationHint: {
+    ...type.caption,
+    fontSize: 11,
+    color: colors.textMuted,
+    fontStyle: "italic",
+    marginTop: spacing.xs,
+  },
+
+  // ── Region ──────────────────────────────────────────────────────────────
+  regionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  regionChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.inputSurface,
+    minHeight: spacing.hitTarget,
+    justifyContent: "center",
+  },
+  regionChipActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  regionChipText: {
+    ...type.caption,
+    fontWeight: weights.body,
+    color: colors.textPrimary,
+    letterSpacing: 0.3,
+  },
+  regionChipTextActive: {
+    color: colors.onAccent,
+  },
+
+  // ── Feature chips ────────────────────────────────────────────────────────
   chipsRow: {
-    paddingHorizontal: spacing.xxl,           // standardised 20 → 24
     gap: spacing.sm,
     alignItems: "center",
   },
   chip: {
-    paddingHorizontal: spacing.lg,            // bumped 14 → 16
-    paddingVertical: 11,                      // bumped 7 → 11 (Fix 4)
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 11,
     borderRadius: radius.pill,
     backgroundColor: colors.inputSurface,
     borderWidth: 1,
     borderColor: colors.border,
-    minHeight: spacing.hitTarget,             // 44pt floor (Apple HIG)
+    minHeight: spacing.hitTarget,
     justifyContent: "center",
   },
   chipActive: {
@@ -682,35 +1079,28 @@ const styles = StyleSheet.create({
     color: colors.onAccent,
   },
 
-  // ── Rating filter ────────────────────────────────────────────────────────
-  ratingRow: {
+  // ── Rating ───────────────────────────────────────────────────────────────
+  ratingBtnsRow: {
     flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: spacing.xxl,           // standardised 20 → 24
     gap: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  ratingLabel: {
-    ...type.kicker,                           // bumped 9 → 10
-    color: colors.textMuted,
-    marginRight: spacing.xs,
   },
   ratingBtn: {
     paddingHorizontal: spacing.md,
-    paddingVertical: 10,                      // bumped 6 → 10 (toward 44pt)
+    paddingVertical: 10,
     borderRadius: radius.card,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-    minHeight: spacing.hitTarget,             // 44pt floor
+    minHeight: spacing.hitTarget,
     justifyContent: "center",
+    alignItems: "center",
   },
   ratingBtnActive: {
     backgroundColor: colors.accent,
     borderColor: colors.accent,
   },
   ratingBtnText: {
-    fontSize: type.caption.fontSize,           // bumped 11 → 12
+    fontSize: type.caption.fontSize,
     letterSpacing: 0.5,
     color: colors.textMuted,
     fontWeight: weights.body,
@@ -724,7 +1114,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: spacing.xxl,           // standardised 20 → 24
+    paddingHorizontal: spacing.xxl,
     marginBottom: spacing.lg,
   },
   resultsLeft: {
@@ -761,11 +1151,9 @@ const styles = StyleSheet.create({
 
   // ── Cards ────────────────────────────────────────────────────────────────
   listContent: {
-    paddingTop: spacing.xs,                    // breathing room for shadows
+    paddingTop: spacing.xs,
     paddingBottom: 120,
   },
-  // Shadow host — owns margin, elevation, and background color.
-  // No overflow:hidden here so the shadow can render freely.
   cardShadow: {
     marginHorizontal: spacing.xxl,
     borderRadius: radius.cardLg,
@@ -776,8 +1164,6 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 4,
   },
-  // Clip host — clips image to rounded corners.
-  // No shadow here; that lives on cardShadow above.
   card: {
     borderRadius: radius.cardLg,
     overflow: "hidden",
@@ -786,10 +1172,10 @@ const styles = StyleSheet.create({
     opacity: 0.92,
   },
   cardSep: {
-    height: spacing.md,                       // 12 — matched to library card rhythm
+    height: spacing.md,
   },
   cardImgWrap: {
-    height: 150,                              // matched to library card height
+    height: 150,
     position: "relative",
     backgroundColor: colors.surfaceDeep,
     borderTopLeftRadius: radius.cardLg,
@@ -800,27 +1186,61 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  partnerBadge: {
+
+  // Featured badge — overlaid on card image (top-left)
+  featuredBadge: {
     position: "absolute",
     top: spacing.md,
     left: spacing.md,
-    backgroundColor: colors.accent,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(50,50,50,0.72)",
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
-    borderRadius: 2,
+    borderRadius: radius.pill,
+    gap: 5,
   },
-  partnerText: {
-    ...type.kicker,                           // bumped 9 → 10 (kicker minimum)
+  featuredBadgeText: {
+    ...type.kicker,
     fontSize: 10,
     letterSpacing: 1.5,
-    color: colors.onAccent,
+    color: "#fff",
     fontWeight: weights.emphasis,
   },
+
+  // Featured chip — shown in card body when there is no image
+  featuredChip: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#e8e8e8",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.pill,
+    marginBottom: spacing.xs,
+    gap: 5,
+  },
+  featuredChipText: {
+    ...type.kicker,
+    fontSize: 10,
+    letterSpacing: 1.5,
+    color: "#444",
+    fontWeight: weights.emphasis,
+  },
+
+  // Red dot used inside featured badge and chip
+  featuredDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#c0392b",
+  },
+
   heartBtn: {
     position: "absolute",
     top: spacing.md,
     right: spacing.md,
-    width: spacing.hitTarget,                 // 44pt — Apple HIG
+    width: spacing.hitTarget,
     height: spacing.hitTarget,
     borderRadius: spacing.hitTarget / 2,
     backgroundColor: colors.photoChromeAlt,
@@ -828,26 +1248,25 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   cardBody: {
-    padding: spacing.xl,                      // card body padding 20 (Fix 3)
+    padding: spacing.xl,
   },
-  // Applied when there's no image — adds left forest accent
   cardBodyAccent: {
     borderLeftWidth: 2,
     borderLeftColor: colors.accent,
     paddingLeft: spacing.lg,
   },
   cardRegion: {
-    ...type.kicker,                           // bumped 9 → 10
+    ...type.kicker,
     letterSpacing: 1.8,
     color: colors.textMuted,
     marginBottom: spacing.xs,
   },
   cardName: {
-    ...type.h3,                               // 22 / bold / Georgia
+    ...type.h3,
     color: colors.textPrimary,
   },
   cardBlurb: {
-    ...type.caption,                          // 12 / 16 line-height
+    ...type.caption,
     color: colors.textSecondary,
     marginTop: spacing.xs,
     lineHeight: 18,
@@ -883,8 +1302,6 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontWeight: weights.emphasis,
   },
-  // Display-only pills for the boolean attributes that are true on a winery.
-  // Smaller and quieter than the filter chips above so the card name still leads.
   featurePillsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -947,7 +1364,7 @@ const styles = StyleSheet.create({
   },
   calloutName: {
     fontFamily: fonts.serif,
-    fontSize: type.body.fontSize,             // 13 → 14 (body)
+    fontSize: type.body.fontSize,
     color: colors.textPrimary,
     marginBottom: 3,
     textAlign: "center",

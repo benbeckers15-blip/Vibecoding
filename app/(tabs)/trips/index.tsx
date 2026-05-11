@@ -1,21 +1,29 @@
 // app/(tabs)/trips/index.tsx
 // Trips hub — entry point for the trip-planning feature.
 //
-// Layout:
-//   • Editorial header (kicker + serif headline)
+// Layout (mirrors the editorial language of app/(tabs)/wineries/index.tsx):
+//   • Editorial header (kicker + serif headline + italic lede)
 //   • "Active Trip" banner (only when one is in progress) → resumes trip-active
-//   • "Curated Trips" section — read from Firestore `premade_trips`
+//   • REGIONAL HALF-DAY  — horizontal scroll of compact trail cards
+//                          (2–3 wineries each, one per region). Lime accent.
+//   • REGIONAL FULL-DAY  — vertical stack of large trail cards on a tinted
+//                          band so the section reads as visually separate
+//                          from the half-day rail (4–5 wineries each, one
+//                          per region). Forest accent + sunny icon.
 //   • "My Trips" section — read from local TripContext
 //   • Floating "+ Build Your Own" CTA → /trips/create
 //
-// Editorial conventions follow constants/theme.ts and mirror the structure
-// of app/(tabs)/wineries/index.tsx so the trip pages don't feel bolted on.
+// Categorisation rule: a curated trip is treated as half-day when its
+// `wineryIds` length is ≤3, and full-day when ≥4. This lines up with the
+// product spec (half = 2–3 stops, full = 4–5 stops) without requiring a
+// Firestore schema migration.
 
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { collection, getDocs, orderBy, query } from "firebase/firestore";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -24,7 +32,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { REGION_NAME_UPPER } from "../../../constants/region";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
@@ -32,6 +39,16 @@ import { useAuth } from "../../../context/AuthContext";
 import { useTrips } from "../../../context/TripContext";
 import { db } from "../../../firebaseConfig";
 import { PremadeTrip, Trip } from "../../../types/trip";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+// Tipping point between half-day and full-day. ≤ HALF_DAY_MAX_STOPS counts as
+// half-day, anything above is full-day. Matches the product spec (2–3 vs 4–5).
+const HALF_DAY_MAX_STOPS = 3;
+
+// Compact card width on the half-day rail. Tuned so two cards peek into view
+// on a 390pt screen, hinting that the rail scrolls horizontally.
+const HALF_CARD_WIDTH = 260;
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -45,8 +62,8 @@ export default function TripsIndexScreen() {
   const [premadeLoading, setPremadeLoading] = useState(true);
 
   // Wait for Firebase Auth to restore the persisted session before querying
-  // Firestore. If we fire before the auth token is attached, rules that require
-  // request.auth will reject the read even for a previously-signed-in user.
+  // Firestore. If we fire before the auth token is attached, rules that
+  // require request.auth will reject the read even for a returning user.
   useEffect(() => {
     if (authLoading) return;
     (async () => {
@@ -68,6 +85,18 @@ export default function TripsIndexScreen() {
     })();
   }, [authLoading]);
 
+  // ── Split curated trips by tier ───────────────────────────────────────────
+  const { halfDayTrips, fullDayTrips } = useMemo(() => {
+    const half: PremadeTrip[] = [];
+    const full: PremadeTrip[] = [];
+    for (const t of premadeTrips) {
+      const stops = t.wineryIds?.length ?? 0;
+      if (stops <= HALF_DAY_MAX_STOPS) half.push(t);
+      else full.push(t);
+    }
+    return { halfDayTrips: half, fullDayTrips: full };
+  }, [premadeTrips]);
+
   const userTrips = trips; // already most-recent-first from context
 
   if (tripsLoading) {
@@ -77,6 +106,12 @@ export default function TripsIndexScreen() {
       </View>
     );
   }
+
+  const openTrip = (id: string) =>
+    router.push({
+      pathname: "/(tabs)/trips/[id]",
+      params: { id, kind: "premade" },
+    });
 
   return (
     <View style={styles.container}>
@@ -89,8 +124,8 @@ export default function TripsIndexScreen() {
           <Text style={styles.headerKicker}>{REGION_NAME_UPPER}</Text>
           <Text style={styles.headerTitle}>Plan Your Trip</Text>
           <Text style={styles.headerLede}>
-            Curated itineraries through the region’s cellar doors — or build
-            your own.
+            Curated trails through every cellar door region — pick a half-day
+            taster or settle in for the full day.
           </Text>
         </View>
 
@@ -116,39 +151,78 @@ export default function TripsIndexScreen() {
           </Pressable>
         )}
 
-        {/* ── Curated trips ──────────────────────────────────────────────── */}
-        <View style={styles.sectionHeaderRow}>
-          <View style={styles.goldLine} />
-          <Text style={styles.sectionLabel}>CURATED TRIPS</Text>
-        </View>
-
+        {/* ── Loading state for both curated rails ────────────────────────── */}
         {premadeLoading ? (
           <View style={styles.sectionLoading}>
             <ActivityIndicator size="small" color={colors.accent} />
           </View>
-        ) : premadeTrips.length === 0 ? (
-          <View style={styles.empty}>
-            <Text style={styles.emptyText}>
-              Curated trips are coming soon. Build your own below.
-            </Text>
-          </View>
         ) : (
-          premadeTrips.map((t) => (
-            <PremadeTripCard
-              key={t.id}
-              trip={t}
-              onPress={() =>
-                router.push({
-                  pathname: "/(tabs)/trips/[id]",
-                  params: { id: t.id, kind: "premade" },
-                })
-              }
+          <>
+            {/* ── Regional Half-Day ─────────────────────────────────────── */}
+            <SectionHeading
+              kicker="HALF-DAY TRAILS"
+              title="Regional Half-Day"
+              subtitle="2–3 cellar doors · about three hours"
+              icon="partly-sunny-outline"
+              accentColor={colors.accentSoft}
             />
-          ))
+
+            {halfDayTrips.length === 0 ? (
+              <View style={styles.empty}>
+                <Text style={styles.emptyText}>
+                  Half-day trails are coming soon.
+                </Text>
+              </View>
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.halfRail}
+                decelerationRate="fast"
+                snapToInterval={HALF_CARD_WIDTH + spacing.md}
+                snapToAlignment="start"
+              >
+                {halfDayTrips.map((t) => (
+                  <HalfDayCard
+                    key={t.id}
+                    trip={t}
+                    onPress={() => openTrip(t.id)}
+                  />
+                ))}
+              </ScrollView>
+            )}
+
+            {/* ── Regional Full-Day ─────────────────────────────────────── */}
+            <View style={styles.fullDayBand}>
+              <SectionHeading
+                kicker="FULL-DAY TRAILS"
+                title="Regional Full-Day"
+                subtitle="4–5 cellar doors · the long way round"
+                icon="sunny-outline"
+                accentColor={colors.accent}
+              />
+
+              {fullDayTrips.length === 0 ? (
+                <View style={styles.empty}>
+                  <Text style={styles.emptyText}>
+                    Full-day trails are coming soon.
+                  </Text>
+                </View>
+              ) : (
+                fullDayTrips.map((t) => (
+                  <FullDayCard
+                    key={t.id}
+                    trip={t}
+                    onPress={() => openTrip(t.id)}
+                  />
+                ))
+              )}
+            </View>
+          </>
         )}
 
         {/* ── My trips ───────────────────────────────────────────────────── */}
-        <View style={[styles.sectionHeaderRow, { marginTop: spacing.hero }]}>
+        <View style={styles.sectionHeaderRow}>
           <View style={styles.goldLine} />
           <Text style={styles.sectionLabel}>MY TRIPS</Text>
         </View>
@@ -174,7 +248,7 @@ export default function TripsIndexScreen() {
           ))
         )}
 
-        {/* spacer so floating CTA doesn't cover the last card */}
+        {/* spacer so the floating CTA never sits on top of the last card */}
         <View style={{ height: 140 }} />
       </ScrollView>
 
@@ -190,9 +264,49 @@ export default function TripsIndexScreen() {
   );
 }
 
-// ─── Curated trip card ────────────────────────────────────────────────────────
+// ─── Section heading ──────────────────────────────────────────────────────────
+// Editorial kicker + serif title + italic subtitle. Accent-colored hairline +
+// icon establish the section's identity (lime/partly-sunny for half, forest/
+// sunny for full).
 
-function PremadeTripCard({
+function SectionHeading({
+  kicker,
+  title,
+  subtitle,
+  icon,
+  accentColor,
+}: {
+  kicker: string;
+  title: string;
+  subtitle: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  accentColor: string;
+}) {
+  return (
+    <View style={styles.sectionBlock}>
+      <View style={styles.sectionTopRow}>
+        <View style={[styles.accentLine, { backgroundColor: accentColor }]} />
+        <Text style={[styles.sectionKicker, { color: accentColor }]}>
+          {kicker}
+        </Text>
+      </View>
+      <View style={styles.sectionTitleRow}>
+        <Ionicons
+          name={icon}
+          size={18}
+          color={accentColor}
+          style={{ marginRight: spacing.sm }}
+        />
+        <Text style={styles.sectionTitle}>{title}</Text>
+      </View>
+      <Text style={styles.sectionSubtitle}>{subtitle}</Text>
+    </View>
+  );
+}
+
+// ─── Half-day card (compact, horizontal-scroll) ───────────────────────────────
+
+function HalfDayCard({
   trip,
   onPress,
 }: {
@@ -200,35 +314,125 @@ function PremadeTripCard({
   onPress: () => void;
 }) {
   return (
-    <Pressable style={styles.card} onPress={onPress}>
-      <View style={styles.cardImgWrap}>
+    <Pressable
+      style={({ pressed }) => [styles.halfCard, pressed && styles.cardPressed]}
+      onPress={onPress}
+    >
+      <View style={styles.halfImgWrap}>
         <Image
           source={{ uri: trip.heroImage }}
-          style={styles.cardImg}
+          style={styles.halfImg}
           contentFit="cover"
           transition={150}
         />
         <LinearGradient
           colors={["transparent", colors.photoOverlayStrong]}
-          style={styles.cardImgOverlay}
+          style={styles.halfImgOverlay}
         />
-        <View style={styles.cardImgText}>
-          <Text style={styles.cardKicker}>
-            {trip.region?.toUpperCase() ?? REGION_NAME_UPPER}
+        {/* Lime tier pill — visually marks this as a half-day card */}
+        <View style={styles.halfTierPill}>
+          <Ionicons
+            name="partly-sunny-outline"
+            size={10}
+            color={colors.background}
+            style={{ marginRight: 4 }}
+          />
+          <Text style={styles.halfTierPillText}>HALF DAY</Text>
+        </View>
+        <View style={styles.halfImgText}>
+          <Text style={styles.halfKicker}>
+            {(trip.region ?? REGION_NAME_UPPER).toUpperCase()}
           </Text>
-          <Text style={styles.cardTitle}>{trip.title}</Text>
+          <Text style={styles.halfTitle} numberOfLines={2}>
+            {trip.title}
+          </Text>
         </View>
       </View>
-      <View style={styles.cardBody}>
-        <Text style={styles.cardBlurb} numberOfLines={2}>
-          {trip.blurb}
+      <View style={styles.halfMetaRow}>
+        <Text style={styles.halfMetaText}>
+          {trip.wineryIds.length} STOPS
         </Text>
-        <View style={styles.cardMeta}>
-          <Text style={styles.cardMetaText}>
-            {trip.wineryIds.length} stops
+        <View style={styles.halfMetaDot} />
+        <Text style={styles.halfMetaText}>~{trip.durationHours} HR</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+// ─── Full-day card (large, full-width) ────────────────────────────────────────
+
+function FullDayCard({
+  trip,
+  onPress,
+}: {
+  trip: PremadeTrip;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.fullCardShadow, pressed && styles.cardPressed]}
+      onPress={onPress}
+    >
+      <View style={styles.fullCard}>
+        <View style={styles.fullImgWrap}>
+          <Image
+            source={{ uri: trip.heroImage }}
+            style={styles.fullImg}
+            contentFit="cover"
+            transition={150}
+          />
+          <LinearGradient
+            colors={["transparent", colors.photoOverlayStrong]}
+            style={styles.fullImgOverlay}
+          />
+          {/* Forest tier pill — visually marks this as a full-day card */}
+          <View style={styles.fullTierPill}>
+            <Ionicons
+              name="sunny-outline"
+              size={11}
+              color={colors.onAccent}
+              style={{ marginRight: 4 }}
+            />
+            <Text style={styles.fullTierPillText}>FULL DAY</Text>
+          </View>
+          <View style={styles.fullImgText}>
+            <Text style={styles.fullKicker}>
+              {(trip.region ?? REGION_NAME_UPPER).toUpperCase()}
+            </Text>
+            <Text style={styles.fullTitle} numberOfLines={2}>
+              {trip.title}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.fullBody}>
+          <Text style={styles.fullBlurb} numberOfLines={2}>
+            {trip.blurb}
           </Text>
-          <Text style={styles.cardMetaSep}>·</Text>
-          <Text style={styles.cardMetaText}>~{trip.durationHours} hr</Text>
+          <View style={styles.fullMetaRow}>
+            <View style={styles.fullMetaItem}>
+              <Ionicons
+                name="wine-outline"
+                size={12}
+                color={colors.accent}
+                style={{ marginRight: 4 }}
+              />
+              <Text style={styles.fullMetaText}>
+                {trip.wineryIds.length} stops
+              </Text>
+            </View>
+            <View style={styles.fullMetaDot} />
+            <View style={styles.fullMetaItem}>
+              <Ionicons
+                name="time-outline"
+                size={12}
+                color={colors.accent}
+                style={{ marginRight: 4 }}
+              />
+              <Text style={styles.fullMetaText}>
+                ~{trip.durationHours} hr
+              </Text>
+            </View>
+          </View>
         </View>
       </View>
     </Pressable>
@@ -284,7 +488,7 @@ const styles = StyleSheet.create({
   },
   scroll: { paddingBottom: spacing.hero },
 
-  // Header
+  // ── Header ──────────────────────────────────────────────────────────────
   header: {
     paddingHorizontal: spacing.xxl,
     paddingBottom: spacing.lg,
@@ -299,17 +503,16 @@ const styles = StyleSheet.create({
     ...type.body,
     color: colors.textSecondary,
     marginTop: spacing.sm,
-    fontFamily: fonts.serif,
-    fontStyle: "italic",
+    fontFamily: fonts.sans,
     lineHeight: 22,
   },
 
-  // Active banner
+  // ── Active banner ───────────────────────────────────────────────────────
   activeBanner: {
     marginHorizontal: spacing.xxl,
     marginTop: spacing.lg,
     backgroundColor: colors.accent,
-    borderRadius: radius.card,
+    borderRadius: radius.cardLg,
     overflow: "hidden",
   },
   activeBannerInner: {
@@ -318,7 +521,7 @@ const styles = StyleSheet.create({
   activeBannerKicker: {
     ...type.kicker,
     color: colors.textOnDark,
-    opacity: 0.8,
+    opacity: 0.85,
     marginBottom: spacing.xs,
   },
   activeBannerTitle: {
@@ -332,13 +535,48 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
 
-  // Section header
+  // ── Section heading (used by both curated rails) ───────────────────────
+  sectionBlock: {
+    paddingHorizontal: spacing.xxl,
+    marginTop: spacing.xxxl,
+    marginBottom: spacing.lg,
+  },
+  sectionTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  accentLine: {
+    width: spacing.xl,
+    height: 1,
+  },
+  sectionKicker: {
+    ...type.kicker,
+  },
+  sectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: spacing.xs,
+  },
+  sectionTitle: {
+    ...type.h2,
+    color: colors.textPrimary,
+  },
+  sectionSubtitle: {
+    ...type.body,
+    fontFamily: fonts.sans,
+    color: colors.textSecondary,
+    lineHeight: 20,
+  },
+
+  // ── Plain "MY TRIPS" section header (matches wineries divider style) ───
   sectionHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
     paddingHorizontal: spacing.xxl,
-    marginTop: spacing.xxl,
+    marginTop: spacing.hero,
     marginBottom: spacing.lg,
   },
   goldLine: {
@@ -350,12 +588,13 @@ const styles = StyleSheet.create({
     ...type.kicker,
     color: colors.accentSoft,
   },
+
   sectionLoading: {
     paddingVertical: spacing.xxl,
     alignItems: "center",
   },
 
-  // Empty state
+  // ── Empty state ─────────────────────────────────────────────────────────
   empty: {
     paddingHorizontal: spacing.xxl,
     paddingVertical: spacing.lg,
@@ -363,67 +602,199 @@ const styles = StyleSheet.create({
   emptyText: {
     ...type.body,
     color: colors.textMuted,
-    fontFamily: fonts.serif,
-    fontStyle: "italic",
+    fontFamily: fonts.serifItalic,
   },
 
-  // Curated card
-  card: {
+  // ── Half-day rail ───────────────────────────────────────────────────────
+  halfRail: {
+    paddingLeft: spacing.xxl,
+    paddingRight: spacing.lg,
+    paddingVertical: spacing.xs,
+    gap: spacing.md,
+  },
+  halfCard: {
+    width: HALF_CARD_WIDTH,
+    backgroundColor: colors.surface,
+    borderRadius: radius.cardLg,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  halfImgWrap: {
+    height: 150,
+    position: "relative",
+    backgroundColor: colors.surfaceDeep,
+  },
+  halfImg: { width: "100%", height: "100%" },
+  halfImgOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: "75%",
+  },
+  halfTierPill: {
+    position: "absolute",
+    top: spacing.sm,
+    left: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.accentSoft,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+  },
+  halfTierPillText: {
+    ...type.kicker,
+    fontSize: 9,
+    letterSpacing: 1.4,
+    color: colors.background,
+    fontWeight: weights.emphasis,
+  },
+  halfImgText: {
+    position: "absolute",
+    left: spacing.md,
+    right: spacing.md,
+    bottom: spacing.md,
+  },
+  halfKicker: {
+    ...type.kicker,
+    fontSize: 9,
+    letterSpacing: 1.8,
+    color: colors.textOnDark,
+    opacity: 0.85,
+    marginBottom: spacing.xs,
+  },
+  halfTitle: {
+    fontFamily: fonts.serifSemiBold,
+    fontSize: 18,
+    lineHeight: 22,
+    color: colors.textOnDark,
+    letterSpacing: -0.2,
+  },
+  halfMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  halfMetaText: {
+    ...type.kicker,
+    color: colors.textMuted,
+  },
+  halfMetaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: radius.pill,
+    backgroundColor: colors.textMuted,
+  },
+
+  // ── Full-day band + cards ───────────────────────────────────────────────
+  // The band is a tinted strip behind the full-day rail. It's the strongest
+  // visual cue separating this section from the half-day rail above.
+  fullDayBand: {
+    marginTop: spacing.xxl,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xxl,
+    backgroundColor: colors.surfaceDeep,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  fullCardShadow: {
     marginHorizontal: spacing.xxl,
     marginBottom: spacing.lg,
-    backgroundColor: colors.surface,
-    borderRadius: radius.card,
+    borderRadius: radius.cardLg,
+    backgroundColor: colors.surfaceElevated,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  fullCard: {
+    borderRadius: radius.cardLg,
     overflow: "hidden",
   },
-  cardImgWrap: {
-    height: 180,
+  fullImgWrap: {
+    height: 200,
     position: "relative",
+    backgroundColor: colors.surfaceDeep,
   },
-  cardImg: { width: "100%", height: "100%" },
-  cardImgOverlay: {
+  fullImg: { width: "100%", height: "100%" },
+  fullImgOverlay: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
     height: "70%",
   },
-  cardImgText: {
+  fullTierPill: {
+    position: "absolute",
+    top: spacing.md,
+    left: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.accent,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+  },
+  fullTierPillText: {
+    ...type.kicker,
+    fontSize: 10,
+    letterSpacing: 1.5,
+    color: colors.onAccent,
+    fontWeight: weights.emphasis,
+  },
+  fullImgText: {
     position: "absolute",
     left: spacing.lg,
     right: spacing.lg,
     bottom: spacing.lg,
   },
-  cardKicker: {
+  fullKicker: {
     ...type.kicker,
     color: colors.textOnDark,
-    opacity: 0.8,
+    opacity: 0.85,
     marginBottom: spacing.xs,
   },
-  cardTitle: { ...type.h3, color: colors.textOnDark },
-  cardBody: {
+  fullTitle: {
+    ...type.h2,
+    color: colors.textOnDark,
+  },
+  fullBody: {
     padding: spacing.xl,
   },
-  cardBlurb: {
+  fullBlurb: {
     ...type.body,
     color: colors.textSecondary,
     lineHeight: 20,
   },
-  cardMeta: {
+  fullMetaRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
     marginTop: spacing.md,
   },
-  cardMetaText: {
-    ...type.kicker,
-    color: colors.textMuted,
+  fullMetaItem: {
+    flexDirection: "row",
+    alignItems: "center",
   },
-  cardMetaSep: {
+  fullMetaText: {
     ...type.kicker,
-    color: colors.textMuted,
+    color: colors.textPrimary,
+  },
+  fullMetaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: radius.pill,
+    backgroundColor: colors.textMuted,
   },
 
-  // User trip card
+  // ── User trip card ──────────────────────────────────────────────────────
   userCard: {
     marginHorizontal: spacing.xxl,
     marginBottom: spacing.md,
@@ -455,7 +826,12 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
 
-  // Floating CTA
+  // ── Pressed feedback (shared) ───────────────────────────────────────────
+  cardPressed: {
+    opacity: 0.92,
+  },
+
+  // ── Floating CTA ────────────────────────────────────────────────────────
   fab: {
     position: "absolute",
     right: spacing.xxl,

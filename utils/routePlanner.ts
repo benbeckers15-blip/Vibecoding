@@ -60,7 +60,7 @@ export async function optimiseRoute(
     return { orderedStops: stops, usedGoogle: false };
   }
 
-  const apiKey = process.env.EXPO_PUBLIC_GOOGLE_DIRECTIONS_API_KEY;
+  const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
     // No key configured → use local heuristic and surface that fact.
     return {

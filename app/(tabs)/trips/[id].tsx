@@ -13,8 +13,8 @@
 // computed at start-time so we don't hit the Directions API on every view.
 
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Location from "expo-location";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -27,9 +27,11 @@ import {
   Text,
   View,
 } from "react-native";
-import MapView, { Marker, Polyline } from "react-native-maps";
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
+import { fetchRoutePolyline, type LatLng } from "../../../utils/fetchRoutePolyline";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { REGION_NAME_UPPER } from "../../../constants/region";
+import { MAP_STYLE } from "../../../constants/mapStyle";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
 import { useTrips } from "../../../context/TripContext";
 import { db } from "../../../firebaseConfig";
@@ -63,6 +65,11 @@ export default function TripDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
 
+  // Driving route polyline — fetched from Google Directions API after stops load.
+  // Falls back to straight lines (empty array) if the fetch fails.
+  const [routeCoords, setRouteCoords] = useState<LatLng[]>([]);
+  const [routeLoading, setRouteLoading] = useState(false);
+
   const userTrip = kind === "user" ? getTrip(tripId) : undefined;
 
   // For user trips, the stops come straight from context. For premade, we
@@ -87,7 +94,12 @@ export default function TripDetailScreen() {
 
         // Fetch the referenced wineries — chunk to handle Firestore's
         // 30-id "in" limit (we won't have that many, but keep it safe).
-        const ids = tripData.wineryIds;
+        // Guard against malformed docs where `wineryIds` is missing or not
+        // an array — otherwise `.length` / `.slice` blows up before we even
+        // get to the map, and the screen crashes silently behind the catch.
+        const ids = Array.isArray(tripData.wineryIds)
+          ? tripData.wineryIds.filter((x): x is string => typeof x === "string")
+          : [];
         if (ids.length === 0) {
           setLoading(false);
           return;
@@ -102,9 +114,14 @@ export default function TripDetailScreen() {
           const snap = await getDocs(q);
           snap.forEach((d) => {
             const data = d.data() as any;
+            // Use Number.isFinite — `typeof NaN === "number"` is true, so the
+            // looser typeof check lets NaN coords (from failed geocoding)
+            // through. Once NaN reaches MapView's initialRegion, Google Maps
+            // on iOS hard-crashes silently, which is exactly what was
+            // happening on the Derwent Valley trip.
             if (
-              typeof data.latitude === "number" &&
-              typeof data.longitude === "number"
+              Number.isFinite(data.latitude) &&
+              Number.isFinite(data.longitude)
             ) {
               wineries.push({
                 wineryId: d.id,
@@ -113,6 +130,14 @@ export default function TripDetailScreen() {
                 latitude: data.latitude,
                 longitude: data.longitude,
               });
+            } else if (__DEV__) {
+              // Surface bad data in dev so we can fix the Firestore record
+              // rather than silently dropping it forever.
+              console.warn(
+                `[trip detail] dropping winery ${d.id} — non-finite coords:`,
+                data.latitude,
+                data.longitude
+              );
             }
           });
         }
@@ -130,9 +155,17 @@ export default function TripDetailScreen() {
   }, [tripId, kind]);
 
   // ── Stops shown on screen ─────────────────────────────────────────────────
+  // Belt-and-braces: filter out stops with non-finite coords here too. The
+  // premade branch already filters at fetch time, but `userTrip?.stops` comes
+  // straight from AsyncStorage — and any user trip created before the
+  // create.tsx filter was tightened can carry NaN-coord stops on disk. Strip
+  // them at the source so every downstream consumer (Map, Polyline, route
+  // optimiser, Directions API) only ever sees finite coords.
   const stops: TripStop[] = useMemo(() => {
-    if (kind === "user") return userTrip?.stops ?? [];
-    return premadeStops;
+    const raw = kind === "user" ? userTrip?.stops ?? [] : premadeStops;
+    return raw.filter(
+      (s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude)
+    );
   }, [kind, userTrip, premadeStops]);
 
   const title =
@@ -140,18 +173,45 @@ export default function TripDetailScreen() {
   const blurb = kind === "premade" ? premade?.blurb : undefined;
   const durationHours = kind === "premade" ? premade?.durationHours : undefined;
 
+  // ── Polyline coords — derive once per render so we don't recompute or build
+  // them inside the JSX. Wrapping Polylines in an IIFE / Fragment inside
+  // <MapView> can prevent react-native-maps from registering the overlay on
+  // the native side (it traverses children to find Marker/Polyline nodes,
+  // and Fragment wrappers can interfere with that).
+  //
+  // Defensive filter: if any non-finite coord ever sneaks past the upstream
+  // filter (e.g. corrupted Firestore data), strip it here so the polyline
+  // never hands NaN to the native side.
+  const routeDisplayCoords: LatLng[] = useMemo(() => {
+    const source = routeCoords.length > 1
+      ? routeCoords
+      : stops.map((s) => ({ latitude: s.latitude, longitude: s.longitude }));
+    return source.filter(
+      (c) => Number.isFinite(c.latitude) && Number.isFinite(c.longitude)
+    );
+  }, [routeCoords, stops]);
+  const usingRealRoute = routeCoords.length > 1;
+
   // ── Map region — center on stops ──────────────────────────────────────────
+  // We compute from stops with finite coords only. Even though the upstream
+  // filter rejects NaN, defending here means a single bad doc can never take
+  // down the screen via initialRegion={NaN, NaN, NaN, NaN} — which was the
+  // exact path that crashed the Derwent Valley trip.
   const initialRegion = useMemo(() => {
-    if (stops.length === 0) {
+    const safeStops = stops.filter(
+      (s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude)
+    );
+    if (safeStops.length === 0) {
+      // Tasmania-wide fallback — sensible default for this app's region.
       return {
-        latitude: -33.95,
-        longitude: 115.07,
-        latitudeDelta: 0.3,
-        longitudeDelta: 0.3,
+        latitude: -42.0,
+        longitude: 146.8,
+        latitudeDelta: 3.0,
+        longitudeDelta: 3.0,
       };
     }
-    const lats = stops.map((s) => s.latitude);
-    const lngs = stops.map((s) => s.longitude);
+    const lats = safeStops.map((s) => s.latitude);
+    const lngs = safeStops.map((s) => s.longitude);
     const minLat = Math.min(...lats);
     const maxLat = Math.max(...lats);
     const minLng = Math.min(...lngs);
@@ -161,6 +221,25 @@ export default function TripDetailScreen() {
       longitude: (minLng + maxLng) / 2,
       latitudeDelta: Math.max(0.05, (maxLat - minLat) * 1.6),
       longitudeDelta: Math.max(0.05, (maxLng - minLng) * 1.6),
+    };
+  }, [stops]);
+
+  // ── Fetch driving-route polyline for the map preview ─────────────────────
+  useEffect(() => {
+    if (stops.length < 2) {
+      setRouteCoords([]);
+      return;
+    }
+    let cancelled = false;
+    setRouteLoading(true);
+    fetchRoutePolyline(stops).then((coords) => {
+      if (!cancelled) {
+        setRouteCoords(coords ?? []);
+        setRouteLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
     };
   }, [stops]);
 
@@ -269,7 +348,10 @@ export default function TripDetailScreen() {
     <View style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: CTA_BOTTOM + 80 }}
+        // Leave clear space for the floating tab bar at the bottom — the CTA
+        // now lives on the map (top-right), so we no longer reserve room for
+        // a full-width bottom button.
+        contentContainerStyle={{ paddingBottom: CTA_BOTTOM }}
       >
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
@@ -306,30 +388,140 @@ export default function TripDetailScreen() {
           </View>
         </View>
 
+        {/* ── CTA above the map (right-aligned) ──────────────────────────────
+            Sits directly above the map preview, anchored to the right edge so
+            the action stays prominent and clear of the map gestures below. */}
+        {stops.length > 0 && (
+          <View style={styles.mapCtaRow}>
+            {isActive ? (
+              <Pressable
+                style={styles.mapCtaBtn}
+                onPress={() =>
+                  router.push({
+                    pathname: "/trip-active",
+                    params: { tripId },
+                  })
+                }
+              >
+                <Ionicons
+                  name="play"
+                  size={18}
+                  color={colors.onAccent}
+                />
+                <Text style={styles.mapCtaText}>Resume</Text>
+              </Pressable>
+            ) : isCompleted ? (
+              <View style={[styles.mapCtaBtn, styles.mapCtaBtnDisabled]}>
+                <Ionicons
+                  name="checkmark"
+                  size={18}
+                  color={colors.onAccent}
+                />
+                <Text style={styles.mapCtaText}>Completed</Text>
+              </View>
+            ) : (
+              <Pressable
+                style={[
+                  styles.mapCtaBtn,
+                  starting && styles.mapCtaBtnDisabled,
+                ]}
+                onPress={handleStart}
+                disabled={starting}
+              >
+                {starting ? (
+                  <ActivityIndicator size="small" color={colors.onAccent} />
+                ) : (
+                  <>
+                    <Ionicons
+                      name="play"
+                      size={18}
+                      color={colors.onAccent}
+                    />
+                    <Text style={styles.mapCtaText}>Start Trip</Text>
+                  </>
+                )}
+              </Pressable>
+            )}
+          </View>
+        )}
+
         {/* ── Map preview ────────────────────────────────────────────────── */}
         {stops.length > 0 && (
           <View style={styles.mapWrap}>
-            <MapView style={styles.map} initialRegion={initialRegion}>
-              {stops.map((s, idx) => (
-                <Marker
-                  key={s.wineryId}
-                  coordinate={{
-                    latitude: s.latitude,
-                    longitude: s.longitude,
-                  }}
-                  title={`${idx + 1}. ${s.name}`}
-                  pinColor={colors.accent}
+            <MapView
+              style={styles.map}
+              provider={PROVIDER_GOOGLE}
+              customMapStyle={MAP_STYLE}
+              initialRegion={initialRegion}
+              loadingEnabled
+              loadingBackgroundColor={colors.surface}
+              loadingIndicatorColor={colors.accent}
+            >
+              {/* Polylines FIRST so they render below the markers. Listing
+                  them as direct children of MapView (no Fragment / IIFE
+                  wrapper) is required — react-native-maps traverses children
+                  to register native overlays, and Fragments can break that. */}
+              {/* Route polylines. Both use stable keys so React UPDATES their
+                  props when the real route arrives rather than unmounting +
+                  remounting the native GMSPolyline. Unmounting while the map
+                  is fully active (i.e. tiles have loaded) crashes the Google
+                  Maps iOS SDK silently on real devices — the Derwent Valley
+                  trip triggered this because its longer fetch completed after
+                  the map was active, whereas shorter trips' fetches completed
+                  during initialization when the SDK is more forgiving.
+                  The casing is shown only for the real route; its conditional
+                  render (add/remove, not key-swap) is safe. */}
+              {routeDisplayCoords.length > 1 && usingRealRoute && (
+                <Polyline
+                  key="route-casing"
+                  coordinates={routeDisplayCoords}
+                  strokeColor={colors.background}
+                  strokeWidth={9}
+                  zIndex={1}
+                  geodesic
                 />
-              ))}
-              <Polyline
-                coordinates={stops.map((s) => ({
-                  latitude: s.latitude,
-                  longitude: s.longitude,
-                }))}
-                strokeColor={colors.accent}
-                strokeWidth={3}
-              />
+              )}
+              {routeDisplayCoords.length > 1 && (
+                <Polyline
+                  key="route-polyline"
+                  coordinates={routeDisplayCoords}
+                  strokeColor={colors.accentSoft}
+                  strokeWidth={usingRealRoute ? 5 : 2}
+                  strokeOpacity={usingRealRoute ? 1 : 0.45}
+                  zIndex={2}
+                  geodesic
+                />
+              )}
+              {stops.map((s, idx) => {
+                // Skip any stop with a non-finite coord — react-native-maps
+                // can crash natively (especially with PROVIDER_GOOGLE on iOS)
+                // if a Marker receives NaN. Belt-and-braces with the upstream
+                // Number.isFinite filter.
+                if (
+                  !Number.isFinite(s.latitude) ||
+                  !Number.isFinite(s.longitude)
+                ) {
+                  return null;
+                }
+                return (
+                  <Marker
+                    key={s.wineryId}
+                    coordinate={{
+                      latitude: s.latitude,
+                      longitude: s.longitude,
+                    }}
+                    title={`${idx + 1}. ${s.name}`}
+                    pinColor={colors.accent}
+                  />
+                );
+              })}
             </MapView>
+            {/* Spinner overlay while the driving route is being fetched */}
+            {routeLoading && (
+              <View style={styles.mapLoadingOverlay}>
+                <ActivityIndicator size="small" color={colors.accent} />
+              </View>
+            )}
           </View>
         )}
 
@@ -344,7 +536,22 @@ export default function TripDetailScreen() {
             kind === "user" &&
             userTrip?.visitedStopIds.includes(s.wineryId);
           return (
-            <View key={s.wineryId} style={styles.stopRow}>
+            <Pressable
+              key={s.wineryId}
+              style={({ pressed }) => [
+                styles.stopRow,
+                pressed && styles.stopRowPressed,
+              ]}
+              onPress={() =>
+                router.push(
+                  `/wineries/${s.slug}?from=trip&tripId=${encodeURIComponent(
+                    tripId
+                  )}&kind=${kind}` as any
+                )
+              }
+              accessibilityRole="link"
+              accessibilityLabel={`View ${s.name}`}
+            >
               <View
                 style={[
                   styles.stopIdx,
@@ -357,14 +564,20 @@ export default function TripDetailScreen() {
                 <Text style={styles.stopName}>{s.name}</Text>
                 <Text style={styles.stopRegion}>{REGION_NAME_UPPER}</Text>
               </View>
-              {visited && (
+              {visited ? (
                 <Ionicons
                   name="checkmark-circle"
                   size={22}
                   color={colors.accent}
                 />
+              ) : (
+                <Ionicons
+                  name="chevron-forward"
+                  size={18}
+                  color={colors.textMuted}
+                />
               )}
-            </View>
+            </Pressable>
           );
         })}
 
@@ -375,41 +588,6 @@ export default function TripDetailScreen() {
           </Pressable>
         )}
       </ScrollView>
-
-      {/* ── Bottom CTA ───────────────────────────────────────────────────── */}
-      {/* Positioned above the floating tab bar (defined in (tabs)/_layout.tsx)
-          so the green pill isn't obscured by the nav. */}
-      <View style={styles.ctaBar} pointerEvents="box-none">
-        {isActive ? (
-          <Pressable
-            style={styles.ctaBtn}
-            onPress={() =>
-              router.push({
-                pathname: "/trip-active",
-                params: { tripId },
-              })
-            }
-          >
-            <Text style={styles.ctaBtnText}>Resume Trip</Text>
-          </Pressable>
-        ) : isCompleted ? (
-          <View style={[styles.ctaBtn, styles.ctaBtnDisabled]}>
-            <Text style={styles.ctaBtnText}>Trip Completed</Text>
-          </View>
-        ) : (
-          <Pressable
-            style={[styles.ctaBtn, starting && styles.ctaBtnDisabled]}
-            onPress={handleStart}
-            disabled={starting}
-          >
-            {starting ? (
-              <ActivityIndicator color={colors.onAccent} />
-            ) : (
-              <Text style={styles.ctaBtnText}>Start Trip</Text>
-            )}
-          </Pressable>
-        )}
-      </View>
     </View>
   );
 }
@@ -446,7 +624,7 @@ const styles = StyleSheet.create({
   headerBlurb: {
     ...type.body,
     color: colors.textSecondary,
-    fontFamily: fonts.serif,
+    fontFamily: fonts.sans,
     fontStyle: "italic",
     lineHeight: 22,
   },
@@ -468,13 +646,21 @@ const styles = StyleSheet.create({
   mapWrap: {
     height: 240,
     marginHorizontal: spacing.xxl,
-    marginVertical: spacing.lg,
+    marginBottom: spacing.lg,
     borderRadius: radius.card,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: colors.border,
   },
   map: { width: "100%", height: "100%" },
+  mapLoadingOverlay: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
+    backgroundColor: colors.surfaceDeep,
+    borderRadius: 12,
+    padding: 6,
+  },
 
   stopsHeader: {
     flexDirection: "row",
@@ -500,6 +686,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xxl,
     paddingVertical: spacing.md,
     gap: spacing.md,
+  },
+  // Subtle dimming on tap so users get tactile feedback that the row links out.
+  stopRowPressed: {
+    backgroundColor: colors.surface,
   },
   stopIdx: {
     width: 32,
@@ -543,36 +733,37 @@ const styles = StyleSheet.create({
     color: colors.error,
   },
 
-  ctaBar: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: CTA_BOTTOM,
+  // ── CTA above the map (right-aligned) ────────────────────────────────────
+  // Lives in flow ABOVE the map preview, right-aligned via flex. Slightly
+  // larger than the previous overlay pill so it's easy to spot.
+  mapCtaRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
     paddingHorizontal: spacing.xxl,
-    // No background / borderTop — the bar sits above the floating tab bar
-    // so a full-width band would leave an awkward strip of color over the
-    // page. The pill below carries its own visual weight.
-    zIndex: 1500,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
   },
-  ctaBtn: {
+  mapCtaBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     backgroundColor: colors.accent,
     borderRadius: radius.pill,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 16,
-    minHeight: spacing.hitTarget,
-    // Subtle lift so the floating pill separates from page content scrolling
-    // underneath it.
+    paddingHorizontal: spacing.xl,
+    paddingVertical: 14,
+    // Subtle lift to anchor the CTA visually above the map below.
     shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  ctaBtnDisabled: { opacity: 0.5 },
-  ctaBtnText: {
+  mapCtaBtnDisabled: { opacity: 0.6 },
+  mapCtaText: {
     ...type.kicker,
+    fontSize: 13,
     color: colors.onAccent,
     fontWeight: weights.emphasis,
+    letterSpacing: 1.5,
   },
 });

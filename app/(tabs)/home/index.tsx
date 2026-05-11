@@ -3,6 +3,7 @@
 // Dark bg · Georgia serif · gold accents · glass search · editorial grid
 
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import {
@@ -26,15 +27,15 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { REGION_NAME, REGION_NAME_UPPER } from "../../../constants/region";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
 import { db } from "../../../firebaseConfig";
 
-// Wrap expo-image so it can be driven by React Native's Animated values
-// (used for the parallax hero photo on the homepage).
-const AnimatedImage = Animated.createAnimatedComponent(Image);
+// We can't reliably drive expo-image's <Image> via Animated.createAnimatedComponent
+// — its native view doesn't forward the native-driver transform props, so
+// translateY just gets dropped (the value updates but the image never moves).
+// Instead, we wrap a plain <Image> in an Animated.View and animate the wrapper.
 
 // ─── Static assets ────────────────────────────────────────────────────────────
 const HERO_FALLBACK =
@@ -124,6 +125,16 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState("");
   const [heroImageUrl, setHeroImageUrl] = useState<string>(HERO_FALLBACK);
+  // Crop anchor for the cover-fit hero photo. Stored in Firestore so the
+  // image can be re-positioned without an app store release. Defaults to
+  // dead-center (matches expo-image's default contentPosition).
+  const [heroImagePosition, setHeroImagePosition] = useState<{
+    top: string;
+    left: string;
+  }>({ top: "50%", left: "50%" });
+  // Extra zoom on top of `contentFit="cover"`. 1 = raw cover crop (default).
+  // > 1 enlarges the image and crops more aggressively around the focal point.
+  const [heroImageZoom, setHeroImageZoom] = useState<number>(1);
   const [featuredWinery, setFeaturedWinery] = useState<FeaturedWinery | null>(null);
   const [wineryCount, setWineryCount] = useState<number>(0);
   const [pour, setPour] = useState<FeaturedPour | null>(null);
@@ -138,13 +149,34 @@ export default function HomeScreen() {
     extrapolate: "clamp",
   });
 
-  // Fetch hero image
+  // Fetch hero image + its crop anchor (both live in config/homepage so they
+  // can be tweaked from a script without shipping a new build).
   useEffect(() => {
     (async () => {
       try {
         const snap = await getDoc(doc(db, "config", "homepage"));
-        if (snap.exists() && snap.data().heroImageUrl) {
-          setHeroImageUrl(snap.data().heroImageUrl as string);
+        if (!snap.exists()) return;
+        const data = snap.data();
+        if (data.heroImageUrl) {
+          setHeroImageUrl(data.heroImageUrl as string);
+        }
+        // heroImagePositionX / heroImagePositionY are CSS-style strings
+        // e.g. "50%" (center), "0%" (top/left edge), "100%" (bottom/right
+        // edge). Falls back to center if either field is missing.
+        const x = data.heroImagePositionX;
+        const y = data.heroImagePositionY;
+        if (typeof x === "string" || typeof y === "string") {
+          setHeroImagePosition({
+            top: typeof y === "string" ? y : "50%",
+            left: typeof x === "string" ? x : "50%",
+          });
+        }
+        // heroImageZoom is a numeric scale multiplier applied on top of
+        // contentFit="cover" so we can crop tighter without pre-cropping
+        // the source image. Clamp to a sane range (1× to 4×).
+        const z = data.heroImageZoom;
+        if (typeof z === "number" && Number.isFinite(z)) {
+          setHeroImageZoom(Math.min(Math.max(z, 1), 4));
         }
       } catch {}
     })();
@@ -268,9 +300,10 @@ export default function HomeScreen() {
       {/* ── Daylight hero — image only, full saturation ───────────────────────── */}
       <View style={styles.hero}>
         {/* Hero image with subtle parallax — image extends beyond the container
-            so it never shows gaps as it translates upward on scroll. */}
-        <AnimatedImage
-          source={{ uri: heroImageUrl }}
+            so it never shows gaps as it translates upward on scroll.
+            The transform lives on the Animated.View wrapper because
+            expo-image's <Image> doesn't pick up native-driven transforms. */}
+        <Animated.View
           style={[
             {
               position: "absolute",
@@ -278,13 +311,27 @@ export default function HomeScreen() {
               right: 0,
               top: -(PARALLAX_EXTRA / 2),
               height: HERO_HEIGHT + PARALLAX_EXTRA,
-              opacity: 0.96,
             },
             { transform: [{ translateY: heroImageTranslate }] },
           ]}
-          contentFit="cover"
-          transition={200}
-        />
+        >
+          <Image
+            source={{ uri: heroImageUrl }}
+            style={{
+              width: "100%",
+              height: "100%",
+              opacity: 0.96,
+              // Extra zoom on top of `cover`. transformOrigin is pinned to
+              // the focal point so increasing zoom keeps the same area
+              // visible — it just crops more tightly around it.
+              transform: [{ scale: heroImageZoom }],
+              transformOrigin: `${heroImagePosition.left} ${heroImagePosition.top}`,
+            }}
+            contentFit="cover"
+            contentPosition={heroImagePosition}
+            transition={200}
+          />
+        </Animated.View>
         {/* Brand header overlaid on photo */}
         <View style={[styles.heroHeader, { paddingTop: insets.top + 10 }]}>
           <Text style={styles.logo}>
@@ -395,7 +442,7 @@ export default function HomeScreen() {
               style={styles.tile}
               onPress={() =>
                 router.push(
-                  `/wineries?filter=${tile.key}&t=${Date.now()}` as any
+                  `/home/articles/collections/${tile.key}` as any
                 )
               }
             >
@@ -614,7 +661,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    marginTop: -20,                          // overlap the hero image
+    marginTop: -15,                          // overlap the hero image
     paddingHorizontal: spacing.xxl,
     paddingTop: spacing.xxxl,
     paddingBottom: spacing.sm,

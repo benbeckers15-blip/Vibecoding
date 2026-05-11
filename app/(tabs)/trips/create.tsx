@@ -71,10 +71,13 @@ export default function CreateTripScreen() {
               longitude: data.longitude,
             };
           })
+          // Use Number.isFinite — `typeof NaN === "number"` is true, so the
+          // looser typeof check lets NaN coords (from failed geocoding)
+          // through. A NaN-coord winery added to a trip persists to
+          // AsyncStorage and later crashes the trip-active map screen.
           .filter(
             (w) =>
-              typeof w.latitude === "number" &&
-              typeof w.longitude === "number"
+              Number.isFinite(w.latitude) && Number.isFinite(w.longitude)
           )
           .sort((a, b) => a.name.localeCompare(b.name));
         setWineries(rows);
@@ -165,7 +168,7 @@ export default function CreateTripScreen() {
         <Text style={styles.fieldLabel}>TRIP NAME</Text>
         <TextInput
           style={styles.nameInput}
-          placeholder="My Margaret River day"
+          placeholder="My Tasmanian Wine Tour"
           placeholderTextColor={colors.textMuted}
           value={name}
           onChangeText={setName}
@@ -258,19 +261,18 @@ export default function CreateTripScreen() {
         ItemSeparatorComponent={() => <View style={styles.rowSep} />}
       />
 
-      {/* ── Save bar ───────────────────────────────────────────────────── */}
-      <View style={[styles.saveBar, { paddingBottom: insets.bottom + 12 }]}>
-        <Pressable
-          style={[
-            styles.saveBtn,
-            selectedStops.length < MIN_STOPS && styles.saveBtnDisabled,
-          ]}
-          onPress={handleSave}
-          disabled={selectedStops.length < MIN_STOPS}
-        >
-          <Text style={styles.saveBtnText}>Save Trip</Text>
-        </Pressable>
-      </View>
+      {/* ── Save FAB ───────────────────────────────────────────────────── */}
+      <Pressable
+        style={[
+          styles.fab,
+          selectedStops.length < MIN_STOPS && styles.fabDisabled,
+        ]}
+        onPress={handleSave}
+        disabled={selectedStops.length < MIN_STOPS}
+      >
+        <Ionicons name="checkmark" size={20} color={colors.onAccent} />
+        <Text style={styles.fabText}>Save Trip</Text>
+      </Pressable>
     </View>
   );
 }
@@ -408,27 +410,25 @@ const styles = StyleSheet.create({
   },
   rowSep: { height: spacing.sm },
 
-  saveBar: {
+  fab: {
     position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingTop: spacing.md,
-    paddingHorizontal: spacing.xxl,
-    backgroundColor: colors.background,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  saveBtn: {
+    right: spacing.xxl,
+    bottom: 100, // above the floating tab bar
     backgroundColor: colors.accent,
     borderRadius: radius.pill,
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 16,
-    minHeight: spacing.hitTarget,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.xs,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  saveBtnDisabled: { opacity: 0.4 },
-  saveBtnText: {
+  fabDisabled: { opacity: 0.4 },
+  fabText: {
     ...type.kicker,
     color: colors.onAccent,
     fontWeight: weights.emphasis,

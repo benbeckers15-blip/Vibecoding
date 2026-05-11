@@ -88,7 +88,41 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
         if (!raw) return;
         try {
           const parsed: Trip[] = JSON.parse(raw);
-          if (Array.isArray(parsed)) setTrips(parsed);
+          if (!Array.isArray(parsed)) return;
+          // Self-heal: strip any stops with non-finite coords. These can land
+          // in storage from earlier app builds where create.tsx filtered with
+          // a leaky `typeof === "number"` (which lets NaN through). Once a
+          // NaN-coord stop reaches react-native-maps with PROVIDER_GOOGLE on
+          // iOS, it crashes the screen — so cleaning here means existing bad
+          // trips repair themselves on next launch instead of remaining
+          // permanently wedged on disk.
+          let mutated = false;
+          const cleaned = parsed.map((t) => {
+            if (!Array.isArray(t.stops)) return t;
+            const cleanStops = t.stops.filter(
+              (s) =>
+                Number.isFinite(s.latitude) && Number.isFinite(s.longitude)
+            );
+            if (cleanStops.length !== t.stops.length) {
+              mutated = true;
+              if (__DEV__) {
+                console.warn(
+                  `[TripContext] dropped ${
+                    t.stops.length - cleanStops.length
+                  } stop(s) with non-finite coords from trip ${t.id}`
+                );
+              }
+              return { ...t, stops: cleanStops };
+            }
+            return t;
+          });
+          setTrips(cleaned);
+          // Persist the cleaned list back so the next hydrate is a no-op.
+          if (mutated) {
+            AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned)).catch(
+              () => {}
+            );
+          }
         } catch {
           // Corrupt data — start fresh
         }

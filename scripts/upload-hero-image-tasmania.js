@@ -20,7 +20,7 @@ const SERVICE_ACCOUNT_PATH = path.join(PROJECT_ROOT, "service-account-tasmania.j
 const STORAGE_BUCKET = "winery-tourism-tasmania.firebasestorage.app";
 
 // Source image — defaults to hero-tamar.jpg in the project root.
-const sourceArg = process.argv[2] || "hero-tamar.jpg";
+const sourceArg = process.argv[2] || "hero-app.jpg";
 const sourcePath = path.isAbsolute(sourceArg)
   ? sourceArg
   : path.join(PROJECT_ROOT, sourceArg);
