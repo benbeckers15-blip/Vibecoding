@@ -1,6 +1,7 @@
 // app/(tabs)/profile/delete-account.tsx
 // ─────────────────────────────────────────────────────────────────────────────
 // Account Deletion screen.
+import { withScreenErrorBoundary } from "../../../components/ScreenErrorBoundary";
 //
 // Compliance: Apple App Review guideline 5.1.1(v).
 //   Apps that support account creation must let the user delete their
@@ -50,7 +51,7 @@ import {
   weights,
 } from "../../../constants/theme";
 
-export default function DeleteAccountScreen() {
+function DeleteAccountScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -213,6 +214,8 @@ export default function DeleteAccountScreen() {
             onPress={() => router.back()}
             disabled={submitting}
             accessibilityRole="button"
+            accessibilityLabel="Cancel and go back"
+            accessibilityState={{ disabled: submitting }}
           >
             <Text style={styles.cancelLabel}>Cancel</Text>
           </Pressable>
@@ -392,3 +395,5 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 });
+
+export default withScreenErrorBoundary(DeleteAccountScreen, "profile/delete-account");

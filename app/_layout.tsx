@@ -26,8 +26,10 @@ import {
 } from "@expo-google-fonts/roboto";
 
 import { RegionGate } from "../components/RegionGate";
+import { RootErrorBoundary } from "../components/RootErrorBoundary";
 import { fonts } from "../constants/theme";
 import { AuthProvider } from "../context/AuthContext";
+import { NetworkProvider } from "../context/NetworkContext";
 import { RegionProvider } from "../context/RegionContext";
 import { SavedProvider } from "../context/SavedContext";
 import { TripProvider } from "../context/TripContext";
@@ -83,11 +85,20 @@ export default function RootLayout() {
   }
 
   return (
-    // RegionProvider is outermost — every other provider may need to read
-    // the active region (Auth potentially syncs users/{uid}.activeRegionId;
-    // Saved/Trip may surface region-scoped data later). RegionGate blocks
-    // the Stack from rendering until the region is settled, so children
-    // can freely call useRegionConfig() without null-checking.
+    // RootErrorBoundary is the outermost wrapper — catches any uncaught
+    // render error anywhere in the app tree and shows ErrorScreen with a
+    // reload action instead of React's blank fallback. Required for App
+    // Store submission (Apple rejects apps that render a blank white
+    // screen on error).
+    //
+    // RegionProvider sits inside the error boundary but outside everything
+    // else — every other provider may need to read the active region
+    // (Auth potentially syncs users/{uid}.activeRegionId; Saved/Trip may
+    // surface region-scoped data later). RegionGate blocks the Stack from
+    // rendering until the region is settled, so children can freely call
+    // useRegionConfig() without null-checking.
+    <RootErrorBoundary>
+    <NetworkProvider>
     <RegionProvider>
       <AuthProvider>
         <SavedProvider>
@@ -120,5 +131,7 @@ export default function RootLayout() {
         </SavedProvider>
       </AuthProvider>
     </RegionProvider>
+    </NetworkProvider>
+    </RootErrorBoundary>
   );
 }

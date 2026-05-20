@@ -1,5 +1,6 @@
 // app/(tabs)/trips/[id].tsx
 // Trip detail screen.
+import { withScreenErrorBoundary } from "../../../components/ScreenErrorBoundary";
 //
 // Two flavours, switched by the `kind` route param:
 //   • kind=premade — read-only view of a curated trip from Firestore. The
@@ -49,7 +50,7 @@ const CTA_BOTTOM = TAB_BAR_BOTTOM_INSET + TAB_BAR_HEIGHT + CTA_GAP_ABOVE_TAB_BAR
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export default function TripDetailScreen() {
+function TripDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const regionId = useActiveRegionId();
@@ -339,7 +340,12 @@ export default function TripDetailScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.emptyText}>This trip no longer exists.</Text>
-        <Pressable style={styles.backBtn} onPress={() => router.back()}>
+        <Pressable
+          style={styles.backBtn}
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Back to trips"
+        >
           <Ionicons name="chevron-back" size={16} color="#1a1a1a" />
           <Text style={styles.backBtnText}>Trips</Text>
         </Pressable>
@@ -361,7 +367,13 @@ export default function TripDetailScreen() {
       >
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
-          <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={12}>
+          <Pressable
+            style={styles.backBtn}
+            onPress={() => router.back()}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Back to trips"
+          >
             <Ionicons name="chevron-back" size={16} color={colors.textPrimary} />
             <Text style={styles.backBtnText}>Trips</Text>
           </Pressable>
@@ -409,6 +421,8 @@ export default function TripDetailScreen() {
                     params: { tripId },
                   })
                 }
+                accessibilityRole="button"
+                accessibilityLabel="Resume active trip"
               >
                 <Ionicons
                   name="play"
@@ -434,6 +448,9 @@ export default function TripDetailScreen() {
                 ]}
                 onPress={handleStart}
                 disabled={starting}
+                accessibilityRole="button"
+                accessibilityLabel={starting ? "Starting trip" : "Start trip"}
+                accessibilityState={{ disabled: starting, busy: starting }}
               >
                 {starting ? (
                   <ActivityIndicator size="small" color={colors.onAccent} />
@@ -590,7 +607,12 @@ export default function TripDetailScreen() {
 
         {/* User trip — delete affordance */}
         {kind === "user" && !isActive && (
-          <Pressable style={styles.deleteBtn} onPress={handleDelete}>
+          <Pressable
+            style={styles.deleteBtn}
+            onPress={handleDelete}
+            accessibilityRole="button"
+            accessibilityLabel="Delete trip"
+          >
             <Text style={styles.deleteText}>Delete Trip</Text>
           </Pressable>
         )}
@@ -787,3 +809,5 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
   },
 });
+
+export default withScreenErrorBoundary(TripDetailScreen, "trips/[id]");

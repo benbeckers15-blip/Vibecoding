@@ -1,5 +1,6 @@
 // app/(tabs)/wineries/[slug].tsx
 // Redesigned with Direction B — Cinematic Dusk aesthetic
+import { withScreenErrorBoundary } from "../../../components/ScreenErrorBoundary";
 // Dark bg · glass header · gold accents · dark info grid · dark modal
 
 import { Ionicons } from "@expo/vector-icons";
@@ -130,7 +131,7 @@ function normaliseHours(raw: unknown): HoursEntry[] {
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
-export default function WineryDetailsScreen() {
+function WineryDetailsScreen() {
   const { slug, from, tripId, kind } = useLocalSearchParams<{
     slug: string;
     from?: string;
@@ -359,6 +360,8 @@ export default function WineryDetailsScreen() {
                   router.replace("/(tabs)/wineries");
                 }
               }}
+              accessibilityRole="button"
+              accessibilityLabel={`Back to ${backLabel}`}
             >
               <Ionicons name="chevron-back" size={16} color={colors.textOnDark} />
               <Text style={styles.headerBtnText}>{backLabel}</Text>
@@ -377,7 +380,12 @@ export default function WineryDetailsScreen() {
                   color={isSaved ? colors.accentSoft : colors.textOnDark}
                 />
               </Pressable>
-              <Pressable style={styles.headerIconBtn} onPress={handleShare}>
+              <Pressable
+                style={styles.headerIconBtn}
+                onPress={handleShare}
+                accessibilityRole="button"
+                accessibilityLabel={`Share ${winery.name}`}
+              >
                 <Ionicons name="share-outline" size={16} color={colors.textOnDark} />
               </Pressable>
             </View>
@@ -474,6 +482,13 @@ export default function WineryDetailsScreen() {
             <Pressable
               style={styles.infoCell}
               onPress={() => winery.website ? safeOpenURL(winery.website) : undefined}
+              disabled={!winery.website}
+              accessibilityRole="button"
+              accessibilityLabel={
+                winery.website
+                  ? "By appointment only. Book via website."
+                  : "By appointment only"
+              }
             >
               <Text style={styles.infoCellLabel}>HOURS</Text>
               <View style={styles.valueRow}>
@@ -488,6 +503,8 @@ export default function WineryDetailsScreen() {
             <Pressable
               style={styles.infoCell}
               onPress={() => setHoursVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel="See all opening hours"
             >
               <Text style={styles.infoCellLabel}>HOURS</Text>
               <View style={styles.valueRow}>
@@ -522,6 +539,12 @@ export default function WineryDetailsScreen() {
                         )
                     : undefined
                 }
+                accessibilityRole={hasCoords ? "button" : undefined}
+                accessibilityLabel={
+                  hasCoords
+                    ? `Get directions to ${winery.name} in ${locationLabel}`
+                    : undefined
+                }
               >
                 <Text style={styles.infoCellLabel}>LOCATION</Text>
                 <View style={styles.valueRow}>
@@ -546,6 +569,8 @@ export default function WineryDetailsScreen() {
                   `tel:${winery.phone.replace(/\s/g, "")}`
                 ).catch(() => console.warn("Could not open phone link"))
               }
+              accessibilityRole="button"
+              accessibilityLabel={`Call ${winery.name} at ${winery.phone}`}
             >
               <Text style={styles.contactLabel}>CALL</Text>
               <View style={styles.valueRow}>
@@ -562,6 +587,8 @@ export default function WineryDetailsScreen() {
                 winery.phone !== "N/A" && styles.contactBtnBorderLeft,
               ]}
               onPress={() => safeOpenURL(winery.website)}
+              accessibilityRole="link"
+              accessibilityLabel={`Open ${winery.name} website`}
             >
               <Text style={styles.contactLabel}>WEBSITE</Text>
               <View style={styles.valueRow}>
@@ -642,8 +669,14 @@ export default function WineryDetailsScreen() {
         <Pressable
           style={styles.modalBackdrop}
           onPress={() => setHoursVisible(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Close opening hours"
         >
-          <Pressable style={styles.modalSheet} onPress={() => {}}>
+          <Pressable
+            style={styles.modalSheet}
+            onPress={() => {}}
+            accessible={false}
+          >
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>OPENING HOURS</Text>
 
@@ -663,6 +696,8 @@ export default function WineryDetailsScreen() {
             <Pressable
               style={styles.modalClose}
               onPress={() => setHoursVisible(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Close opening hours"
             >
               <Text style={styles.modalCloseText}>Close</Text>
             </Pressable>
@@ -1124,3 +1159,5 @@ const skeletonStyles = StyleSheet.create({
   },
   dividerLabel: { height: 8, width: 48, borderRadius: radius.card },
 });
+
+export default withScreenErrorBoundary(WineryDetailsScreen, "wineries/[slug]");

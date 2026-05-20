@@ -46,6 +46,7 @@ import React, {
 import { db } from "../firebaseConfig";
 import { getConcierge } from "../services/concierge/concierge";
 import type { RegionConfig, RegionSummary } from "../types/region";
+import { reportError } from "../utils/errorReporting";
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
 
@@ -65,6 +66,17 @@ type RegionState =
       regionId: string;
       config: RegionConfig;
       available: RegionSummary[];
+    }
+  | {
+      /** Initial fetch of the regions collection failed (network down,
+       *  Firestore unreachable, permissions). The RegionGate shows
+       *  ErrorScreen with a retry button bound to `retry()`. */
+      status: "error";
+      error: Error;
+      /** Distinguishes "no docs in /regions" (a real data problem) from
+       *  "Firestore unreachable" (transient network). Lets the
+       *  ErrorScreen tailor its copy. */
+      kind: "no_regions" | "fetch_failed";
     };
 
 // ─── Context value ────────────────────────────────────────────────────────────
@@ -79,6 +91,10 @@ interface RegionContextValue {
   /** All regions known to Firestore. Empty while loading. */
   available: RegionSummary[];
 
+  /** When status === "error", the underlying error and a kind discriminator. */
+  error: Error | null;
+  errorKind: "no_regions" | "fetch_failed" | null;
+
   /**
    * Switch to a different region. Persists to AsyncStorage and loads the
    * new region's config. Throws if the regionId isn't in `available`.
@@ -88,6 +104,9 @@ interface RegionContextValue {
    * this resolves. Phase 3b wires the concierge reset in.
    */
   setRegion: (regionId: string) => Promise<void>;
+
+  /** Retry the initial load. Wired to the ErrorScreen retry button. */
+  retry: () => void;
 }
 
 const RegionContext = createContext<RegionContextValue>({
@@ -95,8 +114,13 @@ const RegionContext = createContext<RegionContextValue>({
   regionId: null,
   config: null,
   available: [],
+  error: null,
+  errorKind: null,
   setRegion: async () => {
     throw new Error("RegionContext.setRegion called before provider mounted");
+  },
+  retry: () => {
+    throw new Error("RegionContext.retry called before provider mounted");
   },
 });
 
@@ -130,10 +154,15 @@ async function fetchRegionConfig(regionId: string): Promise<RegionConfig> {
 
 export function RegionProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<RegionState>({ status: "loading" });
+  // Bumped by retry() to re-trigger the initial-load effect.
+  const [retryToken, setRetryToken] = useState(0);
 
   // Initial load: persisted choice + available regions in parallel.
+  // Reruns when retryToken changes (the user tapped Try Again on the
+  // error screen).
   useEffect(() => {
     let cancelled = false;
+    setState({ status: "loading" });
     (async () => {
       try {
         const [storedId, available] = await Promise.all([
@@ -142,15 +171,15 @@ export function RegionProvider({ children }: { children: React.ReactNode }) {
         ]);
         if (cancelled) return;
 
-        // Defensive: if Firestore returned no regions at all, fall back to
-        // the loading state with empty available list. The app will hang
-        // here visibly, which is the right signal — a region MUST exist
-        // for the app to function. (Realistically this only happens if
-        // someone forgot to run the seed script.)
+        // Real data problem: someone forgot to seed any region docs.
+        // Surface as an error state so RegionGate can show actionable
+        // copy — much better than hanging in loading forever.
         if (available.length === 0) {
-          console.error(
-            "[RegionContext] No regions found in Firestore. Run scripts/seed-region-tasmania.js."
+          const err = new Error(
+            "No regions found in Firestore. Run scripts/seed-region-tasmania.js."
           );
+          reportError(err, { source: "RegionContext.init" }, "fatal");
+          setState({ status: "error", error: err, kind: "no_regions" });
           return;
         }
 
@@ -188,13 +217,22 @@ export function RegionProvider({ children }: { children: React.ReactNode }) {
         // Multiple regions, no persisted choice → show the picker.
         setState({ status: "needs_picker", available });
       } catch (err) {
-        console.error("[RegionContext] failed to initialise:", err);
-        // Stay in loading state — better than crashing the whole app.
+        if (cancelled) return;
+        // Most likely cause: no network or Firestore unreachable. Surface
+        // as an error state with a retry token so the user can try again
+        // once they reconnect.
+        const error = err instanceof Error ? err : new Error(String(err));
+        reportError(error, { source: "RegionContext.init" }, "error");
+        setState({ status: "error", error, kind: "fetch_failed" });
       }
     })();
     return () => {
       cancelled = true;
     };
+  }, [retryToken]);
+
+  const retry = useCallback(() => {
+    setRetryToken((t) => t + 1);
   }, []);
 
   const setRegion = useCallback(async (nextId: string) => {
@@ -239,7 +277,10 @@ export function RegionProvider({ children }: { children: React.ReactNode }) {
         regionId: state.regionId,
         config: state.config,
         available: state.available,
+        error: null,
+        errorKind: null,
         setRegion,
+        retry,
       };
     }
     if (state.status === "needs_picker") {
@@ -248,7 +289,22 @@ export function RegionProvider({ children }: { children: React.ReactNode }) {
         regionId: null,
         config: null,
         available: state.available,
+        error: null,
+        errorKind: null,
         setRegion,
+        retry,
+      };
+    }
+    if (state.status === "error") {
+      return {
+        status: "error",
+        regionId: null,
+        config: null,
+        available: [],
+        error: state.error,
+        errorKind: state.kind,
+        setRegion,
+        retry,
       };
     }
     return {
@@ -256,9 +312,12 @@ export function RegionProvider({ children }: { children: React.ReactNode }) {
       regionId: null,
       config: null,
       available: [],
+      error: null,
+      errorKind: null,
       setRegion,
+      retry,
     };
-  }, [state, setRegion]);
+  }, [state, setRegion, retry]);
 
   return (
     <RegionContext.Provider value={value}>{children}</RegionContext.Provider>

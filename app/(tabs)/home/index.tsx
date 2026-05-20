@@ -31,6 +31,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ConciergeChat from "../../../components/ConciergeChat";
+import { withScreenErrorBoundary } from "../../../components/ScreenErrorBoundary";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
 import { db } from "../../../firebaseConfig";
 
@@ -89,7 +90,7 @@ type ArticleEntry = {
 };
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
-export default function HomeScreen() {
+function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const regionId = useActiveRegionId();
@@ -315,7 +316,13 @@ export default function HomeScreen() {
       </View>
 
       {/* ── Concierge search bar ─────────────────────────────────────────────── */}
-      <Pressable style={styles.searchSection} onPress={() => setChatOpen(true)}>
+      <Pressable
+        style={styles.searchSection}
+        onPress={() => setChatOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel="Ask the Tasmanian wine concierge"
+        accessibilityHint="Opens an in-app chat with the sommelier"
+      >
         <View style={styles.searchBar} pointerEvents="none">
           <Ionicons
             name="chatbubble-ellipses-outline"
@@ -346,6 +353,8 @@ export default function HomeScreen() {
             onPress={() =>
               router.push(`/wineries/${featuredWinery.slug}?from=home` as any)
             }
+            accessibilityRole="button"
+            accessibilityLabel={`Open featured winery, ${featuredWinery.name}`}
           >
             {featuredWinery.images && featuredWinery.images.length > 0 && (
               <View style={styles.featImgWrap}>
@@ -397,6 +406,8 @@ export default function HomeScreen() {
           <Pressable
             style={styles.featuredCard}
             onPress={() => router.push("/(tabs)/home/pour" as any)}
+            accessibilityRole="button"
+            accessibilityLabel={`Read this week's Pour: ${pour.headline}`}
           >
             <View style={styles.featuredImg}>
               <Image
@@ -438,6 +449,8 @@ export default function HomeScreen() {
           <Pressable
             style={styles.featuredCard}
             onPress={() => router.push("/(tabs)/home/pour" as any)}
+            accessibilityRole="button"
+            accessibilityLabel="Read the latest issue of The Pour"
           >
             <View style={styles.featuredImg}>
               <Image
@@ -497,6 +510,12 @@ export default function HomeScreen() {
               // No-op for placeholders. Swap for navigation when each
               // article's detail screen / collection is ready.
             }}
+            disabled={!item.href}
+            accessibilityRole="button"
+            accessibilityLabel={
+              item.href ? `Read ${item.title}` : `${item.title}, coming soon`
+            }
+            accessibilityState={{ disabled: !item.href }}
           >
             <Image source={{ uri: item.image }} style={styles.articleCardImg} contentFit="cover" transition={150} />
             <View style={styles.articleCardBody}>
@@ -837,3 +856,5 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
 });
+
+export default withScreenErrorBoundary(HomeScreen, "home/index");

@@ -144,12 +144,22 @@ export default function InterviewLayout({ article }: Props) {
           />
 
           <View style={[styles.headerRow, { paddingTop: insets.top + 10 }]}>
-            <Pressable style={styles.backBtn} onPress={() => router.back()}>
+            <Pressable
+              style={styles.backBtn}
+              onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel="Back to home"
+            >
               <Ionicons name="chevron-back" size={16} color={colors.textOnDark} />
               <Text style={styles.backBtnText}>Home</Text>
             </Pressable>
             <Text style={styles.headerKicker}>INTERVIEW</Text>
-            <Pressable style={styles.iconBtn} onPress={handleShare}>
+            <Pressable
+              style={styles.iconBtn}
+              onPress={handleShare}
+              accessibilityRole="button"
+              accessibilityLabel="Share this interview"
+            >
               <Ionicons
                 name="share-outline"
                 size={15}

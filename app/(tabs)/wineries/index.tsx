@@ -23,8 +23,11 @@ import { Image } from "expo-image";
 import MapView from "react-native-map-clustering";
 import { Callout, Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ErrorScreen } from "../../../components/ErrorScreen";
+import { withScreenErrorBoundary } from "../../../components/ScreenErrorBoundary";
 import { MAP_STYLE } from "../../../constants/mapStyle";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
+import { reportError } from "../../../utils/errorReporting";
 import { useActiveRegionId, useRegionConfig } from "../../../context/RegionContext";
 import { useSaved } from "../../../context/SavedContext";
 import { db } from "../../../firebaseConfig";
@@ -120,7 +123,7 @@ function distanceKm(
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
-export default function WineriesScreen() {
+function WineriesScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
     search?: string;
@@ -144,6 +147,9 @@ export default function WineriesScreen() {
 
   const [wineries, setWineries] = useState<Winery[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<Error | null>(null);
+  // Bumped by the retry handler to force the load effect to rerun.
+  const [retryToken, setRetryToken] = useState(0);
   const [view, setView] = useState<"list" | "map">("list");
   const [search, setSearch] = useState(() =>
     typeof params.search === "string" ? params.search : ""
@@ -249,8 +255,10 @@ export default function WineriesScreen() {
     }, [params.search, params.filter, params.sort, params.t, ensureUserLocation])
   );
 
-  // Fetch all wineries in the active region once
+  // Fetch all wineries in the active region. Reruns on retry.
   useEffect(() => {
+    setLoading(true);
+    setLoadError(null);
     (async () => {
       try {
         const q = query(
@@ -272,12 +280,18 @@ export default function WineriesScreen() {
 
         setWineries(data);
       } catch (err) {
-        console.error("Error fetching wineries:", err);
+        const error = err instanceof Error ? err : new Error(String(err));
+        reportError(
+          error,
+          { source: "wineries/index.loadCorpus", region_id: regionId },
+          "error"
+        );
+        setLoadError(error);
       } finally {
         setLoading(false);
       }
     })();
-  }, [regionId]);
+  }, [regionId, retryToken]);
 
   const toggleFilter = (key: keyof Winery) => {
     setActiveFilters((prev) => {
@@ -384,6 +398,21 @@ export default function WineriesScreen() {
     );
   }
 
+  // ── Error state ────────────────────────────────────────────────────────────
+  // Firestore query threw. Most common cause: no internet, transient
+  // backend hiccup, or stale auth token. ErrorScreen with a retry that
+  // bumps the token to re-trigger the load effect.
+  if (loadError) {
+    return (
+      <ErrorScreen
+        kicker="COULDN'T LOAD WINERIES"
+        title="We couldn't fetch the wineries list."
+        message="Check your connection and tap below to try again."
+        onRetry={() => setRetryToken((t) => t + 1)}
+      />
+    );
+  }
+
   // ── Winery card ────────────────────────────────────────────────────────────
   const renderCard = ({ item }: { item: Winery }) => {
     const hasImage = item.images && item.images.length > 0;
@@ -414,6 +443,8 @@ export default function WineriesScreen() {
         <Link href={`/wineries/${item.slug}?from=wineries`} asChild>
           <Pressable
             style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+            accessibilityRole="button"
+            accessibilityLabel={`Open ${item.name}${item.rating != null ? `, rated ${item.rating.toFixed(1)} stars` : ""}`}
           >
             {/* Hero image */}
             {hasImage && (
@@ -439,6 +470,13 @@ export default function WineriesScreen() {
                     toggleSaved(item.id);
                   }}
                   hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    isSaved(item.id)
+                      ? `Remove ${item.name} from saved`
+                      : `Save ${item.name}`
+                  }
+                  accessibilityState={{ selected: isSaved(item.id) }}
                 >
                   <Ionicons
                     name={isSaved(item.id) ? "heart" : "heart-outline"}
@@ -570,6 +608,8 @@ export default function WineriesScreen() {
                         styles.bookingCallBtn,
                         pressed && styles.bookingCallBtnPressed,
                       ]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Book ${item.name} online`}
                     >
                       <Ionicons
                         name="open-outline"
@@ -592,6 +632,8 @@ export default function WineriesScreen() {
                         styles.bookingCallBtn,
                         pressed && styles.bookingCallBtnPressed,
                       ]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Call ${item.name} to book`}
                     >
                       <Ionicons
                         name="call"
@@ -624,7 +666,12 @@ export default function WineriesScreen() {
         </Text>
       </View>
       <View style={styles.viewToggle}>
-        <Pressable onPress={() => setView("list")}>
+        <Pressable
+          onPress={() => setView("list")}
+          accessibilityRole="button"
+          accessibilityLabel="Show wineries as a list"
+          accessibilityState={{ selected: view === "list" }}
+        >
           <Text
             style={[
               styles.viewToggleText,
@@ -635,7 +682,12 @@ export default function WineriesScreen() {
           </Text>
         </Pressable>
         <Text style={styles.viewToggleSep}>·</Text>
-        <Pressable onPress={() => setView("map")}>
+        <Pressable
+          onPress={() => setView("map")}
+          accessibilityRole="button"
+          accessibilityLabel="Show wineries on a map"
+          accessibilityState={{ selected: view === "map" }}
+        >
           <Text
             style={[
               styles.viewToggleText,
@@ -675,7 +727,12 @@ export default function WineriesScreen() {
             onChangeText={setSearch}
           />
           {search.length > 0 && (
-            <Pressable onPress={() => setSearch("")} style={{ marginRight: 8 }}>
+            <Pressable
+              onPress={() => setSearch("")}
+              style={{ marginRight: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+            >
               <Ionicons name="close-circle" size={16} color={colors.textMuted} />
             </Pressable>
           )}
@@ -683,6 +740,15 @@ export default function WineriesScreen() {
             onPress={() => setFiltersOpen((v) => !v)}
             style={[styles.filterBtn, filtersOpen && styles.filterBtnActive]}
             hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={
+              filtersOpen
+                ? "Hide filters"
+                : activeFilterCount > 0
+                ? `Show filters, ${activeFilterCount} active`
+                : "Show filters"
+            }
+            accessibilityState={{ expanded: filtersOpen }}
           >
             <Ionicons
               name="options-outline"
@@ -734,6 +800,8 @@ export default function WineriesScreen() {
                       onPress={() => setFiltersOpen(false)}
                       style={styles.filterCloseBtn}
                       hitSlop={10}
+                      accessibilityRole="button"
+                      accessibilityLabel="Close filters"
                     >
                       <Text style={styles.filterCloseText}>Close</Text>
                       <Ionicons name="chevron-up" size={15} color={colors.textSecondary} />
@@ -744,11 +812,21 @@ export default function WineriesScreen() {
                   <View style={styles.categoryBlock}>
                     <Text style={styles.categoryLabel}>SORT BY</Text>
                     <View style={styles.sortRow}>
-                      {(["featured", "nearMe", "az"] as const).map((mode) => (
+                      {(["featured", "nearMe", "az"] as const).map((mode) => {
+                        const sortLabel =
+                          mode === "featured"
+                            ? "Featured"
+                            : mode === "nearMe"
+                            ? "Near Me"
+                            : "A to Z";
+                        return (
                         <Pressable
                           key={mode}
                           style={[styles.sortBtn, sortBy === mode && styles.sortBtnActive]}
                           onPress={() => handleSortBy(mode)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Sort by ${sortLabel}`}
+                          accessibilityState={{ selected: sortBy === mode }}
                         >
                           <Text
                             style={[
@@ -763,7 +841,8 @@ export default function WineriesScreen() {
                               : "A–Z"}
                           </Text>
                         </Pressable>
-                      ))}
+                        );
+                      })}
                     </View>
                     {sortBy === "nearMe" && locationDenied && (
                       <Text style={styles.locationHint}>
@@ -797,6 +876,13 @@ export default function WineriesScreen() {
                                 active && styles.regionChipActive,
                               ]}
                               onPress={() => toggleRegion(subRegion)}
+                              accessibilityRole="button"
+                              accessibilityLabel={
+                                active
+                                  ? `Remove region filter: ${subRegion}`
+                                  : `Filter by region: ${subRegion}`
+                              }
+                              accessibilityState={{ selected: active }}
                             >
                               <Text
                                 style={[
@@ -828,6 +914,13 @@ export default function WineriesScreen() {
                             key={String(key)}
                             style={[styles.chip, active && styles.chipActive]}
                             onPress={() => toggleFilter(key)}
+                            accessibilityRole="button"
+                            accessibilityLabel={
+                              active
+                                ? `Remove filter: ${label}`
+                                : `Filter by ${label}`
+                            }
+                            accessibilityState={{ selected: active }}
                           >
                             <View style={styles.chipInner}>
                               <Ionicons
@@ -863,6 +956,13 @@ export default function WineriesScreen() {
                             minRating === value && styles.ratingBtnActive,
                           ]}
                           onPress={() => setMinRating(minRating === value ? 0 : value)}
+                          accessibilityRole="button"
+                          accessibilityLabel={
+                            minRating === value
+                              ? `Remove minimum rating filter: ${label}`
+                              : `Filter by minimum rating: ${label}`
+                          }
+                          accessibilityState={{ selected: minRating === value }}
                         >
                           <Text
                             style={[
@@ -1539,3 +1639,8 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
 });
+
+// Wrapped default export — any uncaught render error inside WineriesScreen
+// is caught here and shown as an inline ErrorScreen instead of taking down
+// the whole app.
+export default withScreenErrorBoundary(WineriesScreen, "wineries/index");

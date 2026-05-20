@@ -1,5 +1,6 @@
 // app/(tabs)/explore/index.tsx
 // Explore — editorial directory.
+import { withScreenErrorBoundary } from "../../../components/ScreenErrorBoundary";
 //
 // This screen is the gateway into long-form content. The latest issue of
 // "The Pour" is fetched live from Firestore (`pour_articles`, ordered by
@@ -56,7 +57,7 @@ type ArticleEntry = {
 };
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
-export default function ExploreScreen() {
+function ExploreScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const regionId = useActiveRegionId();
@@ -159,6 +160,8 @@ export default function ExploreScreen() {
           <Pressable
             style={styles.featuredCard}
             onPress={() => router.push("/(tabs)/home/pour" as any)}
+            accessibilityRole="button"
+            accessibilityLabel={`Read this week's Pour: ${pour.headline}`}
           >
             <View style={styles.featuredImg}>
               <Image
@@ -200,6 +203,8 @@ export default function ExploreScreen() {
           <Pressable
             style={styles.featuredCard}
             onPress={() => router.push("/(tabs)/home/pour" as any)}
+            accessibilityRole="button"
+            accessibilityLabel="Read the latest issue of The Pour"
           >
             <View style={styles.featuredImg}>
               <Image
@@ -258,6 +263,12 @@ export default function ExploreScreen() {
               // No-op for placeholders. Swap for navigation when each
               // article's detail screen / collection is ready.
             }}
+            disabled={!item.href}
+            accessibilityRole="button"
+            accessibilityLabel={
+              item.href ? `Read ${item.title}` : `${item.title}, coming soon`
+            }
+            accessibilityState={{ disabled: !item.href }}
           >
             <Image source={{ uri: item.image }} style={styles.articleCardImg} contentFit="cover" transition={150} />
             <View style={styles.articleCardBody}>
@@ -502,3 +513,5 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
 });
+
+export default withScreenErrorBoundary(ExploreScreen, "explore/index");

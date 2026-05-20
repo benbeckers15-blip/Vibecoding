@@ -39,9 +39,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, fonts, radius, spacing, type } from "../constants/theme";
+import { useNetwork } from "../context/NetworkContext";
 import { useRegionConfig } from "../context/RegionContext";
 import { useTrips } from "../context/TripContext";
 import { getConcierge } from "../services/concierge/concierge";
+import { reportError } from "../utils/errorReporting";
 import type {
   ChatMessage,
   TripProposal,
@@ -69,6 +71,7 @@ export default function ConciergeChat({ visible, onClose }: ConciergeChatProps) 
   // region id we pass to the concierge for init() + the request body.
   const regionConfig = useRegionConfig();
   const SUGGESTIONS = regionConfig.suggestedPrompts;
+  const { isConnected } = useNetwork();
 
   const [messages, setMessages] = useState<ChatMessage[]>(concierge.getHistory());
   const [input, setInput] = useState("");
@@ -220,6 +223,10 @@ export default function ConciergeChat({ visible, onClose }: ConciergeChatProps) 
         if (!cancelled) {
           const msg = err instanceof Error ? err.message : String(err);
           setInitError(msg);
+          reportError(err, {
+            source: "ConciergeChat.init",
+            region_id: regionConfig.regionId,
+          });
         }
       }
     })();
@@ -378,6 +385,10 @@ export default function ConciergeChat({ visible, onClose }: ConciergeChatProps) 
         setStreamingText("");
         const msg = err instanceof Error ? err.message : String(err);
         setError(msg);
+        reportError(err, {
+          source: "ConciergeChat.askStream",
+          region_id: regionConfig.regionId,
+        });
         // Roll the local history back to what the concierge actually has,
         // so the failed user turn doesn't linger in the UI.
         const rolledBack = concierge.getHistory();
@@ -570,6 +581,8 @@ export default function ConciergeChat({ visible, onClose }: ConciergeChatProps) 
               styles.headerBtn,
               pressed && styles.headerBtnPressed,
             ]}
+            accessibilityRole="button"
+            accessibilityLabel="Close concierge"
           >
             <Ionicons name="close" size={22} color={colors.textPrimary} />
           </Pressable>
@@ -588,6 +601,9 @@ export default function ConciergeChat({ visible, onClose }: ConciergeChatProps) 
               pressed && styles.headerBtnPressed,
               isEmpty && styles.headerBtnDisabled,
             ]}
+            accessibilityRole="button"
+            accessibilityLabel="Reset conversation"
+            accessibilityState={{ disabled: isEmpty }}
           >
             <Ionicons
               name="refresh"
@@ -695,15 +711,70 @@ export default function ConciergeChat({ visible, onClose }: ConciergeChatProps) 
 
             {error && (
               <View style={styles.errorBlock}>
-                <Text style={styles.errorKicker}>SOMETHING WENT WRONG</Text>
-                <Text style={styles.errorText}>{error}</Text>
+                <Text style={styles.errorKicker}>
+                  {isConnected ? "SOMETHING WENT WRONG" : "YOU'RE OFFLINE"}
+                </Text>
+                <Text style={styles.errorText}>
+                  {isConnected
+                    ? error
+                    : "Check your wifi or cellular connection and try again."}
+                </Text>
+                <Pressable
+                  onPress={() => {
+                    setError(null);
+                    // Re-send the last user message if there is one.
+                    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+                    if (lastUser) void send(lastUser.content);
+                  }}
+                  style={({ pressed }) => [
+                    styles.errorRetryBtn,
+                    pressed && styles.errorRetryBtnPressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Try sending the message again"
+                >
+                  <Ionicons name="refresh" size={12} color={colors.onAccent} />
+                  <Text style={styles.errorRetryBtnText}>TRY AGAIN</Text>
+                </Pressable>
               </View>
             )}
 
             {initError && (
               <View style={styles.errorBlock}>
-                <Text style={styles.errorKicker}>SETUP NEEDED</Text>
-                <Text style={styles.errorText}>{initError}</Text>
+                <Text style={styles.errorKicker}>
+                  {isConnected ? "COULDN'T LOAD THE SOMMELIER" : "YOU'RE OFFLINE"}
+                </Text>
+                <Text style={styles.errorText}>
+                  {isConnected
+                    ? "We couldn't load the winery catalogue. Tap to try again."
+                    : "The sommelier needs an internet connection to load the catalogue. Reconnect, then tap to try again."}
+                </Text>
+                <Pressable
+                  onPress={() => {
+                    setInitError(null);
+                    (async () => {
+                      try {
+                        await concierge.init(regionConfig.regionId);
+                      } catch (err) {
+                        const msg = err instanceof Error ? err.message : String(err);
+                        setInitError(msg);
+                        reportError(err, {
+                          source: "ConciergeChat.initRetry",
+                          region_id: regionConfig.regionId,
+                        });
+                      }
+                    })();
+                  }}
+                  style={({ pressed }) => [
+                    styles.errorRetryBtn,
+                    pressed && styles.errorRetryBtnPressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry loading the sommelier"
+                >
+                  <Ionicons name="refresh" size={12} color={colors.onAccent} />
+                  <Text style={styles.errorRetryBtnText}>TRY AGAIN</Text>
+                </Pressable>
               </View>
             )}
           </ScrollView>
@@ -735,6 +806,12 @@ export default function ConciergeChat({ visible, onClose }: ConciergeChatProps) 
                 (!input.trim() || sending) && styles.sendBtnDisabled,
                 pressed && !!input.trim() && !sending && styles.sendBtnPressed,
               ]}
+              accessibilityRole="button"
+              accessibilityLabel={sending ? "Sending message" : "Send message"}
+              accessibilityState={{
+                disabled: !input.trim() || sending,
+                busy: sending,
+              }}
             >
               <Ionicons name="arrow-up" size={18} color={colors.onAccent} />
             </Pressable>
@@ -888,6 +965,16 @@ function TripStartCard({
           (disabled || starting) && styles.tripCardBtnDisabled,
           pressed && !disabled && !starting && styles.tripCardBtnPressed,
         ]}
+        accessibilityRole="button"
+        accessibilityLabel={
+          starting
+            ? `Starting suggested trip: ${proposal.name}`
+            : `Start suggested trip: ${proposal.name}`
+        }
+        accessibilityState={{
+          disabled: disabled || starting,
+          busy: starting,
+        }}
       >
         {starting ? (
           <ActivityIndicator size="small" color={colors.onAccent} />
@@ -967,6 +1054,8 @@ function WineryCards({
             // were.
             router.push(`/wineries/${w.slug || w.id}?from=concierge` as any);
           }}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${w.name}${typeof w.rating === "number" ? `, rated ${w.rating.toFixed(1)} stars` : ""}`}
         >
           {w.images && w.images.length > 0 && (
             <Image
@@ -1028,6 +1117,8 @@ function WineryCards({
                     styles.bookingCallBtn,
                     pressed && styles.bookingCallBtnPressed,
                   ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Call ${w.name} to book`}
                 >
                   <Ionicons name="call" size={12} color={colors.onAccent} />
                   <Text style={styles.bookingCallBtnText}>CALL TO BOOK</Text>
@@ -1046,6 +1137,12 @@ function WineryCards({
             (tripDisabled || starting) && styles.cardTripBtnDisabled,
             pressed && !tripDisabled && !starting && styles.cardTripBtnPressed,
           ]}
+          accessibilityRole="button"
+          accessibilityLabel={starting ? "Starting trip" : "Start a trip with these wineries"}
+          accessibilityState={{
+            disabled: tripDisabled || starting,
+            busy: starting,
+          }}
         >
           {starting ? (
             <ActivityIndicator size="small" color={colors.onAccent} />
@@ -1096,6 +1193,9 @@ function EmptyState({
               pressed && styles.suggestionChipPressed,
               disabled && styles.suggestionChipDisabled,
             ]}
+            accessibilityRole="button"
+            accessibilityLabel={`Ask: ${s}`}
+            accessibilityState={{ disabled }}
           >
             <Text style={styles.suggestionText}>{s}</Text>
             <Ionicons name="arrow-forward" size={13} color={colors.accent} />
@@ -1571,6 +1671,28 @@ const styles = StyleSheet.create({
     ...type.caption,
     color: colors.textSecondary,
     lineHeight: 18,
+    marginBottom: spacing.sm,
+  },
+  errorRetryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent,
+    alignSelf: "flex-start",
+    marginTop: spacing.xs,
+  },
+  errorRetryBtnPressed: {
+    opacity: 0.85,
+  },
+  errorRetryBtnText: {
+    ...type.kicker,
+    fontSize: 10,
+    letterSpacing: 1.5,
+    color: colors.onAccent,
   },
 
   // ── Input bar ───────────────────────────────────────────────────────

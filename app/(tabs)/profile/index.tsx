@@ -1,6 +1,7 @@
 // app/(tabs)/profile/index.tsx
 // Profile · Saved / Tastings / Palate
 // "Cinematic Dusk" theme — all data live from Firestore users/{uid} doc
+import { withScreenErrorBoundary } from "../../../components/ScreenErrorBoundary";
 // and its subcollections: savedWineries, savedArticles, lists, tastings.
 // Palate breakdown is derived from the tastings subcollection on the fly.
 
@@ -161,7 +162,7 @@ function derivePalate(tastings: TastingEntry[]): PalateRow[] {
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
-export default function ProfileScreen() {
+function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, signOut } = useAuth();
@@ -422,6 +423,9 @@ export default function ProfileScreen() {
                 key={x.id}
                 onPress={() => setTab(x.id)}
                 style={[styles.tabItem, active && styles.tabItemActive]}
+                accessibilityRole="button"
+                accessibilityLabel={`${x.label} tab`}
+                accessibilityState={{ selected: active }}
               >
                 <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
                   {x.label}
@@ -439,7 +443,7 @@ export default function ProfileScreen() {
               <View style={styles.section}>
                 <View style={styles.sectionHeadRow}>
                   <Text style={styles.sectionKickerMuted}>YOUR LISTS</Text>
-                  <Pressable accessibilityRole="button">
+                  <Pressable accessibilityRole="button" accessibilityLabel="Create a new list">
                     <Text style={styles.newListLink}>+ New list</Text>
                   </Pressable>
                 </View>
@@ -449,7 +453,12 @@ export default function ProfileScreen() {
                   contentContainerStyle={styles.listsRow}
                 >
                   {lists.map((l) => (
-                    <Pressable key={l.id} style={styles.listCard}>
+                    <Pressable
+                      key={l.id}
+                      style={styles.listCard}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Open list: ${l.name}, ${l.count} saved`}
+                    >
                       {l.image ? (
                         <Image source={{ uri: l.image }} style={styles.listCardImg} contentFit="cover" transition={150} />
                       ) : (
@@ -676,8 +685,17 @@ export default function ProfileScreen() {
           style={styles.modalBackdrop}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
-          <Pressable style={styles.modalBackdrop} onPress={() => setEditNameVisible(false)}>
-            <Pressable style={styles.editNameSheet} onPress={() => {}}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setEditNameVisible(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss"
+          >
+            <Pressable
+              style={styles.editNameSheet}
+              onPress={() => {}}
+              accessible={false}
+            >
               <View style={styles.modalHandle} />
               <Text style={styles.editNameTitle}>YOUR NAME</Text>
               <TextInput
@@ -698,6 +716,8 @@ export default function ProfileScreen() {
                 <Pressable
                   style={styles.editNameCancel}
                   onPress={() => setEditNameVisible(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel name edit"
                 >
                   <Text style={styles.editNameCancelText}>Cancel</Text>
                 </Pressable>
@@ -708,6 +728,12 @@ export default function ProfileScreen() {
                   ]}
                   onPress={saveEditName}
                   disabled={!editNameValue.trim() || editNameSaving}
+                  accessibilityRole="button"
+                  accessibilityLabel={editNameSaving ? "Saving name" : "Save name"}
+                  accessibilityState={{
+                    disabled: !editNameValue.trim() || editNameSaving,
+                    busy: editNameSaving,
+                  }}
                 >
                   {editNameSaving ? (
                     <ActivityIndicator color={colors.onAccent} size="small" />
@@ -1214,3 +1240,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
 });
+
+export default withScreenErrorBoundary(ProfileScreen, "profile/index");

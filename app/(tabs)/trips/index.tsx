@@ -34,6 +34,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
+import { withScreenErrorBoundary } from "../../../components/ScreenErrorBoundary";
 import { useAuth } from "../../../context/AuthContext";
 import { useActiveRegionId, useRegionConfig } from "../../../context/RegionContext";
 import { useTrips } from "../../../context/TripContext";
@@ -52,7 +53,7 @@ const HALF_CARD_WIDTH = 260;
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export default function TripsIndexScreen() {
+function TripsIndexScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { trips, activeTrip, loading: tripsLoading } = useTrips();
@@ -142,6 +143,8 @@ export default function TripsIndexScreen() {
                 params: { tripId: activeTrip.id },
               })
             }
+            accessibilityRole="button"
+            accessibilityLabel={`Resume trip in progress: ${activeTrip.name}, ${activeTrip.visitedStopIds.length} of ${activeTrip.stops.length} stops visited`}
           >
             <View style={styles.activeBannerInner}>
               <Text style={styles.activeBannerKicker}>TRIP IN PROGRESS</Text>
@@ -259,6 +262,8 @@ export default function TripsIndexScreen() {
       <Pressable
         style={styles.fab}
         onPress={() => router.push("/(tabs)/trips/create")}
+        accessibilityRole="button"
+        accessibilityLabel="Build your own trip"
       >
         <Ionicons name="add" size={20} color={colors.onAccent} />
         <Text style={styles.fabText}>Build Your Own</Text>
@@ -321,6 +326,8 @@ function HalfDayCard({
     <Pressable
       style={({ pressed }) => [styles.halfCard, pressed && styles.cardPressed]}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Open half-day trip: ${trip.title}, ${trip.wineryIds.length} stops, about ${trip.durationHours} hours`}
     >
       <View style={styles.halfImgWrap}>
         <Image
@@ -377,6 +384,8 @@ function FullDayCard({
     <Pressable
       style={({ pressed }) => [styles.fullCardShadow, pressed && styles.cardPressed]}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Open full-day trip: ${trip.title}, ${trip.wineryIds.length} stops, about ${trip.durationHours} hours`}
     >
       <View style={styles.fullCard}>
         <View style={styles.fullImgWrap}>
@@ -461,7 +470,12 @@ function UserTripCard({
       : "DRAFT";
 
   return (
-    <Pressable style={styles.userCard} onPress={onPress}>
+    <Pressable
+      style={styles.userCard}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${statusLabel.toLowerCase()} trip: ${trip.name}, ${trip.stops.length} stops${trip.status === "active" ? `, ${trip.visitedStopIds.length} visited` : ""}`}
+    >
       <View style={styles.userCardInner}>
         <Text style={styles.userCardKicker}>{statusLabel}</Text>
         <Text style={styles.userCardTitle}>{trip.name}</Text>
@@ -860,3 +874,5 @@ const styles = StyleSheet.create({
     fontWeight: weights.emphasis,
   },
 });
+
+export default withScreenErrorBoundary(TripsIndexScreen, "trips/index");

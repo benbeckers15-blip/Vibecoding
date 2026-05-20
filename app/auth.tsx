@@ -163,6 +163,12 @@ export default function AuthScreen() {
             onPress={handleSubmit}
             disabled={submitting}
             accessibilityRole="button"
+            accessibilityLabel={
+              submitting
+                ? (isSignUp ? "Creating account" : "Signing in")
+                : (isSignUp ? "Create account" : "Sign in")
+            }
+            accessibilityState={{ disabled: submitting, busy: submitting }}
           >
             {submitting ? (
               <ActivityIndicator color={colors.onAccent} size="small" />
@@ -179,6 +185,7 @@ export default function AuthScreen() {
           style={styles.toggleRow}
           onPress={() => { setMode(isSignUp ? "signin" : "signup"); setError(null); }}
           accessibilityRole="button"
+          accessibilityLabel={isSignUp ? "Switch to sign in" : "Switch to create account"}
         >
           <Text style={styles.toggleText}>
             {isSignUp

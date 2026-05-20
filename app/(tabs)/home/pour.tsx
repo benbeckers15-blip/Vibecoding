@@ -1,5 +1,6 @@
 // app/(tabs)/home/pour.tsx
 // "The Tassie Pour" — weekly editorial article reader
+import { withScreenErrorBoundary } from "../../../components/ScreenErrorBoundary";
 // Fetches the latest active article from Firestore `pour_articles` collection.
 
 import { Ionicons } from "@expo/vector-icons";
@@ -76,7 +77,7 @@ interface PourArticle {
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
-export default function PourScreen() {
+function PourScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const regionId = useActiveRegionId();
@@ -158,7 +159,12 @@ export default function PourScreen() {
       <View style={styles.loadingContainer}>
         <Ionicons name="alert-circle-outline" size={32} color={colors.textMuted} />
         <Text style={styles.loadingText}>Issue unavailable</Text>
-        <Pressable style={styles.backBtn} onPress={() => router.back()}>
+        <Pressable
+          style={styles.backBtn}
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <Text style={styles.backBtnText}>Go back</Text>
         </Pressable>
       </View>
@@ -240,14 +246,24 @@ export default function PourScreen() {
 
           {/* Header: back · issue label · share */}
           <View style={[styles.headerRow, { paddingTop: insets.top + 10 }]}>
-            <Pressable style={styles.heroBackBtn} onPress={() => router.back()}>
+            <Pressable
+              style={styles.heroBackBtn}
+              onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel="Back to home"
+            >
               <Ionicons name="chevron-back" size={16} color={colors.textOnDark} />
               <Text style={styles.heroBackBtnText}>Home</Text>
             </Pressable>
 
             <Text style={styles.headerKicker}>{article.issueLabel}</Text>
 
-            <Pressable style={styles.iconBtn} onPress={handleShare}>
+            <Pressable
+              style={styles.iconBtn}
+              onPress={handleShare}
+              accessibilityRole="button"
+              accessibilityLabel="Share this article"
+            >
               <Ionicons name="share-outline" size={15} color={colors.textOnDark} />
             </Pressable>
           </View>
@@ -274,10 +290,19 @@ export default function PourScreen() {
           </View>
         </View>
         <View style={styles.authorActions}>
-          <Pressable style={styles.actionBtn}>
+          <Pressable
+            style={styles.actionBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Like this article"
+          >
             <Ionicons name="heart-outline" size={14} color={colors.textSecondary} />
           </Pressable>
-          <Pressable style={styles.actionBtn} onPress={handleShare}>
+          <Pressable
+            style={styles.actionBtn}
+            onPress={handleShare}
+            accessibilityRole="button"
+            accessibilityLabel="Share this article"
+          >
             <Ionicons name="share-outline" size={14} color={colors.textSecondary} />
           </Pressable>
         </View>
@@ -651,3 +676,5 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
 });
+
+export default withScreenErrorBoundary(PourScreen, "home/pour");

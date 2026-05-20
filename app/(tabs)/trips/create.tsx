@@ -1,5 +1,6 @@
 // app/(tabs)/trips/create.tsx
 // Build-your-own-trip screen.
+import { withScreenErrorBoundary } from "../../../components/ScreenErrorBoundary";
 //
 // Flow:
 //   1. Fetch all wineries (same query the wineries list uses).
@@ -46,7 +47,7 @@ interface WineryRow {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export default function CreateTripScreen() {
+function CreateTripScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const regionId = useActiveRegionId();
@@ -163,7 +164,13 @@ export default function CreateTripScreen() {
     <View style={styles.container}>
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={12}>
+        <Pressable
+          style={styles.backBtn}
+          onPress={() => router.back()}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Back to trips"
+        >
           <Ionicons name="chevron-back" size={16} color={colors.textPrimary} />
           <Text style={styles.backBtnText}>Trips</Text>
         </Pressable>
@@ -198,6 +205,8 @@ export default function CreateTripScreen() {
                 key={s.id}
                 style={styles.selectedChip}
                 onPress={() => toggleStop(s.id)}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove stop ${idx + 1}, ${s.name}`}
               >
                 <Text style={styles.selectedChipIdx}>{idx + 1}</Text>
                 <Text style={styles.selectedChipName} numberOfLines={1}>
@@ -231,7 +240,11 @@ export default function CreateTripScreen() {
             onChangeText={setSearch}
           />
           {search.length > 0 && (
-            <Pressable onPress={() => setSearch("")}>
+            <Pressable
+              onPress={() => setSearch("")}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+            >
               <Ionicons
                 name="close-circle"
                 size={16}
@@ -253,6 +266,13 @@ export default function CreateTripScreen() {
             <Pressable
               style={[styles.row, selected && styles.rowSelected]}
               onPress={() => toggleStop(item.id)}
+              accessibilityRole="button"
+              accessibilityLabel={
+                selected
+                  ? `Remove ${item.name} from trip`
+                  : `Add ${item.name} to trip`
+              }
+              accessibilityState={{ selected }}
             >
               <Text style={styles.rowName} numberOfLines={1}>
                 {item.name}
@@ -276,6 +296,13 @@ export default function CreateTripScreen() {
         ]}
         onPress={handleSave}
         disabled={selectedStops.length < MIN_STOPS}
+        accessibilityRole="button"
+        accessibilityLabel={
+          selectedStops.length < MIN_STOPS
+            ? `Save trip, disabled. Add at least ${MIN_STOPS} stops.`
+            : `Save trip with ${selectedStops.length} stops`
+        }
+        accessibilityState={{ disabled: selectedStops.length < MIN_STOPS }}
       >
         <Ionicons name="checkmark" size={20} color={colors.onAccent} />
         <Text style={styles.fabText}>Save Trip</Text>
@@ -452,3 +479,5 @@ const styles = StyleSheet.create({
     fontWeight: weights.emphasis,
   },
 });
+
+export default withScreenErrorBoundary(CreateTripScreen, "trips/create");

@@ -69,12 +69,18 @@ const TabButton = React.memo(function TabButton({
       ? "map"
       : "home";
 
+  const tabLabel: string =
+    descriptor.options.tabBarLabel ??
+    descriptor.options.title ??
+    route.name;
+
   return (
     <TouchableOpacity
       onPress={onPress}
       style={[styles.tabButton, { width: slotWidth }]}
       accessibilityRole="button"
-      accessibilityState={isFocused ? { selected: true } : {}}
+      accessibilityLabel={`${tabLabel} tab${isFocused ? ", selected" : ""}`}
+      accessibilityState={{ selected: isFocused }}
     >
       <Animated.View style={animatedIconStyle}>
         <Ionicons
@@ -83,13 +89,7 @@ const TabButton = React.memo(function TabButton({
           color={isFocused ? colors.onAccent : colors.textMuted}
         />
       </Animated.View>
-      {!isFocused && (
-        <Text style={styles.label}>
-          {descriptor.options.tabBarLabel ??
-            descriptor.options.title ??
-            route.name}
-        </Text>
-      )}
+      {!isFocused && <Text style={styles.label}>{tabLabel}</Text>}
     </TouchableOpacity>
   );
 });

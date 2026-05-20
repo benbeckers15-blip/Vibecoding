@@ -85,6 +85,16 @@ export default function RegionPickerScreen() {
                   pressed && !isDisabled && styles.cardPressed,
                   isDisabled && styles.cardDisabled,
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  isPicking
+                    ? `Loading ${r.displayName}`
+                    : `Explore ${r.displayName}`
+                }
+                accessibilityState={{
+                  disabled: pickingId !== null,
+                  busy: isPicking,
+                }}
               >
                 <View style={styles.cardBody}>
                   <Text style={styles.cardKicker}>EXPLORE</Text>

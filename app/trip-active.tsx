@@ -290,7 +290,11 @@ export default function TripActiveScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.emptyText}>This trip is no longer available.</Text>
-        <Pressable onPress={() => router.back()}>
+        <Pressable
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+        >
           <Text style={styles.backLink}>‹ Close</Text>
         </Pressable>
       </View>
@@ -301,11 +305,21 @@ export default function TripActiveScreen() {
     <View style={styles.container}>
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
       <View style={[styles.topBar, { paddingTop: insets.top + 14 }]}>
-        <Pressable onPress={() => router.back()} hitSlop={12}>
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Close trip view"
+        >
           <Text style={styles.closeLink}>Close</Text>
         </Pressable>
         <Text style={styles.topTitle}>{trip.name}</Text>
-        <Pressable onPress={handleEndTrip} hitSlop={12}>
+        <Pressable
+          onPress={handleEndTrip}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="End trip"
+        >
           <Text style={styles.endLink}>End</Text>
         </Pressable>
       </View>
@@ -429,6 +443,8 @@ export default function TripActiveScreen() {
             <Pressable
               style={styles.directionsBtn}
               onPress={handleDirections}
+              accessibilityRole="button"
+              accessibilityLabel={`Get directions to ${nextStop.name}`}
             >
               <Ionicons
                 name="navigate"
@@ -440,6 +456,8 @@ export default function TripActiveScreen() {
             <Pressable
               style={styles.visitedBtn}
               onPress={() => handleMarkVisited(nextStop.wineryId)}
+              accessibilityRole="button"
+              accessibilityLabel={`Mark ${nextStop.name} as visited`}
             >
               <Ionicons
                 name="checkmark"
@@ -511,6 +529,8 @@ export default function TripActiveScreen() {
                   hitSlop={8}
                   onPress={() => handleMarkVisited(s.wineryId)}
                   style={styles.smallVisitBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Mark ${s.name} as visited`}
                 >
                   <Ionicons
                     name="checkmark-circle-outline"
