@@ -89,7 +89,7 @@ async function run() {
         "https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?w=1200&q=80",
       durationHours: 4,
       wineryIds: halfDayWineries.map((w) => w.id),
-      region: "Margaret River",
+      region: "Tasmania",
       order: 1,
     },
     {
@@ -100,7 +100,7 @@ async function run() {
         "https://images.unsplash.com/photo-1474722883778-792e7990302f?w=1200&q=80",
       durationHours: 6,
       wineryIds: naturalWineries.map((w) => w.id),
-      region: "Margaret River",
+      region: "Tasmania",
       order: 2,
     },
     {
@@ -111,7 +111,7 @@ async function run() {
         "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80",
       durationHours: 5,
       wineryIds: familyWineries.map((w) => w.id),
-      region: "Margaret River",
+      region: "Tasmania",
       order: 3,
     },
     {
@@ -122,7 +122,7 @@ async function run() {
         "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&q=80",
       durationHours: 6,
       wineryIds: longLunchWineries.map((w) => w.id),
-      region: "Margaret River",
+      region: "Tasmania",
       order: 4,
     },
   ];

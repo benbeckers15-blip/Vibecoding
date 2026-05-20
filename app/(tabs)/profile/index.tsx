@@ -6,6 +6,7 @@
 
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -33,6 +34,14 @@ import {
 import { useAuth } from "../../../context/AuthContext";
 import { db } from "../../../firebaseConfig";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
+
+// Privacy policy URL. Override per-build via EXPO_PUBLIC_PRIVACY_URL — useful
+// when you eventually CNAME the policy onto siplocalguide.com/privacy without
+// having to ship a code change. Falls back to the Firebase Hosting default
+// URL that the deploy command in firebase.json produces.
+const PRIVACY_URL =
+  process.env.EXPO_PUBLIC_PRIVACY_URL ||
+  "https://winery-tourism-tasmania.web.app/privacy";
 
 // ─── Firestore-shaped types ───────────────────────────────────────────────────
 
@@ -98,7 +107,12 @@ function formatDate(raw: unknown): string {
       typeof raw === "object" && "toDate" in (raw as object)
         ? (raw as { toDate: () => Date }).toDate()
         : new Date(raw as string);
-    return date.toLocaleDateString("en-AU", { month: "short", year: "'yy" });
+    // Render as e.g. "May '26". toLocaleDateString won't emit the leading
+    // apostrophe directly, so we format month + 2-digit year and stitch
+    // them together by hand.
+    const month = date.toLocaleDateString("en-AU", { month: "short" });
+    const yy = date.getFullYear().toString().slice(-2);
+    return `${month} '${yy}`;
   } catch {
     return "";
   }
@@ -298,6 +312,22 @@ export default function ProfileScreen() {
       unsubTastings();
     };
   }, [user]);
+
+  // ── Privacy policy ────────────────────────────────────────────────────────
+  // Open the privacy policy in an in-app Safari View. We use
+  // expo-web-browser rather than Linking.openURL so the user stays inside
+  // the app (Apple Review notes that pushing users out to mobile Safari for
+  // legal text is allowed but worse UX). Fail soft — a missing policy URL
+  // shouldn't crash the screen; we just log and no-op.
+  const handleOpenPrivacy = useCallback(async () => {
+    try {
+      await WebBrowser.openBrowserAsync(PRIVACY_URL);
+    } catch (err) {
+      if (__DEV__) {
+        console.warn("[profile] failed to open privacy policy:", err);
+      }
+    }
+  }, []);
 
   // ── Sign out ──────────────────────────────────────────────────────────────
   const handleSignOut = useCallback(() => {
@@ -574,6 +604,65 @@ export default function ProfileScreen() {
             )}
           </View>
         )}
+
+        {/* ── Account section (sign out + delete account) ──────────────────
+            Apple App Review guideline 5.1.1(v) requires in-app account
+            deletion that's "easy to find". Keeping it next to Sign out so
+            both lifecycle actions live in the same predictable place, on
+            every tab of the profile screen. */}
+        <View style={styles.accountSection}>
+          <Text style={styles.sectionKickerGold}>ACCOUNT</Text>
+
+          <Pressable
+            style={styles.accountRow}
+            onPress={handleSignOut}
+            accessibilityRole="button"
+            accessibilityLabel="Sign out"
+          >
+            <Ionicons name="log-out-outline" size={18} color={colors.textPrimary} />
+            <View style={styles.accountRowText}>
+              <Text style={styles.accountRowTitle}>Sign out</Text>
+              <Text style={styles.accountRowSubtitle}>
+                Sign out of this device. Your data stays in your account.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </Pressable>
+
+          <Pressable
+            style={styles.accountRow}
+            onPress={handleOpenPrivacy}
+            accessibilityRole="button"
+            accessibilityLabel="Open privacy policy"
+          >
+            <Ionicons name="shield-checkmark-outline" size={18} color={colors.textPrimary} />
+            <View style={styles.accountRowText}>
+              <Text style={styles.accountRowTitle}>Privacy policy</Text>
+              <Text style={styles.accountRowSubtitle}>
+                What we collect, how we use it, and your rights.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </Pressable>
+
+          <Pressable
+            style={styles.accountRow}
+            onPress={() => router.push("/profile/delete-account" as any)}
+            accessibilityRole="button"
+            accessibilityLabel="Delete account"
+          >
+            <Ionicons name="trash-outline" size={18} color={colors.error} />
+            <View style={styles.accountRowText}>
+              <Text style={[styles.accountRowTitle, { color: colors.error }]}>
+                Delete account
+              </Text>
+              <Text style={styles.accountRowSubtitle}>
+                Permanently delete your account and all of your data.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </Pressable>
+        </View>
       </ScrollView>
 
       {/* ── Edit Name Modal ──────────────────────────────────────────────────── */}
@@ -1053,6 +1142,35 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     color: colors.onAccent,
     fontWeight: weights.emphasis,
+  },
+
+  // ── Account section (sign out + delete account) ──────────────────────────
+  accountSection: {
+    paddingTop: spacing.hero,
+    paddingHorizontal: spacing.xxl,
+  },
+  accountRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.lg,
+    paddingVertical: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    minHeight: spacing.hitTarget,
+  },
+  accountRowText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  accountRowTitle: {
+    ...type.body,
+    fontWeight: weights.emphasis,
+    color: colors.textPrimary,
+  },
+  accountRowSubtitle: {
+    ...type.caption,
+    color: colors.textMuted,
+    marginTop: 2,
   },
 
   // ── Palate ────────────────────────────────────────────────────────────────

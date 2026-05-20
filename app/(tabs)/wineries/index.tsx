@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Animated,
   FlatList,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -50,6 +51,16 @@ type Winery = {
   longitude?: number;
   featured?: boolean;
   region?: string;
+  // Phone number used for tap-to-call. Surfaced on the card when
+  // `walkinWelcome === false` so guests can ring ahead and book.
+  phone?: string;
+  // Optional: direct online booking URL for venues whose bookings are
+  // taken via a web form (Tock, Resy, the winery's own booking page,
+  // etc.) rather than by phone. When present and `walkinWelcome ===
+  // false`, the card's CTA flips from "CALL TO BOOK" → tel: to "BOOK
+  // ONLINE" → bookingUrl. House of Arras was the first venue to need
+  // this; expect a small but growing subset.
+  bookingUrl?: string;
 };
 
 type SortMode = "featured" | "nearMe" | "az";
@@ -77,6 +88,7 @@ const VALID_FILTER_KEYS: (keyof Winery)[] = [
   "walkinWelcome",
   "awardWinning",
   "hasTours",
+  "featured",
 ];
 
 const RATING_OPTIONS = [
@@ -87,13 +99,13 @@ const RATING_OPTIONS = [
 ];
 
 const REGION_OPTIONS: string[] = [
-  "Tamar Valley",
-  "Pipers River",
-  "North West",
-  "East Coast",
   "Coal River Valley",
+  "Tamar Valley",
   "Derwent Valley",
+  "Pipers River",
+  "East Coast",
   "Huon Valley",
+  "North West",
 ];
 
 // Tasmania extents (approx):
@@ -131,6 +143,7 @@ export default function WineriesScreen() {
   const params = useLocalSearchParams<{
     search?: string;
     filter?: string;
+    sort?: string;
     near?: string;
     lat?: string;
     lng?: string;
@@ -235,7 +248,16 @@ export default function WineriesScreen() {
       ) {
         setActiveFilters(new Set([params.filter as keyof Winery]));
       }
-    }, [params.search, params.filter, params.t])
+      // Deep-link support for sort mode (e.g. ?sort=nearMe from the home
+      // "Near Me" tile). For nearMe we also kick off the location request
+      // so the list actually sorts by distance once permission is granted.
+      if (params.sort === "nearMe") {
+        setSortBy("nearMe");
+        ensureUserLocation();
+      } else if (params.sort === "featured" || params.sort === "az") {
+        setSortBy(params.sort);
+      }
+    }, [params.search, params.filter, params.sort, params.t, ensureUserLocation])
   );
 
   // Fetch all wineries once
@@ -295,11 +317,16 @@ export default function WineriesScreen() {
 
   // Filter logic
   const filtered = wineries.filter((w) => {
-    if (
-      search.trim() &&
-      !w.name?.toLowerCase().startsWith(search.trim().toLowerCase())
-    ) {
-      return false;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      // Match if the winery name STARTS WITH the query (existing behaviour),
+      // OR if the winery's region INCLUDES the query as a substring. This
+      // lets users type a region name like "coal river valley" or "east
+      // coast" and see every winery in that region, in addition to typing a
+      // winery name prefix like "stef" → Stefano Lubiana.
+      const nameMatch = w.name?.toLowerCase().startsWith(q) ?? false;
+      const regionMatch = w.region?.toLowerCase().includes(q) ?? false;
+      if (!nameMatch && !regionMatch) return false;
     }
     for (const key of activeFilters) {
       if (!w[key]) return false;
@@ -494,6 +521,95 @@ export default function WineriesScreen() {
                   ))}
                 </View>
               )}
+
+              {/*
+                ── Booking-required call-to-action ─────────────────────
+                Walk-ins not welcome → surface a CTA so the guest can
+                actually book without having to drill into the detail
+                screen. Two channels are supported:
+
+                  • `bookingUrl` set → "BOOK ONLINE" → opens the
+                    booking page in the system browser. Used for
+                    venues like House of Arras whose bookings flow
+                    through their website, not their phone.
+                  • Otherwise, falls back to "CALL TO BOOK" → tel:
+                    using `phone`. The phone-first path remains the
+                    default since most small Tasmanian producers take
+                    bookings by phone.
+
+                Only render the block when we have at least ONE of the
+                two channels — without either, the button has nothing
+                to do.
+              */}
+              {item.walkinWelcome === false &&
+                (item.bookingUrl || item.phone) && (
+                <View style={styles.bookingBlock}>
+                  <View style={styles.bookingNoticeRow}>
+                    <Ionicons
+                      name="information-circle-outline"
+                      size={12}
+                      color={colors.accentSoft}
+                      style={styles.bookingNoticeIcon}
+                    />
+                    <Text style={styles.bookingNoticeText}>
+                      Bookings required — walk-ins not accepted.
+                    </Text>
+                  </View>
+                  {item.bookingUrl ? (
+                    <Pressable
+                      // Nested Pressables: stop the press so the outer
+                      // card Link doesn't also fire and navigate into
+                      // the detail screen on every CTA tap.
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        const raw = item.bookingUrl!.trim();
+                        const withProtocol =
+                          raw.startsWith("http://") ||
+                          raw.startsWith("https://")
+                            ? raw
+                            : `https://${raw}`;
+                        Linking.openURL(withProtocol).catch(() =>
+                          console.warn("Could not open booking URL")
+                        );
+                      }}
+                      hitSlop={6}
+                      style={({ pressed }) => [
+                        styles.bookingCallBtn,
+                        pressed && styles.bookingCallBtnPressed,
+                      ]}
+                    >
+                      <Ionicons
+                        name="open-outline"
+                        size={14}
+                        color={colors.onAccent}
+                      />
+                      <Text style={styles.bookingCallBtnText}>BOOK ONLINE</Text>
+                    </Pressable>
+                  ) : (
+                    <Pressable
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        const tel = item.phone!.replace(/\s/g, "");
+                        Linking.openURL(`tel:${tel}`).catch(() =>
+                          console.warn("Could not open phone link")
+                        );
+                      }}
+                      hitSlop={6}
+                      style={({ pressed }) => [
+                        styles.bookingCallBtn,
+                        pressed && styles.bookingCallBtnPressed,
+                      ]}
+                    >
+                      <Ionicons
+                        name="call"
+                        size={14}
+                        color={colors.onAccent}
+                      />
+                      <Text style={styles.bookingCallBtnText}>CALL TO BOOK</Text>
+                    </Pressable>
+                  )}
+                </View>
+              )}
             </View>
           </Pressable>
         </Link>
@@ -671,7 +787,11 @@ export default function WineriesScreen() {
                   {/* ── Region ────────────────────────────────────────── */}
                   <View style={styles.categoryBlock}>
                     <Text style={styles.categoryLabel}>REGION</Text>
-                    <View style={styles.regionRow}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.chipsRow}
+                    >
                       {REGION_OPTIONS.map((region) => {
                         const active = selectedRegions.has(region);
                         return (
@@ -694,7 +814,7 @@ export default function WineriesScreen() {
                           </Pressable>
                         );
                       })}
-                    </View>
+                    </ScrollView>
                   </View>
 
                   {/* ── Features (boolean chips) ──────────────────────── */}
@@ -1014,11 +1134,6 @@ const styles = StyleSheet.create({
   },
 
   // ── Region ──────────────────────────────────────────────────────────────
-  regionRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm,
-  },
   regionChip: {
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
@@ -1326,6 +1441,53 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontWeight: weights.body,
     letterSpacing: 0.2,
+  },
+
+  // ── Booking-required CTA (walk-ins not welcome) ──────────────────────────
+  // A small notice + accent CTA pinned beneath the feature pills. Visually
+  // separated by a top hairline so it reads as a distinct "action required"
+  // affordance rather than just another pill in the row above.
+  bookingBlock: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    gap: spacing.sm,
+  },
+  bookingNoticeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  bookingNoticeIcon: {
+    marginRight: 6,
+  },
+  bookingNoticeText: {
+    ...type.caption,
+    fontStyle: "italic",
+    color: colors.accentSoft,
+    flex: 1,
+  },
+  bookingCallBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent,
+    minHeight: spacing.hitTarget,
+    alignSelf: "flex-start",
+  },
+  bookingCallBtnPressed: {
+    opacity: 0.85,
+  },
+  bookingCallBtnText: {
+    ...type.kicker,
+    fontSize: 11,
+    letterSpacing: 1.5,
+    color: colors.onAccent,
+    fontWeight: weights.emphasis,
   },
 
   // ── Empty state ──────────────────────────────────────────────────────────

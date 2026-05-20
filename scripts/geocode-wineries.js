@@ -3,7 +3,7 @@ const admin = require("firebase-admin");
 const fetch = require("node-fetch");
 
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
-const serviceAccount = require("./service-account.json");
+const serviceAccount = require("./service-account-tasmania.json");
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),

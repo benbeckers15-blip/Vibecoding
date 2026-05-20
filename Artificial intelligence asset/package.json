@@ -1,0 +1,17 @@
+{
+  "name": "siplocal-ai-concierge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI Sommelier Concierge — conversational planner for SipLocal Tasmania",
+  "main": "src/concierge.js",
+  "scripts": {
+    "chat": "node src/cli.js",
+    "ask": "node src/ask.js",
+    "build-context": "node src/build-context.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.82.0",
+    "dotenv": "^16.4.5",
+    "firebase-admin": "^13.7.0"
+  }
+}

@@ -157,8 +157,9 @@ export default function CreateTripScreen() {
     <View style={styles.container}>
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
-        <Pressable onPress={() => router.back()} hitSlop={12}>
-          <Text style={styles.backLink}>‹ Trips</Text>
+        <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={12}>
+          <Ionicons name="chevron-back" size={16} color={colors.textPrimary} />
+          <Text style={styles.backBtnText}>Trips</Text>
         </Pressable>
         <Text style={styles.headerTitle}>Build a Trip</Text>
       </View>
@@ -293,12 +294,23 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     gap: spacing.sm,
   },
-  backLink: {
-    ...type.kicker,
-    color: colors.accentSoft,
-    fontFamily: fonts.serif,
-    fontSize: 14,
-    letterSpacing: 0,
+  backBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    minHeight: 36,
+  },
+  backBtnText: {
+    color: colors.textPrimary,
+    fontSize: type.body.fontSize,
+    fontWeight: weights.body,
+    letterSpacing: 0.2,
   },
   headerTitle: { ...type.h2, color: colors.textPrimary },
 

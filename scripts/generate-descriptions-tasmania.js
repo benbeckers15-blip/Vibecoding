@@ -3,9 +3,8 @@
 // Generates editorial winery descriptions + pull quotes for all Tasmania wineries.
 // Replaces any existing description/pullQuote fields on Firestore winery documents.
 //
-// Mirrors the pattern in generate-descriptions.js (Margaret River), but targets the
-// Tasmania Firebase project via service-account-tasmania.json and writes review
-// outputs to scripts/review/tasmania/ so Tasmania runs never mix with MR runs.
+// Targets the Tasmania Firebase project via service-account-tasmania.json and
+// writes review outputs to scripts/review/tasmania/.
 //
 // USAGE:
 //   node scripts/generate-descriptions-tasmania.js                         ← generate & save review files

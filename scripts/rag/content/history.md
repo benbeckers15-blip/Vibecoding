@@ -1,0 +1,5 @@
+Tasmania was known as Van Diemen's Land until 1856, a name that carried the weight of its colonial past. From 1803 it served as Britain's most remote penal settlement, and the convict infrastructure — stone bridges, Georgian farmhouses, walled estates — is still visible across the midlands and Derwent Valley. That history gave the island its bones: cleared agricultural land, established water sources, and a culture of self-sufficiency that persists in the way Tasmanians think about food and farming today.
+
+Viticulture arrived early. Vines were planted in the 1820s, but the industry faltered through the late nineteenth and early twentieth centuries as mainland preferences ran toward fortified wines and warmer-climate varieties. The modern era began in the 1970s, when a handful of pioneers — most notably Andrew Pirie at Pipers Brook — recognised that Tasmania's cool climate was an asset, not a liability. What followed was slow and deliberate: small family operations, estate-grown fruit, a resistance to industrial scale that still defines the island's wine culture.
+
+

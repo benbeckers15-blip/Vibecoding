@@ -37,6 +37,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // RAG knowledge base — chunked editorial prose + tasting notes the
+    // concierge retrieves at query time. Written by scripts/rag/ingest.js
+    // via Admin SDK; clients only ever read.
+    match /knowledge_chunks/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // App-wide config (e.g. config/homepage.heroImageUrl). Public read so the
     // home screen can fetch the current hero image; writes only via Admin SDK.
     match /config/{doc} {

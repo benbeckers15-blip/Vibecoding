@@ -1,0 +1,7 @@
+# Auto-generated review log — chunks where Claude invented a new `type`.
+# Eyeball this after each ingest to decide whether to formalise the new
+# taxonomy or rerun ingestion with the existing one.
+taxonomy_review.log
+
+# Local notes / scratch markdown you don't want indexed.
+content/_drafts/

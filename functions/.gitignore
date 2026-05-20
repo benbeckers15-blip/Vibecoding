@@ -1,0 +1,9 @@
+# Compiled JS — rebuilt on deploy
+lib/
+
+# Local dev
+node_modules/
+.runtimeconfig.json
+.env
+.env.*
+*.log

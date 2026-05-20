@@ -6,7 +6,8 @@
 //   The user explicitly chose Google's optimisation. The Directions API
 //   computes the shortest *road* distance between waypoints (not straight-
 //   line), which produces noticeably better routes in real-world driving —
-//   especially in Margaret River where many wineries sit on private lanes.
+//   especially in Tasmania where many wineries sit on private lanes off
+//   winding rural roads.
 //
 // API key:
 //   Reads from `EXPO_PUBLIC_GOOGLE_DIRECTIONS_API_KEY` (env var). Add this to

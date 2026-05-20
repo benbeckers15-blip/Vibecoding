@@ -1,205 +1,84 @@
-# Tasmania Launch Workflow
+# Tasmania Workflow
 
-This document outlines the complete workflow for launching a Tasmania version of WineryTourism alongside the Margaret River version.
-
----
-
-## Quick Start (3 Steps)
-
-### 1️⃣ Create Tasmania Firebase Project
-Follow the instructions in `TASMANIA_SETUP.md` → **Step 1 & 2**
-
-You'll end up with:
-- New Firebase project: `winerytourism-tasmania`
-- Service account credentials: `service-account-tasmania.json`
-
-### 2️⃣ Copy Schema Structure
-```bash
-node scripts/copy-schema-to-tasmania.js
-```
-
-This reads your Margaret River Firestore and creates equivalent empty collections in Tasmania. You now have:
-- ✅ Same collection names (`wineries`, `events`, `homepage_carousel`, etc.)
-- ✅ Same field structure (but with placeholder/empty values)
-- ✅ Ready to populate with Tasmania data
-
-### 3️⃣ Set Up Region Environments
-```bash
-node scripts/setup-region-env.js
-```
-
-Interactive setup to create `.env.margaret-river` and `.env.tasmania` files.
+> **Status:** SipLocal targets the `winery-tourism-tasmania` Firestore project
+> exclusively. This document is a historical record of how the project was
+> bootstrapped, plus an operating manual for the ongoing data pipeline.
+>
+> An earlier prototype briefly targeted a Margaret River (WA) Firestore
+> project; that project has been retired. **Do not re-introduce it.** If you
+> see a reference to it in code or config, treat it as a bug.
 
 ---
 
-## What the Schema Copy Script Does
+## Current setup
 
-### Input: Margaret River Firestore
-```
-Collections:
-├── wineries
-│   ├── doc-1 { name: "...", slug: "...", rating: 4.5, ... }
-│   └── doc-2 { name: "...", slug: "...", rating: 4.3, ... }
-├── events
-│   ├── doc-1 { title: "...", startDate: "...", ... }
-│   └── doc-2 { ... }
-└── homepage_carousel
-    └── doc-1 { title: "...", imageUrl: "...", ... }
-```
+- **Firestore project:** `winery-tourism-tasmania`
+- **Service-account JSON:** `service-account-tasmania.json` (repo root, gitignored)
+- **App `.env`:** loads `EXPO_PUBLIC_FIREBASE_PROJECT_ID=winery-tourism-tasmania`
+- **Active region label:** `EXPO_PUBLIC_REGION_NAME=Tasmania` (drives `constants/region.ts`)
 
-### Output: Tasmania Firestore
+The Firestore collections in use:
+
 ```
-Collections (NEW, EMPTY):
-├── wineries
-│   └── _placeholder_<timestamp> { name: "", slug: "", rating: 0, ... }
-├── events
-│   └── _placeholder_<timestamp> { title: "", startDate: "", ... }
-└── homepage_carousel
-    └── _placeholder_<timestamp> { title: "", imageUrl: "", ... }
+winery-tourism-tasmania/
+├── wineries              ← canonical winery dataset
+├── homepage_carousel     ← homepage hero slides
+└── premade_trips         ← curated multi-stop itineraries
 ```
 
-**Key points:**
-- All collections are created
-- All fields are present with empty/placeholder values
-- Placeholder documents are marked with `_placeholder_*` IDs (you can delete them)
-- Field types are preserved (strings → "", numbers → 0, booleans → false, arrays → [])
+Tasmanian sub-region values stored on `wineries.region` are listed in
+`services/concierge/buildContext.ts` (`TASMANIA_REGIONS`). Keep that constant
+in sync if a new sub-region is added.
 
 ---
 
-## Environment File Management
-
-### Structure After Setup
+## Environment files
 
 ```
 project-root/
-├── .env                    ← Active environment (DO NOT COMMIT)
-├── .env.margaret-river     ← Margaret River credentials
-├── .env.tasmania           ← Tasmania credentials
-└── .gitignore             ← Should include all .env files
+├── .env                ← Active environment (gitignored)
+├── .env.tasmania       ← Reference copy of the Tasmania config
+└── .gitignore          ← Lists all .env files and service-account-tasmania.json
 ```
 
-### Switching Regions
-
-**Switch to Margaret River:**
-```bash
-node scripts/setup-region-env.js margaret-river
-```
-
-**Switch to Tasmania:**
-```bash
-node scripts/setup-region-env.js tasmania
-```
-
-**Interactive menu:**
-```bash
-node scripts/setup-region-env.js
-```
+The `scripts/setup-region-env.js` helper exists to interactively manage `.env`
+files. It is a remnant of when the codebase briefly supported a second
+region — for normal day-to-day work you can ignore it; just edit `.env`
+directly. The script is harmless if invoked.
 
 ---
 
-## Next Steps: Populating Tasmania Data
+## Data pipeline
 
-Once you have the empty schema in Tasmania Firestore, you need to:
+Scripts in `/scripts` all target the Tasmania project. They obtain
+credentials by reading `service-account-tasmania.json` (either directly or
+via the `FIREBASE_SERVICE_ACCOUNT_PATH` env var).
 
-### Option A: Manual Upload (via Firebase Console)
-1. Go to [Firebase Console](https://console.firebase.google.com)
-2. Select your `winerytourism-tasmania` project
-3. Go to **Firestore Database**
-4. Manually create documents or bulk import JSON
+Key scripts:
 
-### Option B: Adapt Your Data Pipeline Scripts
-Your existing scripts in `/scripts` can be adapted:
-
-**Example: `add-winery-filters.js`**
-Currently targets Margaret River. To use for Tasmania:
-1. Modify the script to point to Tasmania credentials
-2. Update data sources to reference Tasmania wineries
-3. Run the script
-
-**Example modification:**
-```javascript
-// Change this:
-const db = admin.firestore();
-
-// To this:
-const serviceAccount = require('../service-account-tasmania.json');
-const app = admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-const db = admin.firestore(app);
-```
-
-### Option C: Create New Data Pipeline for Tasmania
-Copy your Margaret River pipeline and adapt it for Tasmania sources:
-```bash
-cp scripts/add-winery-filters.js scripts/add-winery-filters-tasmania.js
-# Edit the new file to use Tasmania credentials + data sources
-node scripts/add-winery-filters-tasmania.js
-```
+| Script | Purpose |
+|---|---|
+| `seed-carousel.js` | Seed `homepage_carousel` |
+| `geocode-wineries.js` | Add lat/lng to winery docs (Google Geocoding API) |
+| `merge-ratings.js` | Merge Google Places ratings into winery docs |
+| `add-featured-fields.js` | Add `featured`, `featuredTier`, `featuredLabel` |
+| `add-winery-filters.js` | Add boolean filter fields |
+| `classify.js` | Use Claude to classify wineries (style, vibe, etc.) |
+| `generate-descriptions-tasmania.js` | Generate editorial descriptions via Claude |
+| `updateEventsSchema.mjs` | Migrate events to current schema |
+| `setup-region-env.js` | Optional env-file switcher (legacy) |
 
 ---
 
-## Code Changes Required (For Multi-Region Support)
+## Security best practices
 
-Once Tasmania is live, you'll eventually want one codebase to support both regions. Here's how:
+- `.env` files are in `.gitignore` — never commit.
+- `service-account-tasmania.json` is in `.gitignore` — never commit.
+- Never hardcode Firebase keys, API keys, or project IDs in source code; read
+  from env vars instead.
+- Once the app ships, set Firestore security rules requiring authenticated
+  reads/writes. Example skeleton:
 
-### 1. Create Region Configuration
-
-**`config/regions.ts` (new file)**
-```typescript
-export type Region = 'margaret-river' | 'tasmania';
-
-export const REGION_CONFIG: Record<Region, RegionData> = {
-  'margaret-river': {
-    name: 'Margaret River',
-    latitude: -33.95,
-    longitude: 115.07,
-    latitudeDelta: 1.0,
-    longitudeDelta: 0.5,
-  },
-  'tasmania': {
-    name: 'Tasmania',
-    latitude: -42.0,  // Center of Tasmania
-    longitude: 147.0,
-    latitudeDelta: 3.0,
-    longitudeDelta: 2.0,
-  },
-};
-```
-
-### 2. Update App to Read Region from Environment
-
-**`firebaseConfig.js` (modified)**
-```javascript
-// Already loads from .env
-// Just make sure environment is switched before building/running
-```
-
-### 3. Update Map Constants
-
-**`app/(tabs)/wineries/index.tsx` (modified)**
-```typescript
-// Instead of hardcoded MARGARET_RIVER_REGION:
-const REGION = process.env.EXPO_PUBLIC_REGION || 'margaret-river';
-const REGION_MAP = REGION_CONFIG[REGION];
-```
-
-But **for now** — while you're still building Margaret River — **no code changes are needed**. Just keep using Margaret River as-is.
-
----
-
-## Security Best Practices
-
-### Firebase Credentials
-- ✅ `.env` files are in `.gitignore` (don't commit)
-- ✅ `service-account-*.json` files are in `.gitignore`
-- ❌ Never hardcode Firebase keys in source code
-- ❌ Never commit credentials to git
-
-### Firestore Rules
-Once Tasmania goes live, **set up Firestore security rules** to:
-- Allow authenticated reads/writes only
-- Prevent accidental cross-region access
-
-Example future rule:
 ```firestore
 match /databases/{database}/documents {
   match /{document=**} {
@@ -212,46 +91,16 @@ match /databases/{database}/documents {
 
 ## Troubleshooting
 
-### "Permission denied" when running copy script
-- Check `service-account-tasmania.json` exists in project root
-- Verify file has correct Firebase Admin SDK credentials
-- Ensure the credentials have Firestore access in GCP
+**"Permission denied" running a script**
+Check `service-account-tasmania.json` exists in the repo root. Either place
+it at the default path or set `FIREBASE_SERVICE_ACCOUNT_PATH` in the
+environment.
 
-### "Collection not found" when running copy script
-- Ensure Margaret River Firestore has the collections
-- Verify `service-account.json` has access to Margaret River project
+**App shows the wrong region label**
+Confirm `EXPO_PUBLIC_REGION_NAME=Tasmania` is set in `.env`. The fallback in
+`constants/region.ts` is also `"Tasmania"`, so the only way to see anything
+else is if a script or build overrides the env var.
 
-### "Can't switch to Tasmania" with env script
-- Ensure you've run `setup-region-env.js 3` to create `.env.tasmania` first
-- Verify the Tasmania Firebase credentials are correct
-
-### Schema copy created wrong field types
-- The script infers types from the first document in each collection
-- If that document has null values, check the second/third document
-- Manually verify the schema in Tasmania Firestore looks correct
-
----
-
-## Quick Reference: File Locations
-
-| File/Script | Purpose |
-|---|---|
-| `TASMANIA_SETUP.md` | Step-by-step Firebase project creation |
-| `TASMANIA_WORKFLOW.md` | This file — overall workflow |
-| `scripts/copy-schema-to-tasmania.js` | Copies schema from MR → TAS |
-| `scripts/setup-region-env.js` | Manages .env files per region |
-| `service-account.json` | Margaret River credentials (DO NOT COMMIT) |
-| `service-account-tasmania.json` | Tasmania credentials (DO NOT COMMIT) |
-| `.env` | Active environment (DO NOT COMMIT) |
-| `.env.margaret-river` | Margaret River env config |
-| `.env.tasmania` | Tasmania env config |
-
----
-
-## Questions?
-
-If you hit any issues:
-1. Check the error message carefully
-2. Review the relevant script comments
-3. Verify Firebase project is properly configured
-4. Check that service account JSON is in the root directory with correct permissions
+**Firestore reads return nothing**
+Confirm `EXPO_PUBLIC_FIREBASE_PROJECT_ID=winery-tourism-tasmania` in `.env`
+and re-bundle (Expo doesn't hot-reload env changes — restart `expo start`).

@@ -1,15 +1,38 @@
 #!/usr/bin/env node
+//
+// Upload a local image as the homepage hero, then store its public URL in
+// Firestore at config/homepage.heroImageUrl.
+//
+// Usage:
+//   node scripts/upload-hero-image.js <path-to-image>
+//
+// Targets the Tasmania Firestore project via service-account-tasmania.json.
 
 const admin = require("firebase-admin");
 const fs = require("fs");
 const path = require("path");
-const os = require("os");
 
-// Initialize Firebase Admin
-const serviceAccount = require("../service-account.json");
+const SERVICE_ACCOUNT_PATH = path.resolve(
+  __dirname,
+  "..",
+  "service-account-tasmania.json"
+);
+
+if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
+  console.error(
+    `Service account JSON not found at: ${SERVICE_ACCOUNT_PATH}\n` +
+      `Place service-account-tasmania.json in the repo root before running.`
+  );
+  process.exit(1);
+}
+
+const serviceAccount = require(SERVICE_ACCOUNT_PATH);
+const PROJECT_ID = serviceAccount.project_id;
+const STORAGE_BUCKET = `${PROJECT_ID}.firebasestorage.app`;
+
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  storageBucket: "solid-garden-474012-q4.firebasestorage.app",
+  storageBucket: STORAGE_BUCKET,
 });
 
 const db = admin.firestore();
@@ -17,41 +40,41 @@ const storage = admin.storage();
 
 async function uploadHeroImage() {
   try {
-    // Path to the image in project folder
-    const desktopPath = path.join(__dirname, "..", "Vasse-Felix-Restaurant.jpg");
+    // Allow the image path to be passed as an argv, fall back to a default.
+    const argPath = process.argv[2];
+    const imagePath = argPath
+      ? path.resolve(argPath)
+      : path.join(__dirname, "..", "hero.jpg");
 
-    console.log(`📸 Uploading image from: ${desktopPath}`);
+    console.log(`Project:    ${PROJECT_ID}`);
+    console.log(`Bucket:     ${STORAGE_BUCKET}`);
+    console.log(`Uploading:  ${imagePath}`);
 
-    // Check if file exists
-    if (!fs.existsSync(desktopPath)) {
-      throw new Error(`File not found: ${desktopPath}`);
+    if (!fs.existsSync(imagePath)) {
+      throw new Error(`File not found: ${imagePath}`);
     }
 
-    // Read the file
-    const fileBuffer = fs.readFileSync(desktopPath);
-    const fileName = "hero-images/margaret-river-hero.jpg";
+    const fileBuffer = fs.readFileSync(imagePath);
+    const fileName = `hero-images/${path.basename(imagePath)}`;
 
-    // Upload to Firebase Storage
     const bucket = storage.bucket();
     const file = bucket.file(fileName);
 
     await file.save(fileBuffer, {
-      metadata: {
-        contentType: "image/jpeg",
-      },
+      metadata: { contentType: "image/jpeg" },
     });
 
-    console.log(`✅ Image uploaded to Firebase Storage: ${fileName}`);
+    console.log(`✓ Uploaded to: ${fileName}`);
 
-    // Make the file publicly accessible
     await file.makePublic();
 
     // Build a permanent public URL (never expires)
-    const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/solid-garden-474012-q4.firebasestorage.app/o/${encodeURIComponent(fileName)}?alt=media`;
+    const downloadUrl =
+      `https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}` +
+      `/o/${encodeURIComponent(fileName)}?alt=media`;
 
-    console.log(`🔗 Download URL: ${downloadUrl}`);
+    console.log(`Download URL: ${downloadUrl}`);
 
-    // Save the URL to Firestore in a config document
     await db.collection("config").doc("homepage").set(
       {
         heroImageUrl: downloadUrl,
@@ -60,10 +83,10 @@ async function uploadHeroImage() {
       { merge: true }
     );
 
-    console.log(`✅ Firestore config updated with image URL`);
-    console.log(`\n🎉 Success! Your hero image is now live.`);
+    console.log("✓ Firestore config/homepage updated.");
+    console.log("\nDone.");
   } catch (error) {
-    console.error("❌ Error uploading image:", error.message);
+    console.error("Error uploading image:", error.message);
     process.exit(1);
   }
 }

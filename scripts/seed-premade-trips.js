@@ -6,7 +6,7 @@
 //   node scripts/seed-premade-trips.js
 //
 // Notes:
-//   • Uses firebase-admin and the service-account.json in the repo root —
+//   • Uses firebase-admin and the service-account-tasmania.json in the repo root —
 //     same pattern as the other scripts in this folder.
 //   • The `wineryIds` arrays below are PLACEHOLDER ids. Edit them to match
 //     real document ids from your `wineries` collection before running.
@@ -17,7 +17,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 const admin = require("firebase-admin");
-const serviceAccount = require("../service-account.json");
+const serviceAccount = require("../service-account-tasmania.json");
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),

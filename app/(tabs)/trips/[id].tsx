@@ -334,8 +334,9 @@ export default function TripDetailScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.emptyText}>This trip no longer exists.</Text>
-        <Pressable onPress={() => router.back()}>
-          <Text style={styles.backLink}>‹ Back</Text>
+        <Pressable style={styles.backBtn} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={16} color="#1a1a1a" />
+          <Text style={styles.backBtnText}>Trips</Text>
         </Pressable>
       </View>
     );
@@ -355,8 +356,9 @@ export default function TripDetailScreen() {
       >
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
-          <Pressable onPress={() => router.back()} hitSlop={12}>
-            <Text style={styles.backLink}>‹ Trips</Text>
+          <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={12}>
+            <Ionicons name="chevron-back" size={16} color={colors.textPrimary} />
+            <Text style={styles.backBtnText}>Trips</Text>
           </Pressable>
           <Text style={styles.headerKicker}>
             {kind === "premade" ? "CURATED" : "YOUR TRIP"}
@@ -610,10 +612,23 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     gap: spacing.sm,
   },
-  backLink: {
-    fontFamily: fonts.serif,
-    fontSize: 14,
-    color: colors.accentSoft,
+  backBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    minHeight: 36,
+  },
+  backBtnText: {
+    color: colors.textPrimary,
+    fontSize: type.body.fontSize,
+    fontWeight: weights.body,
+    letterSpacing: 0.2,
   },
   headerKicker: {
     ...type.kicker,

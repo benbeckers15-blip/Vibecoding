@@ -1,5 +1,5 @@
 const admin = require("firebase-admin");
-const serviceAccount = require("./service-account.json");
+const serviceAccount = require("./service-account-tasmania.json");
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -11,8 +11,8 @@ const slides = [
   {
     order: 1,
     active: true,
-    title: "Explore Margaret River",
-    description: "Discover 91 cellar doors across one of Australia's finest wine regions.",
+    title: "Explore Tasmania",
+    description: "Discover Tasmania's cellar doors across the island's cool-climate wine regions.",
     imageUrl: "https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?w=800",
     linkTo: "/wineries",
   },
@@ -28,7 +28,7 @@ const slides = [
     order: 3,
     active: true,
     title: "Cellar Door Specials",
-    description: "Limited-time offers from your favourite Margaret River producers.",
+    description: "Limited-time offers from your favourite Tasmanian producers.",
     imageUrl: "https://images.unsplash.com/photo-1474722883778-792e7990302f?w=800",
     linkTo: "/specials",
   },

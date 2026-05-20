@@ -20,6 +20,10 @@ import {
   PlayfairDisplay_700Bold,
   PlayfairDisplay_700Bold_Italic,
 } from "@expo-google-fonts/playfair-display";
+import {
+  Roboto_400Regular,
+  Roboto_500Medium,
+} from "@expo-google-fonts/roboto";
 
 import { fonts } from "../constants/theme";
 import { AuthProvider } from "../context/AuthContext";
@@ -61,6 +65,8 @@ export default function RootLayout() {
     DMSans_500Medium,
     DMSans_700Bold,
     BebasNeue_400Regular,
+    Roboto_400Regular,
+    Roboto_500Medium,
   });
 
   useEffect(() => {

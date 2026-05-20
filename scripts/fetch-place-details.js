@@ -14,7 +14,7 @@
 
 const admin = require('firebase-admin');
 const fetch = require('node-fetch');
-const serviceAccount = require('../service-account.json');
+const serviceAccount = require('../service-account-tasmania.json');
 
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();

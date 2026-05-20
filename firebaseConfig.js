@@ -7,6 +7,7 @@ import {
   persistentLocalCache,
   persistentSingleTabManager,
 } from "firebase/firestore";
+import { getFunctions } from "firebase/functions";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -40,3 +41,8 @@ export const db = initializeFirestore(app, {
 });
 
 export const storage = getStorage(app);
+
+// Callable Functions — used for actions that require server-side privileges
+// (e.g. account deletion needs the Admin SDK to wipe Auth + subcollections).
+// Region must match how the functions are deployed (us-central1 is the default).
+export const functions = getFunctions(app, "us-central1");

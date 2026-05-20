@@ -1,0 +1,367 @@
+[
+  {
+    "id": "apogee-tasmania",
+    "name": "Apogee Tasmania",
+    "slug": "apogee-tasmania"
+  },
+  {
+    "id": "bangor-vineyard-shed",
+    "name": "Bangor Vineyard Shed",
+    "slug": "bangor-vineyard-shed"
+  },
+  {
+    "id": "bellebonne",
+    "name": "Bellebonne",
+    "slug": "bellebonne"
+  },
+  {
+    "id": "bream-creek-vineyard",
+    "name": "Bream Creek Vineyard",
+    "slug": "bream-creek-vineyard"
+  },
+  {
+    "id": "brinktop-vineyard",
+    "name": "Brinktop Vineyard",
+    "slug": "brinktop-vineyard"
+  },
+  {
+    "id": "broad-acres-vineyard",
+    "name": "Broad Acres Vineyard",
+    "slug": "broad-acres-vineyard"
+  },
+  {
+    "id": "brook-eden-vineyard",
+    "name": "Brook Eden Vineyard",
+    "slug": "brook-eden-vineyard"
+  },
+  {
+    "id": "bruny-island-premium-wines",
+    "name": "Bruny Island Premium Wines",
+    "slug": "bruny-island-premium-wines"
+  },
+  {
+    "id": "bundaleera-vineyard",
+    "name": "Bundaleera Vineyard",
+    "slug": "bundaleera-vineyard"
+  },
+  {
+    "id": "caledon-estate",
+    "name": "Caledon Estate",
+    "slug": "caledon-estate"
+  },
+  {
+    "id": "cathedral-rock-winery-cellar-door",
+    "name": "Cathedral Rock Winery Cellar Door",
+    "slug": "cathedral-rock-winery-cellar-door"
+  },
+  {
+    "id": "charles-reuben-estate",
+    "name": "Charles Reuben Estate",
+    "slug": "charles-reuben-estate"
+  },
+  {
+    "id": "clover-hill-wines",
+    "name": "Clover Hill Wines",
+    "slug": "clover-hill-wines"
+  },
+  {
+    "id": "coal-valley-vineyard",
+    "name": "Coal Valley Vineyard",
+    "slug": "coal-valley-vineyard"
+  },
+  {
+    "id": "craigie-knowe-vineyard--floras-restaurant",
+    "name": "Craigie Knowe Vineyard & Flora's Restaurant",
+    "slug": "craigie-knowe-vineyard--floras-restaurant"
+  },
+  {
+    "id": "craigow-vineyard",
+    "name": "Craigow Vineyard",
+    "slug": "craigow-vineyard"
+  },
+  {
+    "id": "dalrymple-vineyards",
+    "name": "Dalrymple Vineyards",
+    "slug": "dalrymple-vineyards"
+  },
+  {
+    "id": "darlington-vineyard",
+    "name": "Darlington Vineyard",
+    "slug": "darlington-vineyard"
+  },
+  {
+    "id": "delamere-vineyard",
+    "name": "Delamere Vineyard",
+    "slug": "delamere-vineyard"
+  },
+  {
+    "id": "derwent-estate-vineyard",
+    "name": "Derwent Estate Vineyard",
+    "slug": "derwent-estate-vineyard"
+  },
+  {
+    "id": "devils-corner-cellar-door",
+    "name": "Devil's Corner Cellar Door",
+    "slug": "devils-corner-cellar-door"
+  },
+  {
+    "id": "domaine-a-stoney-vineyard",
+    "name": "Domaine A Stoney Vineyard",
+    "slug": "domaine-a-stoney-vineyard"
+  },
+  {
+    "id": "eastford-creek-vineyard",
+    "name": "Eastford Creek Vineyard",
+    "slug": "eastford-creek-vineyard"
+  },
+  {
+    "id": "evenfall-winery-and-restaurant",
+    "name": "Evenfall Winery and Restaurant",
+    "slug": "evenfall-winery-and-restaurant"
+  },
+  {
+    "id": "every-man--his-dog-vineyard",
+    "name": "Every Man & His Dog Vineyard",
+    "slug": "every-man--his-dog-vineyard"
+  },
+  {
+    "id": "freycinet-vineyards",
+    "name": "Freycinet Vineyards",
+    "slug": "freycinet-vineyards"
+  },
+  {
+    "id": "frogmore-creek-cellar-door--restaurant",
+    "name": "Frogmore Creek Cellar Door & Restaurant",
+    "slug": "frogmore-creek-cellar-door--restaurant"
+  },
+  {
+    "id": "ghost-rock-wines-tasmania",
+    "name": "Ghost Rock Wines Tasmania",
+    "slug": "ghost-rock-wines-tasmania"
+  },
+  {
+    "id": "glaetzer-dixon-family-winemakers",
+    "name": "Glaetzer-Dixon Family Winemakers",
+    "slug": "glaetzer-dixon-family-winemakers"
+  },
+  {
+    "id": "glendale-vineyard",
+    "name": "Glendale Vineyard",
+    "slug": "glendale-vineyard"
+  },
+  {
+    "id": "grey-sands-vineyard",
+    "name": "Grey Sands Vineyard",
+    "slug": "grey-sands-vineyard"
+  },
+  {
+    "id": "handpicked-wines",
+    "name": "Handpicked Wines",
+    "slug": "handpicked-wines"
+  },
+  {
+    "id": "hartzview-vineyard",
+    "name": "Hartzview Vineyard",
+    "slug": "hartzview-vineyard"
+  },
+  {
+    "id": "heriots-point-vineyard-and-boutique-accommodation",
+    "name": "Heriots Point Vineyard and Boutique Accommodation",
+    "slug": "heriots-point-vineyard-and-boutique-accommodation"
+  },
+  {
+    "id": "highclare-estate-wine-room",
+    "name": "Highclare Estate Wine Room",
+    "slug": "highclare-estate-wine-room"
+  },
+  {
+    "id": "holm-oak-vineyards",
+    "name": "Holm Oak Vineyards",
+    "slug": "holm-oak-vineyards"
+  },
+  {
+    "id": "home-hill-winery",
+    "name": "Home Hill Winery",
+    "slug": "home-hill-winery"
+  },
+  {
+    "id": "house-of-arras",
+    "name": "House Of Arras",
+    "slug": "house-of-arras"
+  },
+  {
+    "id": "iron-pot-bay-vineyard",
+    "name": "Iron Pot Bay Vineyard",
+    "slug": "iron-pot-bay-vineyard"
+  },
+  {
+    "id": "jansz-tasmania",
+    "name": "Jansz Tasmania",
+    "slug": "jansz-tasmania"
+  },
+  {
+    "id": "josef-chromy-wines",
+    "name": "Josef Chromy Wines",
+    "slug": "josef-chromy-wines"
+  },
+  {
+    "id": "kate-hill-wines",
+    "name": "Kate Hill Wines",
+    "slug": "kate-hill-wines"
+  },
+  {
+    "id": "leven-valley-vineyard",
+    "name": "Leven Valley Vineyard",
+    "slug": "leven-valley-vineyard"
+  },
+  {
+    "id": "loira-vines",
+    "name": "Loira Vines",
+    "slug": "loira-vines"
+  },
+  {
+    "id": "marions-vineyard",
+    "name": "Marion's Vineyard",
+    "slug": "marions-vineyard"
+  },
+  {
+    "id": "mayfield-estate",
+    "name": "Mayfield Estate",
+    "slug": "mayfield-estate"
+  },
+  {
+    "id": "meander-valley-vineyard",
+    "name": "Meander Valley Vineyard",
+    "slug": "meander-valley-vineyard"
+  },
+  {
+    "id": "mewstone-wines",
+    "name": "Mewstone Wines",
+    "slug": "mewstone-wines"
+  },
+  {
+    "id": "moores-hill-estate",
+    "name": "Moores Hill Estate",
+    "slug": "moores-hill-estate"
+  },
+  {
+    "id": "moorilla-winery",
+    "name": "Moorilla Winery",
+    "slug": "moorilla-winery"
+  },
+  {
+    "id": "nandroya-vineyard",
+    "name": "Nandroya Vineyard",
+    "slug": "nandroya-vineyard"
+  },
+  {
+    "id": "pipers-brook-winery",
+    "name": "Pipers Brook Winery",
+    "slug": "pipers-brook-winery"
+  },
+  {
+    "id": "pooley-wines",
+    "name": "Pooley Wines",
+    "slug": "pooley-wines"
+  },
+  {
+    "id": "pressing-matters-cellar-door",
+    "name": "Pressing Matters Cellar Door",
+    "slug": "pressing-matters-cellar-door"
+  },
+  {
+    "id": "puddleduck-wines",
+    "name": "Puddleduck Wines",
+    "slug": "puddleduck-wines"
+  },
+  {
+    "id": "riversdale-estate-winery-cellar-door--french-bistro",
+    "name": "Riversdale Estate Winery, Cellar Door & French Bistro",
+    "slug": "riversdale-estate-winery-cellar-door--french-bistro"
+  },
+  {
+    "id": "roslyn-1823",
+    "name": "Roslyn 1823",
+    "slug": "roslyn-1823"
+  },
+  {
+    "id": "sailor-seeks-horse",
+    "name": "Sailor Seeks Horse",
+    "slug": "sailor-seeks-horse"
+  },
+  {
+    "id": "sen-vineyard",
+    "name": "Sen Vineyard",
+    "slug": "sen-vineyard"
+  },
+  {
+    "id": "sinapius-wines",
+    "name": "Sinapius Wines",
+    "slug": "sinapius-wines"
+  },
+  {
+    "id": "sisu-wines",
+    "name": "Sisu Wines",
+    "slug": "sisu-wines"
+  },
+  {
+    "id": "small-wonder-wines",
+    "name": "Small Wonder Wines",
+    "slug": "small-wonder-wines"
+  },
+  {
+    "id": "stargazer-wine",
+    "name": "Stargazer Wine",
+    "slug": "stargazer-wine"
+  },
+  {
+    "id": "stefano-lubiana-wines",
+    "name": "Stefano Lubiana Wines",
+    "slug": "stefano-lubiana-wines"
+  },
+  {
+    "id": "stoney-rise-wine-company",
+    "name": "Stoney Rise Wine Company",
+    "slug": "stoney-rise-wine-company"
+  },
+  {
+    "id": "swinging-gate-vineyard",
+    "name": "Swinging Gate Vineyard",
+    "slug": "swinging-gate-vineyard"
+  },
+  {
+    "id": "tamar-ridge-cellar-door",
+    "name": "Tamar Ridge Cellar Door",
+    "slug": "tamar-ridge-cellar-door"
+  },
+  {
+    "id": "tolpuddle-vineyard",
+    "name": "Tolpuddle Vineyard",
+    "slug": "tolpuddle-vineyard"
+  },
+  {
+    "id": "uplands-vineyard",
+    "name": "Uplands Vineyard",
+    "slug": "uplands-vineyard"
+  },
+  {
+    "id": "utzinger-wines",
+    "name": "Utzinger Wines",
+    "slug": "utzinger-wines"
+  },
+  {
+    "id": "velo-wines",
+    "name": "Velo Wines",
+    "slug": "velo-wines"
+  },
+  {
+    "id": "viridian-wines",
+    "name": "Viridian Wines",
+    "slug": "viridian-wines"
+  },
+  {
+    "id": "westella-vineyard",
+    "name": "Westella Vineyard",
+    "slug": "westella-vineyard"
+  }
+]

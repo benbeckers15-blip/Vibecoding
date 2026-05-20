@@ -5,7 +5,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   collection,
   doc,
@@ -20,6 +20,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Dimensions,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -28,6 +29,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import ConciergeChat from "../../../components/ConciergeChat";
 import { REGION_NAME, REGION_NAME_UPPER } from "../../../constants/region";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
 import { db } from "../../../firebaseConfig";
@@ -42,49 +44,16 @@ const HERO_FALLBACK =
   "https://images.unsplash.com/photo-1734517648070-2e8d4ed686ac?q=80&w=1035&auto=format&fit=crop";
 
 // ─── Hero parallax constants ──────────────────────────────────────────────────
-const HERO_HEIGHT = 440;          // taller than the original 340
-const PARALLAX_EXTRA = 100;       // extra px the image extends beyond the container (50 each side)
-const PARALLAX_TRANSLATE = 60;    // max px the image translates as the hero scrolls away
+const HERO_HEIGHT = 320;
+const PARALLAX_EXTRA = 100;       // extra px the image extends beyond the container
+const PARALLAX_TRANSLATE = 10;    // max px the image translates as the hero scrolls away (very subtle)
+const PARALLAX_TOP_BIAS = 100;    // how far above the hero container the image starts (shifts image up)
 
+const SCREEN_W = Dimensions.get("window").width;
+// Rounded top corners on the content card that overlaps the hero image
+const CARD_OVERLAP = 24;
+const CARD_RADIUS  = 20;
 
-// ─── Editorial tiles ──────────────────────────────────────────────────────────
-const EXPLORE_TILES: {
-  key: string;
-  label: string;
-  headline: string;
-  image: string;
-}[] = [
-  {
-    key:      "hasRestaurant",
-    label:    "DINING",
-    headline: "Best for\nLunch",
-    image:    "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=80",
-  },
-  {
-    key:      "dogFriendly",
-    label:    "OUTDOORS",
-    headline: "Dog-Friendly\nEstates",
-    image:    "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=400&q=80",
-  },
-  {
-    key:      "walkinWelcome",
-    label:    "CASUAL",
-    headline: "Walk In,\nNo Booking",
-    image:    "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=400&q=80",
-  },
-  {
-    key:      "isOrganic",
-    label:    "SUSTAINABLE",
-    headline: "Organic\nProducers",
-    image:    "https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?w=400&q=80",
-  },
-  {
-    key:      "isBiodynamic",
-    label:    "NATURAL",
-    headline: "Biodynamic\nWines",
-    image:    "https://images.unsplash.com/photo-1474722883778-792e7990302f?w=400&q=80",
-  },
-];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type FeaturedWinery = {
@@ -123,7 +92,6 @@ type ArticleEntry = {
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [search, setSearch] = useState("");
   const [heroImageUrl, setHeroImageUrl] = useState<string>(HERO_FALLBACK);
   // Crop anchor for the cover-fit hero photo. Stored in Firestore so the
   // image can be re-positioned without an app store release. Defaults to
@@ -131,15 +99,32 @@ export default function HomeScreen() {
   const [heroImagePosition, setHeroImagePosition] = useState<{
     top: string;
     left: string;
-  }>({ top: "50%", left: "50%" });
+  }>({ top: "70%", left: "50%" });
   // Extra zoom on top of `contentFit="cover"`. 1 = raw cover crop (default).
   // > 1 enlarges the image and crops more aggressively around the focal point.
   const [heroImageZoom, setHeroImageZoom] = useState<number>(1);
   const [featuredWinery, setFeaturedWinery] = useState<FeaturedWinery | null>(null);
-  const [wineryCount, setWineryCount] = useState<number>(0);
   const [pour, setPour] = useState<FeaturedPour | null>(null);
   const [loadingPour, setLoadingPour] = useState(true);
   const [articles, setArticles] = useState<ArticleEntry[]>([]);
+  // Concierge chat modal — opened by the floating FAB pinned bottom-right.
+  // State lives on the home screen so the entry point and the modal stay
+  // tightly coupled; the modal itself manages all chat state internally.
+  const [chatOpen, setChatOpen] = useState(false);
+
+  // Reopen-chat trigger. When the user taps a winery card inside the
+  // concierge, navigates to the detail screen, and then taps "Chat"
+  // back, the winery detail screen routes them here with
+  // `?openConcierge=1`. We respond by re-showing the modal and
+  // immediately clear the param so subsequent renders (or a fresh
+  // visit to the home tab) don't pop the chat open again.
+  const params = useLocalSearchParams<{ openConcierge?: string }>();
+  useEffect(() => {
+    if (params.openConcierge === "1") {
+      setChatOpen(true);
+      router.setParams({ openConcierge: undefined });
+    }
+  }, [params.openConcierge, router]);
 
   // Parallax scroll driver
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -199,16 +184,6 @@ export default function HomeScreen() {
             ...(d.data() as Omit<FeaturedWinery, "id">),
           });
         }
-      } catch {}
-    })();
-  }, []);
-
-  // Fetch total winery count for hero kicker
-  useEffect(() => {
-    (async () => {
-      try {
-        const snap = await getDocs(collection(db, "wineries"));
-        setWineryCount(snap.size);
       } catch {}
     })();
   }, []);
@@ -275,18 +250,10 @@ export default function HomeScreen() {
     return () => { cancelled = true; };
   }, []);
 
-  const handleSearchSubmit = () => {
-    const trimmed = search.trim();
-    const t = Date.now();
-    router.push(
-      (trimmed
-        ? `/wineries?search=${encodeURIComponent(trimmed)}&t=${t}`
-        : `/wineries?t=${t}`) as any
-    );
-  };
 
 
   return (
+    <View style={styles.screen}>
     <Animated.ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
@@ -299,18 +266,16 @@ export default function HomeScreen() {
     >
       {/* ── Daylight hero — image only, full saturation ───────────────────────── */}
       <View style={styles.hero}>
-        {/* Hero image with subtle parallax — image extends beyond the container
-            so it never shows gaps as it translates upward on scroll.
-            The transform lives on the Animated.View wrapper because
-            expo-image's <Image> doesn't pick up native-driven transforms. */}
+        {/* Hero image with subtle parallax — extended beyond the container so
+            it never shows gaps as it translates upward on scroll. */}
         <Animated.View
           style={[
             {
               position: "absolute",
               left: 0,
-              right: 0,
-              top: -(PARALLAX_EXTRA / 2),
-              height: HERO_HEIGHT + PARALLAX_EXTRA,
+              top: -PARALLAX_TOP_BIAS,
+              width: SCREEN_W,
+              height: HERO_HEIGHT + PARALLAX_TOP_BIAS + PARALLAX_TRANSLATE,
             },
             { transform: [{ translateY: heroImageTranslate }] },
           ]}
@@ -321,9 +286,6 @@ export default function HomeScreen() {
               width: "100%",
               height: "100%",
               opacity: 0.96,
-              // Extra zoom on top of `cover`. transformOrigin is pinned to
-              // the focal point so increasing zoom keeps the same area
-              // visible — it just crops more tightly around it.
               transform: [{ scale: heroImageZoom }],
               transformOrigin: `${heroImagePosition.left} ${heroImagePosition.top}`,
             }}
@@ -342,39 +304,28 @@ export default function HomeScreen() {
 
       {/* ── Hero editorial copy — on warm paper below the image ──────────────── */}
       <View style={styles.heroCopySection}>
-        <Text style={[styles.heroKicker, { textAlign: "right" }]}>
-          Issue No. 1
-        </Text>
         <Text style={styles.heroHeadline}>
           {"Tasmania,\nby the glass."}
         </Text>
       </View>
 
-      {/* ── Search + filter chips ─────────────────────────────────────────────── */}
-      <View style={styles.searchSection}>
-        {/* Glass search pill */}
-        <View style={styles.searchBar}>
+      {/* ── Concierge search bar ─────────────────────────────────────────────── */}
+      <Pressable style={styles.searchSection} onPress={() => setChatOpen(true)}>
+        <View style={styles.searchBar} pointerEvents="none">
           <Ionicons
-            name="search"
+            name="chatbubble-ellipses-outline"
             size={15}
             color={colors.textSecondary}
             style={{ marginRight: 10 }}
           />
-          <TextInput
-            style={styles.searchInput}
-            placeholder={`Search ${REGION_NAME}…`}
-            placeholderTextColor={colors.textMuted}
-            value={search}
-            onChangeText={setSearch}
-            returnKeyType="search"
-            onSubmitEditing={handleSearchSubmit}
-          />
-          <Pressable onPress={handleSearchSubmit} style={styles.searchBtn}>
-            <Ionicons name="options-outline" size={14} color={colors.onAccent} />
-          </Pressable>
+          <Text style={styles.searchPlaceholder}>
+            Ask about Tasmanian wine…
+          </Text>
+          <View style={styles.searchBtn}>
+            <Ionicons name="arrow-up" size={14} color={colors.onAccent} />
+          </View>
         </View>
-
-      </View>
+      </Pressable>
 
       {/* ── Featured winery card ─────────────────────────────────────────────── */}
       {featuredWinery && (
@@ -424,53 +375,6 @@ export default function HomeScreen() {
           </Pressable>
         </View>
       )}
-
-      {/* ── Editorial tiles — Explore by ─────────────────────────────────────── */}
-      <View style={[styles.section, { paddingHorizontal: 0 }]}>
-        <View style={[styles.sectionHead, { paddingHorizontal: 20 }]}>
-          <View style={styles.goldLine} />
-          <Text style={styles.sectionKicker}>EXPLORE BY</Text>
-        </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tilesRow}
-        >
-          {EXPLORE_TILES.map((tile) => (
-            <Pressable
-              key={tile.key}
-              style={styles.tile}
-              onPress={() =>
-                router.push(
-                  `/home/articles/collections/${tile.key}` as any
-                )
-              }
-            >
-              <Image
-                source={{ uri: tile.image }}
-                style={styles.tileImg}
-                contentFit="cover"
-                transition={150}
-              />
-              {/* Double-stop scrim: top + bottom darkened so kicker AND headline
-                  remain legible regardless of the photo's exposure. */}
-              <LinearGradient
-                colors={[
-                  colors.photoOverlayTop,
-                  "transparent",
-                  colors.photoOverlayBottom,
-                ]}
-                locations={[0, 0.4, 1]}
-                style={[StyleSheet.absoluteFill, { borderRadius: radius.card }]}
-              />
-              <View style={styles.tileOverlay}>
-                <Text style={styles.tileKicker}>{tile.label}</Text>
-                <Text style={styles.tileTitle}>{tile.headline}</Text>
-              </View>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
 
       {/* ── Featured: The Pour (live from Firestore) ──────────────────────────
           Relocated from the former Explore tab. Same layout & data source. */}
@@ -620,11 +524,21 @@ export default function HomeScreen() {
         ))}
       </View>
     </Animated.ScrollView>
+
+      <ConciergeChat visible={chatOpen} onClose={() => setChatOpen(false)} />
+    </View>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
+  // Outer wrapper that hosts both the scroll view and the floating FAB so the
+  // FAB can be absolutely positioned over the scrolling content without
+  // joining the scroll itself.
+  screen: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -635,8 +549,8 @@ const styles = StyleSheet.create({
 
   // ── Hero ──────────────────────────────────────────────────────────────────
   hero: {
-    height: HERO_HEIGHT,        // taller hero; copy stays below
-    overflow: "hidden",         // clip the parallax image extension
+    height: HERO_HEIGHT,
+    overflow: "hidden",                   // clip the parallax image
   },
   heroHeader: {
     flexDirection: "row",
@@ -654,17 +568,21 @@ const styles = StyleSheet.create({
     fontFamily: fonts.display,          // keep the same family so the wordmark reads as one
     color: colors.accentSoft,
   },
-  // Editorial copy section — sits on the dark slate page below the photo.
-  // Pulled up over the hero with rounded top corners so the page surface reads
-  // as a card overlaid on the photograph (rather than a hard horizontal seam).
+  // Card overlay that floats over the bottom of the hero photo with rounded
+  // top corners, replacing the old telescope/curve-box trick.
   heroCopySection: {
     backgroundColor: colors.background,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    marginTop: -15,                          // overlap the hero image
+    borderTopLeftRadius: CARD_RADIUS,
+    borderTopRightRadius: CARD_RADIUS,
+    marginTop: -CARD_OVERLAP,
     paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.xxxl,
+    paddingTop: spacing.xl,
     paddingBottom: spacing.sm,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 8,
   },
   heroKicker: {
     ...type.kicker,
@@ -673,7 +591,7 @@ const styles = StyleSheet.create({
   heroHeadline: {
     ...type.display,                          // 54 / 58 / 1.5 / Bebas Neue
     color: colors.textPrimary,                // soft off-white on dark slate — pops confidently
-    marginTop: spacing.md,
+    marginTop: spacing.xs,                    // pulled tighter under the kicker
   },
 
   // ── Search + chips ────────────────────────────────────────────────────────
@@ -689,14 +607,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     paddingHorizontal: spacing.lg,
-    paddingVertical: 13,
-    minHeight: spacing.hitTarget,             // 44pt — Apple HIG
+    paddingVertical: 9,
   },
-  searchInput: {
+  searchPlaceholder: {
     flex: 1,
     fontSize: type.body.fontSize,
-    color: colors.textPrimary,
-    paddingVertical: 0,
+    color: colors.textMuted,
   },
   searchBtn: {
     width: 36,                                 // bumped from 30 to 36
@@ -766,88 +682,6 @@ const styles = StyleSheet.create({
     color: colors.accentSoft,
     fontWeight: weights.emphasis,
     marginTop: spacing.md,
-  },
-
-  // ── Editorial tiles ───────────────────────────────────────────────────────
-  tilesRow: {
-    paddingHorizontal: spacing.xxl,           // standardised to 24
-    gap: spacing.md,                           // bumped 10 → 12
-  },
-  tile: {
-    width: 140,
-    height: 200,
-    borderRadius: radius.card,
-    overflow: "hidden",
-  },
-  tileImg: {
-    width: "100%",
-    height: "100%",
-  },
-  tileOverlay: {
-    position: "absolute",
-    bottom: spacing.md,
-    left: spacing.md,
-    right: spacing.md,
-  },
-  tileKicker: {
-    ...type.kicker,                           // bumped from 9pt → 10pt (kicker minimum)
-    color: colors.accentSoft,
-    marginBottom: spacing.xs,
-  },
-  tileTitle: {
-    fontFamily: fonts.serif,
-    fontSize: type.lede.fontSize,             // 17pt
-    color: colors.textOnDark,
-    lineHeight: 22,
-  },
-
-  // ── Explore cards ─────────────────────────────────────────────────────────
-  exploreCards: {
-    gap: spacing.md,
-  },
-  exploreCard: {
-    borderRadius: radius.card,
-    overflow: "hidden",
-  },
-  exploreSmall: {
-    flex: 1,
-    borderRadius: radius.card,
-    overflow: "hidden",
-  },
-  smallRow: {
-    flexDirection: "row",
-    gap: spacing.md,
-  },
-  exploreCardBg: {
-    height: 150,
-  },
-  cardGrad: {
-    flex: 1,
-    justifyContent: "flex-end",
-    paddingHorizontal: spacing.xl,            // card body padding 20 (Fix 3)
-    paddingBottom: spacing.xl,
-    paddingTop: 50,
-  },
-  cardKicker: {
-    ...type.kicker,                           // bumped 9 → 10
-    color: colors.textOnDarkSubtle,
-    marginBottom: spacing.xs,
-  },
-  cardTitle: {
-    ...type.h3,                               // 22 / bold / Georgia
-    color: colors.textOnDark,
-    marginBottom: spacing.xs,
-  },
-  cardBody: {
-    ...type.caption,                          // 12 / 16
-    color: colors.textOnDarkMuted,
-  },
-  smallCardTitle: {
-    fontFamily: fonts.serif,
-    fontSize: type.lede.fontSize,             // 17pt
-    fontWeight: weights.emphasis,
-    color: colors.textOnDark,
-    lineHeight: 22,
   },
 
   // ── Featured (The Pour) — relocated from the explore tab ────────────────

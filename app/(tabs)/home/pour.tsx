@@ -231,8 +231,9 @@ export default function PourScreen() {
 
           {/* Header: back · issue label · share */}
           <View style={[styles.headerRow, { paddingTop: insets.top + 10 }]}>
-            <Pressable style={styles.iconBtn} onPress={() => router.back()}>
+            <Pressable style={styles.heroBackBtn} onPress={() => router.back()}>
               <Ionicons name="chevron-back" size={16} color={colors.textOnDark} />
+              <Text style={styles.heroBackBtnText}>Home</Text>
             </Pressable>
 
             <Text style={styles.headerKicker}>{article.issueLabel}</Text>
@@ -379,6 +380,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: spacing.xxl,           // standardised 20 → 24
+  },
+  heroBackBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    backgroundColor: colors.photoChrome,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.borderOnDark,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    minHeight: spacing.hitTarget,
+  },
+  heroBackBtnText: {
+    color: colors.textOnDark,
+    fontSize: type.body.fontSize,
+    fontWeight: weights.body,
+    letterSpacing: 0.2,
   },
   iconBtn: {
     width: spacing.hitTarget,                 // 44pt — Apple HIG

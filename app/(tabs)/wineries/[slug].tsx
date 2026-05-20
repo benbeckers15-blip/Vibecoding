@@ -138,10 +138,11 @@ export default function WineryDetailsScreen() {
     kind?: string;
   }>();
   const backLabel =
-    from === "events"   ? "Events"   :
-    from === "wineries" ? "Wineries" :
-    from === "home"     ? "Home"     :
-    from === "trip"     ? "Trip"     : "Back";
+    from === "events"    ? "Events"    :
+    from === "wineries"  ? "Wineries"  :
+    from === "home"      ? "Home"      :
+    from === "trip"      ? "Trip"      :
+    from === "concierge" ? "Chat"      : "Back";
 
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -333,6 +334,17 @@ export default function WineryDetailsScreen() {
             <Pressable
               style={styles.headerBtn}
               onPress={() => {
+                // The concierge case has to OVERRIDE the natural
+                // stack pop: even if `canGoBack()` would return us
+                // to the home screen, we still need to signal "open
+                // the chat again on arrival" via a query param.
+                // Falling through to router.back() would dump the
+                // user on a closed-chat home screen with no way back
+                // to the conversation they were in.
+                if (from === "concierge") {
+                  router.replace("/(tabs)/home?openConcierge=1" as any);
+                  return;
+                }
                 if (router.canGoBack()) {
                   router.back();
                 } else if (from === "trip" && tripId) {

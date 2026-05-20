@@ -144,12 +144,9 @@ export default function InterviewLayout({ article }: Props) {
           />
 
           <View style={[styles.headerRow, { paddingTop: insets.top + 10 }]}>
-            <Pressable style={styles.iconBtn} onPress={() => router.back()}>
-              <Ionicons
-                name="chevron-back"
-                size={16}
-                color={colors.textOnDark}
-              />
+            <Pressable style={styles.backBtn} onPress={() => router.back()}>
+              <Ionicons name="chevron-back" size={16} color={colors.textOnDark} />
+              <Text style={styles.backBtnText}>Home</Text>
             </Pressable>
             <Text style={styles.headerKicker}>INTERVIEW</Text>
             <Pressable style={styles.iconBtn} onPress={handleShare}>
@@ -241,6 +238,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: spacing.xxl,
+  },
+  backBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    backgroundColor: colors.photoChrome,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.borderOnDark,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    minHeight: spacing.hitTarget,
+  },
+  backBtnText: {
+    color: colors.textOnDark,
+    fontSize: type.body.fontSize,
+    fontWeight: weights.body,
+    letterSpacing: 0.2,
   },
   iconBtn: {
     width: spacing.hitTarget,

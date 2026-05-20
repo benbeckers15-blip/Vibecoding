@@ -203,6 +203,10 @@ export const fonts = {
   // Tall, condensed sans with a single weight; pair with extra letter-spacing.
   display:         "BebasNeue_400Regular",
 
+  // Roboto — used for concierge chat replies.
+  roboto:          "Roboto_400Regular",
+  robotoMedium:    "Roboto_500Medium",
+
   // Backward-compat aliases.
   mono:            "DMSans_500Medium",
 } as const;

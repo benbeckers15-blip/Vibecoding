@@ -78,7 +78,7 @@ export interface PremadeTrip {
   durationHours: number;
   /** Ordered list of winery document ids. */
   wineryIds: string[];
-  /** Region label, e.g. "Margaret River" — for future multi-region support. */
+  /** Region label, e.g. "Tamar Valley" — for future multi-region support. */
   region: string;
   /** Display order on the Trips index. */
   order: number;

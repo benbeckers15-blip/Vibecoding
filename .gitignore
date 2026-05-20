@@ -35,11 +35,18 @@ yarn-error.*
 .env*.local
 
 # secrets — never commit these
-service-account.json
 service-account-tasmania.json
+service-account*.json
+.env.tasmania
+.env.*
 
 # Claude Code worktrees / local agent state
 .claude/
+
+# Cloud Functions build + local config
+functions/lib/
+functions/node_modules/
+functions/.runtimeconfig.json
 
 # typescript
 *.tsbuildinfo
