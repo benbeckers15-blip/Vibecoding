@@ -38,8 +38,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { REGION_NAME } from "../constants/region";
 import { colors, fonts, radius, spacing, type } from "../constants/theme";
+import { useRegionConfig } from "../context/RegionContext";
 import { useTrips } from "../context/TripContext";
 import { getConcierge } from "../services/concierge/concierge";
 import type {
@@ -60,20 +60,15 @@ interface ConciergeChatProps {
   onClose: () => void;
 }
 
-// Three quick-start prompts shown in the empty state. Tapping one sends it
-// as the user's first message — lower-friction onboarding than "type your
-// question into the void".
-const SUGGESTIONS = [
-  "One day in Tasmania, pinot-focused — plan it.",
-  "Best Sunday cellar door near Hobart?",
-  "Where should I base myself for a sparkling weekend?",
-];
-
 export default function ConciergeChat({ visible, onClose }: ConciergeChatProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const concierge = getConcierge();
   const { createTrip, setTripStops, startTrip } = useTrips();
+  // Region config drives the per-region empty-state prompts and the
+  // region id we pass to the concierge for init() + the request body.
+  const regionConfig = useRegionConfig();
+  const SUGGESTIONS = regionConfig.suggestedPrompts;
 
   const [messages, setMessages] = useState<ChatMessage[]>(concierge.getHistory());
   const [input, setInput] = useState("");
@@ -219,7 +214,7 @@ export default function ConciergeChat({ visible, onClose }: ConciergeChatProps) 
     let cancelled = false;
     (async () => {
       try {
-        await concierge.init();
+        await concierge.init(regionConfig.regionId);
         if (!cancelled) setInitError(null);
       } catch (err) {
         if (!cancelled) {
@@ -231,7 +226,7 @@ export default function ConciergeChat({ visible, onClose }: ConciergeChatProps) 
     return () => {
       cancelled = true;
     };
-  }, [visible, concierge]);
+  }, [visible, concierge, regionConfig.regionId]);
 
   // Fetch the user's location each time the chat opens so the concierge
   // can prioritise nearby wineries. Fails silently — location is optional
@@ -300,7 +295,7 @@ export default function ConciergeChat({ visible, onClose }: ConciergeChatProps) 
 
       try {
         if (!concierge.isReady()) {
-          await concierge.init();
+          await concierge.init(regionConfig.regionId);
         }
         // Streamed variant — `askStream` invokes the callback once
         // per text fragment as the model emits them. We DO NOT paint
@@ -625,7 +620,8 @@ export default function ConciergeChat({ visible, onClose }: ConciergeChatProps) 
           >
             {isEmpty ? (
               <EmptyState
-                regionName={REGION_NAME}
+                regionName={regionConfig.displayName}
+                suggestions={SUGGESTIONS}
                 disabled={sending || !!initError}
                 onPick={(prompt) => void send(prompt)}
               />
@@ -1067,10 +1063,12 @@ function WineryCards({
 
 function EmptyState({
   regionName,
+  suggestions,
   disabled,
   onPick,
 }: {
   regionName: string;
+  suggestions: string[];
   disabled: boolean;
   onPick: (prompt: string) => void;
 }) {
@@ -1088,7 +1086,7 @@ function EmptyState({
 
       <Text style={styles.suggestionsKicker}>TRY ASKING</Text>
       <View style={styles.suggestions}>
-        {SUGGESTIONS.map((s) => (
+        {suggestions.map((s) => (
           <Pressable
             key={s}
             onPress={() => onPick(s)}

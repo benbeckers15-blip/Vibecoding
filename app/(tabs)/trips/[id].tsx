@@ -30,9 +30,11 @@ import {
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import { fetchRoutePolyline, type LatLng } from "../../../utils/fetchRoutePolyline";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { REGION_NAME_UPPER } from "../../../constants/region";
+// REGION_NAME_UPPER was sourced from constants/region.ts — now from the
+// active region config via useRegionConfig() (see imports below).
 import { MAP_STYLE } from "../../../constants/mapStyle";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
+import { useActiveRegionId, useRegionConfig } from "../../../context/RegionContext";
 import { useTrips } from "../../../context/TripContext";
 import { db } from "../../../firebaseConfig";
 import { PremadeTrip, TripStop } from "../../../types/trip";
@@ -50,6 +52,8 @@ const CTA_BOTTOM = TAB_BAR_BOTTOM_INSET + TAB_BAR_HEIGHT + CTA_GAP_ABOVE_TAB_BAR
 export default function TripDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const regionId = useActiveRegionId();
+  const region = useRegionConfig();
   const params = useLocalSearchParams<{ id: string; kind?: string }>();
   const tripId = String(params.id);
   const kind = (params.kind === "premade" ? "premade" : "user") as
@@ -109,6 +113,7 @@ export default function TripDetailScreen() {
           const chunk = ids.slice(i, i + 10);
           const q = query(
             collection(db, "wineries"),
+            where("regionId", "==", regionId),
             where("__name__", "in", chunk)
           );
           const snap = await getDocs(q);
@@ -152,7 +157,7 @@ export default function TripDetailScreen() {
         setLoading(false);
       }
     })();
-  }, [tripId, kind]);
+  }, [tripId, kind, regionId]);
 
   // ── Stops shown on screen ─────────────────────────────────────────────────
   // Belt-and-braces: filter out stops with non-finite coords here too. The
@@ -564,7 +569,7 @@ export default function TripDetailScreen() {
               </View>
               <View style={styles.stopBody}>
                 <Text style={styles.stopName}>{s.name}</Text>
-                <Text style={styles.stopRegion}>{REGION_NAME_UPPER}</Text>
+                <Text style={styles.stopRegion}>{region.displayNameUpper}</Text>
               </View>
               {visited ? (
                 <Ionicons

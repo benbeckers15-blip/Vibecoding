@@ -17,6 +17,7 @@ import {
   where,
 } from "firebase/firestore";
 import { useEffect, useRef, useState } from "react";
+import { useActiveRegionId, useRegionConfig } from "../../../context/RegionContext";
 import {
   ActivityIndicator,
   Animated,
@@ -30,7 +31,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ConciergeChat from "../../../components/ConciergeChat";
-import { REGION_NAME, REGION_NAME_UPPER } from "../../../constants/region";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
 import { db } from "../../../firebaseConfig";
 
@@ -92,6 +92,8 @@ type ArticleEntry = {
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const regionId = useActiveRegionId();
+  const region = useRegionConfig();
   const [heroImageUrl, setHeroImageUrl] = useState<string>(HERO_FALLBACK);
   // Crop anchor for the cover-fit hero photo. Stored in Firestore so the
   // image can be re-positioned without an app store release. Defaults to
@@ -173,6 +175,7 @@ export default function HomeScreen() {
       try {
         const q = query(
           collection(db, "wineries"),
+          where("regionId", "==", regionId),
           where("featured", "==", true),
           where("featuredTier", "==", "hero")
         );
@@ -186,7 +189,7 @@ export default function HomeScreen() {
         }
       } catch {}
     })();
-  }, []);
+  }, [regionId]);
 
   // Fetch explore_articles directory (relocated from the explore tab)
   useEffect(() => {
@@ -196,6 +199,7 @@ export default function HomeScreen() {
       try {
         const q = query(
           collection(db, "explore_articles"),
+          where("regionId", "==", regionId),
           orderBy("order", "asc")
         );
         const snap = await getDocs(q);
@@ -211,7 +215,7 @@ export default function HomeScreen() {
     })();
 
     return () => { cancelled = true; };
-  }, []);
+  }, [regionId]);
 
   // Fetch latest active Pour issue (relocated from the explore tab)
   useEffect(() => {
@@ -221,6 +225,7 @@ export default function HomeScreen() {
       try {
         const q = query(
           collection(db, "pour_articles"),
+          where("regionId", "==", regionId),
           orderBy("issueNumber", "desc"),
           limit(10)
         );
@@ -248,7 +253,7 @@ export default function HomeScreen() {
     })();
 
     return () => { cancelled = true; };
-  }, []);
+  }, [regionId]);
 
 
 
@@ -358,7 +363,7 @@ export default function HomeScreen() {
             )}
             <View style={styles.featBody}>
               <Text style={styles.featRegion}>
-                {REGION_NAME_UPPER} · Estate
+                {region.displayNameUpper} · Estate
               </Text>
               <Text style={styles.featName}>{featuredWinery.name}</Text>
               {featuredWinery.rating != null && (

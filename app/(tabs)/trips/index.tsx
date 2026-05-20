@@ -22,7 +22,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import { collection, getDocs, orderBy, query, where } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -33,9 +33,9 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { REGION_NAME_UPPER } from "../../../constants/region";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
 import { useAuth } from "../../../context/AuthContext";
+import { useActiveRegionId, useRegionConfig } from "../../../context/RegionContext";
 import { useTrips } from "../../../context/TripContext";
 import { db } from "../../../firebaseConfig";
 import { PremadeTrip, Trip } from "../../../types/trip";
@@ -57,6 +57,8 @@ export default function TripsIndexScreen() {
   const insets = useSafeAreaInsets();
   const { trips, activeTrip, loading: tripsLoading } = useTrips();
   const { loading: authLoading } = useAuth();
+  const regionId = useActiveRegionId();
+  const region = useRegionConfig();
 
   const [premadeTrips, setPremadeTrips] = useState<PremadeTrip[]>([]);
   const [premadeLoading, setPremadeLoading] = useState(true);
@@ -70,6 +72,7 @@ export default function TripsIndexScreen() {
       try {
         const q = query(
           collection(db, "premade_trips"),
+          where("regionId", "==", regionId),
           orderBy("order", "asc")
         );
         const snapshot = await getDocs(q);
@@ -83,7 +86,7 @@ export default function TripsIndexScreen() {
         setPremadeLoading(false);
       }
     })();
-  }, [authLoading]);
+  }, [authLoading, regionId]);
 
   // ── Split curated trips by tier ───────────────────────────────────────────
   const { halfDayTrips, fullDayTrips } = useMemo(() => {
@@ -121,7 +124,7 @@ export default function TripsIndexScreen() {
       >
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
-          <Text style={styles.headerKicker}>{REGION_NAME_UPPER}</Text>
+          <Text style={styles.headerKicker}>{region.displayNameUpper}</Text>
           <Text style={styles.headerTitle}>Plan Your Trip</Text>
           <Text style={styles.headerLede}>
             Curated trails through every cellar door region — pick a half-day
@@ -313,6 +316,7 @@ function HalfDayCard({
   trip: PremadeTrip;
   onPress: () => void;
 }) {
+  const region = useRegionConfig();
   return (
     <Pressable
       style={({ pressed }) => [styles.halfCard, pressed && styles.cardPressed]}
@@ -341,7 +345,7 @@ function HalfDayCard({
         </View>
         <View style={styles.halfImgText}>
           <Text style={styles.halfKicker}>
-            {(trip.region ?? REGION_NAME_UPPER).toUpperCase()}
+            {(trip.region ?? region.displayNameUpper).toUpperCase()}
           </Text>
           <Text style={styles.halfTitle} numberOfLines={2}>
             {trip.title}
@@ -368,6 +372,7 @@ function FullDayCard({
   trip: PremadeTrip;
   onPress: () => void;
 }) {
+  const region = useRegionConfig();
   return (
     <Pressable
       style={({ pressed }) => [styles.fullCardShadow, pressed && styles.cardPressed]}
@@ -397,7 +402,7 @@ function FullDayCard({
           </View>
           <View style={styles.fullImgText}>
             <Text style={styles.fullKicker}>
-              {(trip.region ?? REGION_NAME_UPPER).toUpperCase()}
+              {(trip.region ?? region.displayNameUpper).toUpperCase()}
             </Text>
             <Text style={styles.fullTitle} numberOfLines={2}>
               {trip.title}

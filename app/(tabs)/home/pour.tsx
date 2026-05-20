@@ -5,8 +5,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
+import { collection, getDocs, limit, orderBy, query, where } from "firebase/firestore";
 import { useEffect, useState } from "react";
+import { useActiveRegionId } from "../../../context/RegionContext";
 import {
   ActivityIndicator,
   Dimensions,
@@ -78,6 +79,7 @@ interface PourArticle {
 export default function PourScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const regionId = useActiveRegionId();
 
   const [article, setArticle] = useState<PourArticle | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,6 +95,7 @@ export default function PourScreen() {
         try {
           const q = query(
             collection(db, "pour_articles"),
+            where("regionId", "==", regionId),
             orderBy("issueNumber", "desc"),
             limit(10)
           );
@@ -100,7 +103,13 @@ export default function PourScreen() {
           docs = snap.docs;
         } catch {
           // Fallback: unordered fetch — works even if issueNumber is missing
-          const snap = await getDocs(collection(db, "pour_articles"));
+          // (still region-scoped — we don't want to surface a different
+          // region's Pour issue if the indexed query fails).
+          const fallbackQ = query(
+            collection(db, "pour_articles"),
+            where("regionId", "==", regionId)
+          );
+          const snap = await getDocs(fallbackQ);
           docs = snap.docs.sort((a, b) => {
             const aNum = (a.data().issueNumber as number) ?? 0;
             const bNum = (b.data().issueNumber as number) ?? 0;
@@ -122,7 +131,7 @@ export default function PourScreen() {
 
     fetchLatest();
     return () => { cancelled = true; };
-  }, []);
+  }, [regionId]);
 
   const handleShare = async () => {
     if (!article) return;

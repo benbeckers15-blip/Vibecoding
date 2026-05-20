@@ -197,22 +197,34 @@ export class Concierge {
   private history: ChatMessage[] = [];
   private userLocation: { latitude: number; longitude: number } | null = null;
   private initialized = false;
+  /** Active region this concierge instance is scoped to. Set by init().
+   *  Sent as `regionId` in every askStream() request and used to invalidate
+   *  the cached corpus when the user switches region (see `setRegion`). */
+  private regionId: string | null = null;
 
   /**
-   * Load the winery corpus. Required ONLY so `getWinery(slug)` can answer
-   * synchronous lookups from the chat UI when rendering winery cards.
+   * Load the winery corpus for the given region. Required ONLY so
+   * `getWinery(slug)` can answer synchronous lookups from the chat UI
+   * when rendering winery cards.
+   *
    * No API keys are touched here — the wineries collection is public-read.
-   * Idempotent.
+   *
+   * Idempotent per region: a second call with the SAME regionId is a no-op.
+   * A call with a DIFFERENT regionId reloads — the cached corpus is for
+   * the old region and would return wrong results for the new one. The
+   * caller is responsible for invoking reset() (which also clears chat
+   * history) before switching regions in the UI.
    */
-  async init(): Promise<void> {
-    if (this.initialized) return;
-    const { wineries } = await loadContext();
+  async init(regionId: string): Promise<void> {
+    if (this.initialized && this.regionId === regionId) return;
+    const { wineries } = await loadContext(regionId);
     this.wineries = wineries;
     const bySlug = new Map<string, WineryDoc>();
     for (const w of wineries) {
       bySlug.set(w.slug || w.id, w);
     }
     this.bySlug = bySlug;
+    this.regionId = regionId;
     this.initialized = true;
   }
 
@@ -235,17 +247,23 @@ export class Concierge {
     userMessage: string,
     onDelta: (textDelta: string) => void
   ): Promise<AskResult> {
-    if (!this.initialized) {
-      // The chat UI auto-calls init() before askStream, but a stray
-      // call path could land here cold. Init transparently rather than
-      // throw — loadContext() is cheap (Firestore persistent cache).
-      await this.init();
+    if (!this.initialized || !this.regionId) {
+      // The chat UI auto-calls init(regionId) before askStream, but a
+      // stray call path could land here without init having run. We
+      // can't recover safely without a regionId — throw a clear error
+      // rather than fall through to a server call that would either
+      // 400 or silently use the server's default region.
+      throw new Error(
+        "Concierge.askStream called before init(regionId). " +
+          "Make sure the chat UI calls init() with the active region first."
+      );
     }
 
     const requestBody = {
       message: userMessage,
       history: this.history,
       userLocation: this.userLocation,
+      regionId: this.regionId,
     };
 
     let result: AskResult | null = null;
@@ -292,6 +310,26 @@ export class Concierge {
   /** Clear the conversation; keep the loaded winery context. */
   reset(): void {
     this.history = [];
+  }
+
+  /**
+   * Full teardown — drops the cached corpus, history, region, AND the
+   * initialized flag. Used by RegionContext when the user switches
+   * regions: the chat next time will run init(newRegionId) cleanly
+   * against the new corpus.
+   *
+   * Distinct from reset() because reset() preserves the loaded wineries
+   * (history-only clear, used by the in-chat Reset button); this method
+   * wipes everything so getWinery(slug) won't accidentally return a
+   * winery from the old region between the switch and the next chat open.
+   */
+  resetForRegionChange(): void {
+    this.history = [];
+    this.wineries = [];
+    this.bySlug = new Map();
+    this.userLocation = null;
+    this.regionId = null;
+    this.initialized = false;
   }
 
   /** Snapshot of the current history — handy for the UI's message list. */

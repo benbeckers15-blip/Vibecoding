@@ -6,8 +6,8 @@
 import { Redirect } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
-import { REGION_NAME_UPPER } from "../constants/region";
 import { useAuth } from "../context/AuthContext";
+import { useRegionConfig } from "../context/RegionContext";
 import { colors, fonts } from "../constants/theme";
 
 function FadingDots() {
@@ -46,6 +46,7 @@ function FadingDots() {
 export default function Index() {
   const [timerDone, setTimerDone] = useState(false);
   const { user, loading } = useAuth();
+  const region = useRegionConfig();
 
   // 2-second minimum splash display
   useEffect(() => {
@@ -57,7 +58,7 @@ export default function Index() {
   if (!timerDone || loading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.region}>{REGION_NAME_UPPER}</Text>
+        <Text style={styles.region}>{region.displayNameUpper}</Text>
         <Text style={styles.title}>Winery Guide</Text>
         <FadingDots />
       </View>

@@ -10,7 +10,7 @@
 // system-prompt cache hit wide and the per-turn payload small.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
 
 // ─── Tasmania sub-regions ────────────────────────────────────────────────────
@@ -527,8 +527,15 @@ export function renderWorldIndex(wineries: WineryDoc[]): string {
  * adjacent-region expansion, owner-boost sort, drive-time sort,
  * then opt-in description hydration via retrieve.ts).
  */
-export async function loadContext(): Promise<{ wineries: WineryDoc[] }> {
-  const snap = await getDocs(collection(db, "wineries"));
+export async function loadContext(
+  regionId: string
+): Promise<{ wineries: WineryDoc[] }> {
+  // Filter by regionId so the in-memory corpus only ever holds wineries
+  // for the active region. In a multi-region future this is what keeps
+  // getWinery(slug) from returning a Margaret River winery when the user
+  // is browsing Tasmania.
+  const q = query(collection(db, "wineries"), where("regionId", "==", regionId));
+  const snap = await getDocs(q);
   // Spread the doc data FIRST, then set `id` from `d.id` — this way the
   // Firestore document ID always wins over any stray `id` field that may
   // exist in the document body.

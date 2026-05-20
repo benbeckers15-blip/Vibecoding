@@ -14,7 +14,7 @@
 
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -28,6 +28,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
+import { useActiveRegionId } from "../../../context/RegionContext";
 import { useTrips } from "../../../context/TripContext";
 import { db } from "../../../firebaseConfig";
 import { TripStop } from "../../../types/trip";
@@ -48,6 +49,7 @@ interface WineryRow {
 export default function CreateTripScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const regionId = useActiveRegionId();
   const { createTrip } = useTrips();
 
   const [wineries, setWineries] = useState<WineryRow[]>([]);
@@ -59,7 +61,11 @@ export default function CreateTripScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const snap = await getDocs(collection(db, "wineries"));
+        const q = query(
+          collection(db, "wineries"),
+          where("regionId", "==", regionId)
+        );
+        const snap = await getDocs(q);
         const rows: WineryRow[] = snap.docs
           .map((d) => {
             const data = d.data() as any;
@@ -87,7 +93,7 @@ export default function CreateTripScreen() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [regionId]);
 
   const wineryById = useMemo(() => {
     const m = new Map<string, WineryRow>();

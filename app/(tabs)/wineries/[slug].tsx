@@ -35,9 +35,9 @@ import Animated, {
 } from "react-native-reanimated";
 import Carousel from "react-native-reanimated-carousel";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { REGION_NAME, REGION_NAME_UPPER } from "../../../constants/region";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
 import { useAuth } from "../../../context/AuthContext";
+import { useRegionConfig } from "../../../context/RegionContext";
 import { db } from "../../../firebaseConfig";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -147,6 +147,7 @@ export default function WineryDetailsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const region = useRegionConfig();
   const [winery, setWinery] = useState<WineryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -235,7 +236,7 @@ export default function WineryDetailsScreen() {
       } else {
         await setDoc(savedRef, {
           name:      winery.name,
-          region:    REGION_NAME,
+          region:    region.displayName,
           rating:    winery.rating ?? 0,
           distance:  "",
           image:     winery.images[0] ?? "",
@@ -309,7 +310,7 @@ export default function WineryDetailsScreen() {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Check out ${winery.name} — a winery in ${REGION_NAME}!`,
+        message: `Check out ${winery.name} — a winery in ${region.displayName}!`,
         url: winery.website || "",
       });
     } catch (e) {
@@ -436,7 +437,7 @@ export default function WineryDetailsScreen() {
           {/* Winery name + region overlaid on hero */}
           <View style={styles.heroContent}>
             <Text style={styles.heroRegion}>
-              {REGION_NAME_UPPER} · Estate
+              {region.displayNameUpper} · Estate
             </Text>
             <Text style={styles.heroTitle}>{winery.name}</Text>
             {winery.rating != null && (
@@ -506,7 +507,7 @@ export default function WineryDetailsScreen() {
               typeof winery.longitude === "number" &&
               Number.isFinite(winery.latitude) &&
               Number.isFinite(winery.longitude);
-            const locationLabel = winery.region || REGION_NAME;
+            const locationLabel = winery.region || region.displayName;
             const Wrapper: React.ComponentType<any> = hasCoords ? Pressable : View;
             return (
               <Wrapper

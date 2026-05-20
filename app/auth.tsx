@@ -29,7 +29,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth } from "../firebaseConfig";
-import { REGION_NAME_UPPER } from "../constants/region";
+import { useRegionConfig } from "../context/RegionContext";
 import { colors, fonts } from "../constants/theme";
 
 // ─── Friendly error messages ──────────────────────────────────────────────────
@@ -63,6 +63,7 @@ function friendlyError(code: string): string {
 export default function AuthScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const region = useRegionConfig();
 
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
@@ -106,7 +107,7 @@ export default function AuthScreen() {
 
         {/* ── Header ──────────────────────────────────────────────────── */}
         <View style={styles.header}>
-          <Text style={styles.region}>{REGION_NAME_UPPER}</Text>
+          <Text style={styles.region}>{region.displayNameUpper}</Text>
           <Text style={styles.title}>Winery Guide</Text>
           <Text style={styles.subtitle}>
             {isSignUp ? "Create your account" : "Sign in to your account"}

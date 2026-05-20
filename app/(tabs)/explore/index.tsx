@@ -16,8 +16,10 @@ import {
   limit,
   orderBy,
   query,
+  where,
 } from "firebase/firestore";
 import { useEffect, useState } from "react";
+import { useActiveRegionId } from "../../../context/RegionContext";
 import {
   ActivityIndicator,
   Pressable,
@@ -57,6 +59,7 @@ type ArticleEntry = {
 export default function ExploreScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const regionId = useActiveRegionId();
 
   const [pour, setPour] = useState<FeaturedPour | null>(null);
   const [loadingPour, setLoadingPour] = useState(true);
@@ -70,6 +73,7 @@ export default function ExploreScreen() {
       try {
         const q = query(
           collection(db, "explore_articles"),
+          where("regionId", "==", regionId),
           orderBy("order", "asc")
         );
         const snap = await getDocs(q);
@@ -85,7 +89,7 @@ export default function ExploreScreen() {
     })();
 
     return () => { cancelled = true; };
-  }, []);
+  }, [regionId]);
 
   // Fetch latest active Pour issue
   useEffect(() => {
@@ -95,6 +99,7 @@ export default function ExploreScreen() {
       try {
         const q = query(
           collection(db, "pour_articles"),
+          where("regionId", "==", regionId),
           orderBy("issueNumber", "desc"),
           limit(10)
         );
@@ -122,7 +127,7 @@ export default function ExploreScreen() {
     })();
 
     return () => { cancelled = true; };
-  }, []);
+  }, [regionId]);
 
   return (
     <ScrollView

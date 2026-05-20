@@ -4,7 +4,7 @@
 
 import { Ionicons } from "@expo/vector-icons";
 import { Link, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -24,8 +24,8 @@ import MapView from "react-native-map-clustering";
 import { Callout, Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MAP_STYLE } from "../../../constants/mapStyle";
-import { REGION_NAME_UPPER } from "../../../constants/region";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
+import { useActiveRegionId, useRegionConfig } from "../../../context/RegionContext";
 import { useSaved } from "../../../context/SavedContext";
 import { db } from "../../../firebaseConfig";
 
@@ -98,27 +98,9 @@ const RATING_OPTIONS = [
   { label: "4.5+", value: 4.5 },
 ];
 
-const REGION_OPTIONS: string[] = [
-  "Coal River Valley",
-  "Tamar Valley",
-  "Derwent Valley",
-  "Pipers River",
-  "East Coast",
-  "Huon Valley",
-  "North West",
-];
-
-// Tasmania extents (approx):
-//   lat   -40.6 (north)  →  -43.65 (south)   span ~3.05°
-//   lng  144.6 (west)    →  148.4  (east)    span ~3.8°
-// We center slightly south of the geographic mid-point and use generous
-// deltas so the whole island fits with breathing room on every aspect ratio.
-const TASMANIA_REGION = {
-  latitude: -42.2,
-  longitude: 146.8,
-  latitudeDelta: 5.0,
-  longitudeDelta: 4.5,
-};
+// REGION_OPTIONS and TASMANIA_REGION used to be hardcoded here. They now
+// come from the active region's config doc (region.subRegions + region.mapBounds).
+// See constants/region.ts → regions/{regionId} migration.
 
 // ─── Haversine distance ───────────────────────────────────────────────────────
 function distanceKm(
@@ -150,6 +132,13 @@ export default function WineriesScreen() {
     t?: string;
   }>();
   const insets = useSafeAreaInsets();
+  const regionId = useActiveRegionId();
+  const region = useRegionConfig();
+  // Derive sub-region names + map bounds from the active region config.
+  // When subRegions is empty (flat region), regionOptions === [] and the
+  // chip row will be hidden below.
+  const regionOptions = (region.subRegions ?? []).map((s) => s.name);
+  const mapBounds = region.mapBounds;
 
   const { isSaved, toggle: toggleSaved } = useSaved();
 
@@ -260,11 +249,15 @@ export default function WineriesScreen() {
     }, [params.search, params.filter, params.sort, params.t, ensureUserLocation])
   );
 
-  // Fetch all wineries once
+  // Fetch all wineries in the active region once
   useEffect(() => {
     (async () => {
       try {
-        const snapshot = await getDocs(collection(db, "wineries"));
+        const q = query(
+          collection(db, "wineries"),
+          where("regionId", "==", regionId)
+        );
+        const snapshot = await getDocs(q);
         const data = snapshot.docs
           .map((d) => ({ id: d.id, ...(d.data() as Omit<Winery, "id">) }))
           .sort((a, b) => a.name.localeCompare(b.name));
@@ -284,7 +277,7 @@ export default function WineriesScreen() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [regionId]);
 
   const toggleFilter = (key: keyof Winery) => {
     setActiveFilters((prev) => {
@@ -466,7 +459,7 @@ export default function WineriesScreen() {
                 </View>
               )}
 
-              <Text style={styles.cardRegion}>{REGION_NAME_UPPER}</Text>
+              <Text style={styles.cardRegion}>{region.displayNameUpper}</Text>
               <Text style={styles.cardName} numberOfLines={2}>
                 {item.name}
               </Text>
@@ -661,7 +654,7 @@ export default function WineriesScreen() {
 
       {/* ── Header ────────────────────────────────────────────────────────────── */}
       <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
-        <Text style={styles.headerKicker}>{REGION_NAME_UPPER}</Text>
+        <Text style={styles.headerKicker}>{region.displayNameUpper}</Text>
         <Text style={styles.headerTitle}>Our Wineries</Text>
       </View>
 
@@ -784,38 +777,41 @@ export default function WineriesScreen() {
                     )}
                   </View>
 
-                  {/* ── Region ────────────────────────────────────────── */}
-                  <View style={styles.categoryBlock}>
-                    <Text style={styles.categoryLabel}>REGION</Text>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.chipsRow}
-                    >
-                      {REGION_OPTIONS.map((region) => {
-                        const active = selectedRegions.has(region);
-                        return (
-                          <Pressable
-                            key={region}
-                            style={[
-                              styles.regionChip,
-                              active && styles.regionChipActive,
-                            ]}
-                            onPress={() => toggleRegion(region)}
-                          >
-                            <Text
+                  {/* ── Sub-region chips (only for regions that HAVE
+                       sub-regions; hidden entirely for flat regions). */}
+                  {regionOptions.length > 0 && (
+                    <View style={styles.categoryBlock}>
+                      <Text style={styles.categoryLabel}>REGION</Text>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.chipsRow}
+                      >
+                        {regionOptions.map((subRegion) => {
+                          const active = selectedRegions.has(subRegion);
+                          return (
+                            <Pressable
+                              key={subRegion}
                               style={[
-                                styles.regionChipText,
-                                active && styles.regionChipTextActive,
+                                styles.regionChip,
+                                active && styles.regionChipActive,
                               ]}
+                              onPress={() => toggleRegion(subRegion)}
                             >
-                              {region}
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
-                    </ScrollView>
-                  </View>
+                              <Text
+                                style={[
+                                  styles.regionChipText,
+                                  active && styles.regionChipTextActive,
+                                ]}
+                              >
+                                {subRegion}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
+                  )}
 
                   {/* ── Features (boolean chips) ──────────────────────── */}
                   <View style={styles.categoryBlock}>
@@ -907,7 +903,7 @@ export default function WineriesScreen() {
             style={styles.map}
             provider={PROVIDER_GOOGLE}
             customMapStyle={MAP_STYLE}
-            initialRegion={TASMANIA_REGION}
+            initialRegion={mapBounds}
             showsUserLocation
             showsMyLocationButton
             clusterColor={colors.accent}

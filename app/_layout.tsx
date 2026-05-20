@@ -25,8 +25,10 @@ import {
   Roboto_500Medium,
 } from "@expo-google-fonts/roboto";
 
+import { RegionGate } from "../components/RegionGate";
 import { fonts } from "../constants/theme";
 import { AuthProvider } from "../context/AuthContext";
+import { RegionProvider } from "../context/RegionContext";
 import { SavedProvider } from "../context/SavedContext";
 import { TripProvider } from "../context/TripContext";
 
@@ -81,26 +83,42 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <SavedProvider>
-        <TripProvider>
-          {/* Light status-bar text — the dark theme uses near-black surfaces
-              throughout, so the OS status bar (clock, signal, battery) needs
-              to render in light glyphs to remain legible. */}
-          <StatusBar style="light" />
-          <Stack>
-            {/* Main tab navigator */}
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            {/* Auth screen — presented full-screen, no header */}
-            <Stack.Screen name="auth" options={{ headerShown: false }} />
-            {/* Active-trip experience — full-screen modal route */}
-            <Stack.Screen
-              name="trip-active"
-              options={{ headerShown: false, presentation: "modal" }}
-            />
-          </Stack>
-        </TripProvider>
-      </SavedProvider>
-    </AuthProvider>
+    // RegionProvider is outermost — every other provider may need to read
+    // the active region (Auth potentially syncs users/{uid}.activeRegionId;
+    // Saved/Trip may surface region-scoped data later). RegionGate blocks
+    // the Stack from rendering until the region is settled, so children
+    // can freely call useRegionConfig() without null-checking.
+    <RegionProvider>
+      <AuthProvider>
+        <SavedProvider>
+          <TripProvider>
+            {/* Light status-bar text — the dark theme uses near-black surfaces
+                throughout, so the OS status bar (clock, signal, battery) needs
+                to render in light glyphs to remain legible. */}
+            <StatusBar style="light" />
+            <RegionGate>
+              <Stack>
+                {/* Main tab navigator */}
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                {/* Auth screen — presented full-screen, no header */}
+                <Stack.Screen name="auth" options={{ headerShown: false }} />
+                {/* Active-trip experience — full-screen modal route */}
+                <Stack.Screen
+                  name="trip-active"
+                  options={{ headerShown: false, presentation: "modal" }}
+                />
+                {/* Region picker — full-screen modal-style route. Reached
+                    via Redirect from RegionGate when no region is selected
+                    AND there are 2+ regions to choose from. */}
+                <Stack.Screen
+                  name="region-picker"
+                  options={{ headerShown: false }}
+                />
+              </Stack>
+            </RegionGate>
+          </TripProvider>
+        </SavedProvider>
+      </AuthProvider>
+    </RegionProvider>
   );
 }
