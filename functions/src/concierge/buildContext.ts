@@ -379,17 +379,29 @@ export function renderWorldIndex(wineries: WineryDoc[]): string {
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
- * Load every winery from Firestore once per cold start. The orchestrator
- * (index.ts) holds the result in module-level memo so warm invocations
- * skip the Firestore round-trip entirely.
+ * Load every winery in the given region from Firestore once per cold
+ * start per region. The orchestrator holds the result in a module-level
+ * Map<regionId, …> so warm invocations skip the Firestore round-trip
+ * entirely.
  *
  * Uses firebase-admin (NOT the client SDK). Admin reads bypass security
  * rules — fine, because the wineries collection is public-read anyway,
  * and the function runs in a trusted server environment.
+ *
+ * Multi-region: the filter `where("regionId","==",regionId)` requires
+ * every winery document to have a `regionId` field. Phase 1 backfilled
+ * `regionId: "tasmania"` onto every existing wineries doc, so today
+ * every read returns the full Tasmanian corpus. When a second region
+ * is added, that region's wineries will be returned independently.
  */
-export async function loadContext(): Promise<{ wineries: WineryDoc[] }> {
+export async function loadContext(
+  regionId: string
+): Promise<{ wineries: WineryDoc[] }> {
   const db = getFirestore();
-  const snap = await db.collection("wineries").get();
+  const snap = await db
+    .collection("wineries")
+    .where("regionId", "==", regionId)
+    .get();
   const wineries: WineryDoc[] = snap.docs.map((d) => ({
     ...(d.data() as Omit<WineryDoc, "id">),
     id: d.id,

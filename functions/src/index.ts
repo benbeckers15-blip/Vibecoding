@@ -125,7 +125,8 @@ export const testEmbed = onRequest(
 //       { "role": "user",      "content": "..." },
 //       { "role": "assistant", "content": "..." }
 //     ],
-//     "userLocation": { "latitude": -42.88, "longitude": 147.32 } | null
+//     "userLocation": { "latitude": -42.88, "longitude": 147.32 } | null,
+//     "regionId": "tasmania"  // optional — defaults to "tasmania" if absent
 //   }
 //
 // Response: text/event-stream with three event types:
@@ -135,11 +136,19 @@ export const testEmbed = onRequest(
 //
 // The client appends delta.text into the active assistant bubble as each
 // chunk arrives, then resyncs from done.history when the stream ends.
+//
+// Multi-region: `regionId` is optional during the Phase 2/3 transition.
+// When missing it defaults to "tasmania" so the current client (which
+// doesn't send the field yet) keeps working. Phase 3 wires the client
+// to send the active region from RegionContext explicitly.
+
+const DEFAULT_REGION_ID = "tasmania";
 
 interface ConciergeRequest {
   message?: unknown;
   history?: unknown;
   userLocation?: unknown;
+  regionId?: unknown;
 }
 
 function validateRequest(body: ConciergeRequest): {
@@ -147,6 +156,7 @@ function validateRequest(body: ConciergeRequest): {
   message: string;
   history: import("./concierge/orchestrator").ChatMessage[];
   userLocation: { latitude: number; longitude: number } | null;
+  regionId: string;
 } | { ok: false; error: string } {
   if (!body || typeof body !== "object") {
     return { ok: false, error: "Body must be a JSON object." };
@@ -193,7 +203,20 @@ function validateRequest(body: ConciergeRequest): {
     }
     userLocation = { latitude: loc.latitude, longitude: loc.longitude };
   }
-  return { ok: true, message: body.message, history, userLocation };
+  // regionId — optional, falls back to DEFAULT_REGION_ID for back-compat
+  // with clients that haven't been updated to send it yet. Loose
+  // validation: a non-empty string, lowercase kebab-case style.
+  let regionId: string = DEFAULT_REGION_ID;
+  if (body.regionId !== undefined && body.regionId !== null) {
+    if (typeof body.regionId !== "string" || body.regionId.trim().length === 0) {
+      return { ok: false, error: "`regionId` must be a non-empty string." };
+    }
+    if (!/^[a-z0-9-]+$/.test(body.regionId)) {
+      return { ok: false, error: "`regionId` must be lowercase kebab-case." };
+    }
+    regionId = body.regionId;
+  }
+  return { ok: true, message: body.message, history, userLocation, regionId };
 }
 
 // Bounded per-IP rate limiter. Cheap, in-process map keyed by remote IP.
@@ -323,6 +346,7 @@ export const concierge = onRequest(
         validation.message,
         validation.history,
         validation.userLocation,
+        validation.regionId,
         (delta) => send("delta", { text: delta }),
       );
       send("done", result);

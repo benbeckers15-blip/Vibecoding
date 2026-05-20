@@ -1,16 +1,20 @@
 // functions/src/concierge/router.ts
 // ─────────────────────────────────────────────────────────────────────────────
-// Server-side port of services/concierge/router.ts.
+// The cheap classifier turn — a small model call that reads the user's
+// question and emits a structured `RouteDecision` (intent + filters)
+// the orchestrator uses to retrieve the right wineries.
 //
-// CHANGES FROM THE CLIENT VERSION:
-//   • Env: EXPO_PUBLIC_OPENAI_ROUTER_MODEL → OPENAI_ROUTER_MODEL
-//   • Diagnostics: React Native's `__DEV__` global → NODE_ENV check
-//   • All routing logic, the tool definition, the system prompt, every
-//     example, and the normalisation pipeline are unchanged.
+// MULTI-REGION REFACTOR (Phase 2):
+//   The list of valid `regions` (sub-region enum in the tool schema +
+//   the post-call validator) now comes from the per-region RegionConfig
+//   passed in by the caller. The router gracefully handles flat regions
+//   by dropping the `regions` field from the tool schema entirely when
+//   `subRegions` is empty.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import OpenAI from "openai";
 import type { RawUsage } from "./costTracker";
+import { subRegionNames, type RegionConfig } from "./regionConfig";
 
 const IS_DEV = process.env.NODE_ENV !== "production";
 
@@ -18,15 +22,6 @@ const ROUTER_MODEL =
   process.env.OPENAI_ROUTER_MODEL || "gpt-5.4-mini";
 
 const ROUTER_MAX_TOKENS = 256;
-
-export const KNOWN_REGIONS = [
-  "Tamar Valley",
-  "Pipers River",
-  "East Coast",
-  "Coal River Valley",
-  "Derwent Valley",
-  "Huon Valley",
-] as const;
 
 export const KNOWN_TAGS = [
   "dog-friendly",
@@ -90,119 +85,144 @@ const DEFAULT_DECISION: RouteDecision = {
   limit: 12,
 };
 
-const ROUTE_TOOL = {
-  type: "function" as const,
-  function: {
-    name: "route_query",
-    description:
-      "Classify the user's wine-tourism question and extract filters " +
-      "that can be applied to a list of Tasmanian wineries. Always call " +
-      "this tool exactly once per turn.",
-    parameters: {
-      type: "object" as const,
-      properties: {
-        intent: {
-          type: "string",
-          enum: [
-            "specific_winery",
-            "regional",
-            "feature",
-            "itinerary",
-            "general",
-            "out_of_scope",
-          ],
-          description:
-            "Coarse intent. Use 'specific_winery' when the user names " +
-            "one or more wineries. Use 'itinerary' when they want a day " +
-            "or trip planned. Use 'out_of_scope' only for questions " +
-            "unrelated to Tasmanian wine tourism.",
-        },
-        regions: {
-          type: "array",
-          items: {
-            type: "string",
-            enum: KNOWN_REGIONS as unknown as string[],
-          },
-          description:
-            "Tasmanian sub-regions the user mentioned or strongly " +
-            "implied. Empty array if no region was specified.",
-        },
-        tags: {
-          type: "array",
-          items: {
-            type: "string",
-            enum: KNOWN_TAGS as unknown as string[],
-          },
-          description:
-            "Feature tags the user cares about. 'dog-friendly' if they " +
-            "mentioned dogs/pets; 'restaurant' for food/lunch/dinner; " +
-            "'walk-ins' for spontaneous visits; 'organic' or " +
-            "'biodynamic' if those are mentioned; 'award-winning' when " +
-            "the user explicitly asks for award-winning / decorated / " +
-            "Halliday-rated / show-winning producers; 'tours' when the " +
-            "user wants a guided tour, vineyard walk, behind-the-scenes " +
-            "experience, or anything beyond a tasting-only visit.",
-        },
-        nameKeywords: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Lowercase fragments of winery names the user asked about. " +
-            "Include only when the user actually mentioned a winery by " +
-            "name. Single words or short phrases — e.g. ['tolpuddle'], " +
-            "['domaine', 'a'] for Domaine A.",
-        },
-        dayOfWeek: {
-          type: "string",
-          enum: [...DAYS_OF_WEEK, "none"],
-          description:
-            "Three-letter day abbreviation if the user asked about a " +
-            "specific day (e.g. 'Sun' for Sunday). 'none' otherwise.",
-        },
-        retrieveDescriptions: {
-          type: "boolean",
-          description:
-            "Set TRUE when the user wants rich editorial prose about a " +
-            "winery — vibe queries ('intimate', 'with a view', 'first-" +
-            "date'), 'tell me about <winery>', anniversary / special-" +
-            "occasion framing, or anything the structured tags can't " +
-            "capture. Set FALSE for routine filter queries ('open " +
-            "Tuesday', 'dog-friendly', 'Coal River Valley wineries') — " +
-            "the world index + structured rows are enough.",
-        },
-        retrieveTastingNotes: {
-          type: "boolean",
-          description:
-            "Set TRUE whenever the user mentions a specific wine, " +
-            "varietal, vintage, or style — chardonnay, pinot, sparkling, " +
-            "skin-contact, '2018', single-vineyard, etc. Also set TRUE " +
-            "when the user asks what a winery's wines are actually like. " +
-            "Set FALSE when no wine-specific terms are mentioned.",
-        },
-        wineKeywords: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Lowercase fragments describing wines the user mentioned: " +
-            "varietals, styles, vintages. Examples: ['chardonnay'], " +
-            "['skin-contact', 'riesling'], ['2018'], ['sparkling']. " +
-            "Empty array if no wine-specific terms appear. Only consulted " +
-            "when retrieveTastingNotes is true.",
-        },
-      },
-      required: [
-        "intent",
-        "regions",
-        "tags",
-        "nameKeywords",
-        "dayOfWeek",
-        "retrieveDescriptions",
-        "retrieveTastingNotes",
-        "wineKeywords",
+/**
+ * Build the tool schema for the router call. Per-region because the
+ * `regions` field's enum (and required-ness) depends on whether the
+ * active region has sub-regions.
+ *
+ * For a flat region (no sub-regions), the `regions` field is omitted
+ * entirely — there's nothing for the model to populate, and including
+ * it as an empty enum would just confuse the call.
+ */
+function buildRouteTool(region: RegionConfig) {
+  const regionNames = subRegionNames(region);
+  const hasSubRegions = regionNames.length > 0;
+
+  const baseProperties: Record<string, unknown> = {
+    intent: {
+      type: "string",
+      enum: [
+        "specific_winery",
+        "regional",
+        "feature",
+        "itinerary",
+        "general",
+        "out_of_scope",
       ],
+      description:
+        `Coarse intent. Use 'specific_winery' when the user names ` +
+        `one or more wineries. Use 'itinerary' when they want a day ` +
+        `or trip planned. Use 'out_of_scope' only for questions ` +
+        `unrelated to ${region.displayName} wine tourism.`,
     },
-  },
-};
+  };
+
+  if (hasSubRegions) {
+    baseProperties.regions = {
+      type: "array",
+      items: {
+        type: "string",
+        enum: regionNames,
+      },
+      description:
+        `${region.displayName} sub-regions the user mentioned or strongly ` +
+        `implied. Empty array if no region was specified.`,
+    };
+  }
+
+  const properties: Record<string, unknown> = {
+    ...baseProperties,
+    tags: {
+      type: "array",
+      items: {
+        type: "string",
+        enum: KNOWN_TAGS as unknown as string[],
+      },
+      description:
+        "Feature tags the user cares about. 'dog-friendly' if they " +
+        "mentioned dogs/pets; 'restaurant' for food/lunch/dinner; " +
+        "'walk-ins' for spontaneous visits; 'organic' or " +
+        "'biodynamic' if those are mentioned; 'award-winning' when " +
+        "the user explicitly asks for award-winning / decorated / " +
+        "Halliday-rated / show-winning producers; 'tours' when the " +
+        "user wants a guided tour, vineyard walk, behind-the-scenes " +
+        "experience, or anything beyond a tasting-only visit.",
+    },
+    nameKeywords: {
+      type: "array",
+      items: { type: "string" },
+      description:
+        "Lowercase fragments of winery names the user asked about. " +
+        "Include only when the user actually mentioned a winery by " +
+        "name. Single words or short phrases — e.g. ['tolpuddle'], " +
+        "['domaine', 'a'] for Domaine A.",
+    },
+    dayOfWeek: {
+      type: "string",
+      enum: [...DAYS_OF_WEEK, "none"],
+      description:
+        "Three-letter day abbreviation if the user asked about a " +
+        "specific day (e.g. 'Sun' for Sunday). 'none' otherwise.",
+    },
+    retrieveDescriptions: {
+      type: "boolean",
+      description:
+        "Set TRUE when the user wants rich editorial prose about a " +
+        "winery — vibe queries ('intimate', 'with a view', 'first-" +
+        "date'), 'tell me about <winery>', anniversary / special-" +
+        "occasion framing, or anything the structured tags can't " +
+        "capture. Set FALSE for routine filter queries ('open " +
+        "Tuesday', 'dog-friendly', 'Coal River Valley wineries') — " +
+        "the world index + structured rows are enough.",
+    },
+    retrieveTastingNotes: {
+      type: "boolean",
+      description:
+        "Set TRUE whenever the user mentions a specific wine, " +
+        "varietal, vintage, or style — chardonnay, pinot, sparkling, " +
+        "skin-contact, '2018', single-vineyard, etc. Also set TRUE " +
+        "when the user asks what a winery's wines are actually like. " +
+        "Set FALSE when no wine-specific terms are mentioned.",
+    },
+    wineKeywords: {
+      type: "array",
+      items: { type: "string" },
+      description:
+        "Lowercase fragments describing wines the user mentioned: " +
+        "varietals, styles, vintages. Examples: ['chardonnay'], " +
+        "['skin-contact', 'riesling'], ['2018'], ['sparkling']. " +
+        "Empty array if no wine-specific terms appear. Only consulted " +
+        "when retrieveTastingNotes is true.",
+    },
+  };
+
+  const required: string[] = [
+    "intent",
+    ...(hasSubRegions ? ["regions"] : []),
+    "tags",
+    "nameKeywords",
+    "dayOfWeek",
+    "retrieveDescriptions",
+    "retrieveTastingNotes",
+    "wineKeywords",
+  ];
+
+  return {
+    type: "function" as const,
+    function: {
+      name: "route_query",
+      description:
+        `Classify the user's wine-tourism question and extract filters ` +
+        `that can be applied to a list of ${region.displayName} wineries. ` +
+        `Always call this tool exactly once per turn.`,
+      parameters: {
+        type: "object" as const,
+        properties,
+        required,
+      },
+    },
+  };
+}
 
 const ROUTER_SYSTEM_PROMPT = `You are the routing classifier for the
 SipLocal Sommelier — an in-app concierge that helps users plan visits
@@ -494,6 +514,10 @@ export interface RouteOptions {
   client: OpenAI;
   model?: string;
   worldIndex: string;
+  /** Active region's config. The router's tool schema is built per-region
+   *  (sub-region enum, description text) and the output is validated
+   *  against this region's sub-region names. */
+  region: RegionConfig;
 }
 
 export async function routeQuery(
@@ -502,13 +526,14 @@ export async function routeQuery(
 ): Promise<RouteResult> {
   const client = opts.client;
   const model = opts.model || ROUTER_MODEL;
+  const routeTool = buildRouteTool(opts.region);
 
   try {
     const response = await client.chat.completions.create({
       model,
       max_completion_tokens: ROUTER_MAX_TOKENS,
       tool_choice: { type: "function", function: { name: "route_query" } },
-      tools: [ROUTE_TOOL],
+      tools: [routeTool],
       messages: [
         {
           role: "system",
@@ -562,7 +587,7 @@ export async function routeQuery(
       return { decision: DEFAULT_DECISION, usage, model };
     }
 
-    return { decision: normaliseDecision(args), usage, model };
+    return { decision: normaliseDecision(args, opts.region), usage, model };
   } catch (err) {
     if (IS_DEV) {
       console.warn("[concierge] router fell back to default:", err);
@@ -581,13 +606,19 @@ function normaliseDecision(
     retrieveDescriptions: boolean;
     retrieveTastingNotes: boolean;
     wineKeywords: string[];
-  }>
+  }>,
+  region: RegionConfig
 ): RouteDecision {
   const intent: RouteIntent = (raw.intent as RouteIntent) || "general";
 
+  // Whitelist regions against THIS region's sub-region names — drops any
+  // hallucinated sub-region the model might emit. For a flat region
+  // (subRegions empty), the tool schema omits this field entirely, so
+  // raw.regions should be undefined; the filter still works.
+  const knownSubRegions = subRegionNames(region);
   const regions = (raw.regions || [])
     .map((r) => String(r).trim())
-    .filter((r) => (KNOWN_REGIONS as readonly string[]).includes(r));
+    .filter((r) => knownSubRegions.includes(r));
 
   const tags = (raw.tags || [])
     .map((t) => String(t).trim().toLowerCase())

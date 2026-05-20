@@ -1,25 +1,45 @@
 // functions/src/concierge/systemPrompt.ts
 // ─────────────────────────────────────────────────────────────────────────────
-// Server-side port of services/concierge/systemPrompt.ts.
-// NO LOGIC CHANGES from the client version — this module has no external
-// dependencies (no Firestore, no fetch, no env), so it copies verbatim.
-//
 // The SipLocal Sommelier's voice, scope, and guardrails. This block is
 // the *stable* part of every concierge call — it never changes within a
 // session. OpenAI's prompt cache is automatic: there's no explicit
 // `cache_control` knob, but content reused across requests is
 // transparently served at the discounted `cachedInput` rate on every
 // subsequent turn.
+//
+// MULTI-REGION REFACTOR (Phase 2):
+//   Three blocks are now per-region — BRAND_VOICE (one sentence varies),
+//   HARD_RULES (one paragraph about itinerary discipline varies), and
+//   REGIONAL_PRIMER (entirely from the region doc). Everything else
+//   (TASK_AND_SCOPE, HOURS_RULE, STYLE_NOTES, LENGTH_DISCIPLINE, FEW_SHOT,
+//   DATASET_FORMAT, TRIP_PROPOSAL_PROTOCOL, WINERY_CARD_PROTOCOL) stays
+//   constant. The constant tail is positioned AFTER the variable head so
+//   the prompt cache hit rate stays high — once a tail is cached, it's
+//   shared across every region the same warm container serves.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const BRAND_VOICE = `You are the SipLocal Sommelier — the in-app concierge for SipLocal, an
-editorial wine-tourism guide to Tasmania. You speak the way a thoughtful
+import type { RegionConfig } from "./regionConfig";
+
+// ─── Per-region BRAND_VOICE ──────────────────────────────────────────────────
+// The literal sentence about Tasmania is now a single placeholder
+// {{BRAND_VOICE_LINE}}. The region doc supplies the replacement, e.g.
+// "the in-app concierge for SipLocal, an editorial wine-tourism guide
+//  to Tasmania." for Tasmania, or the equivalent for Margaret River.
+
+const BRAND_VOICE_TEMPLATE = `You are the SipLocal Sommelier — {{BRAND_VOICE_LINE}} You speak the way a thoughtful
 sommelier would: warm, specific, never showy, never preachy. You write
 in flowing prose with the occasional confident recommendation. You do
 not use bullet points unless the user explicitly asks for a list. You
 never use emoji. Match SipLocal's editorial register — think
 long-form magazine, not chatbot. Sentences are tight; adjectives earn
 their place.`;
+
+function buildBrandVoice(region: RegionConfig): string {
+  return BRAND_VOICE_TEMPLATE.replace(
+    "{{BRAND_VOICE_LINE}}",
+    region.brandVoiceLine
+  );
+}
 
 const TASK_AND_SCOPE = `Your role is to be a curious, knowledgeable companion for anyone
 interested in Tasmanian wine — travellers, locals, and the merely
@@ -302,18 +322,10 @@ That gives you three stops, two glasses each, and enough daylight to
 get back to Hobart in time for dinner. One of you should be the
 designated driver — tastings stack up fast."`;
 
-const REGIONAL_PRIMER = `## Regional primer
-
-- Tamar Valley (north, near Launceston): cool-climate sparkling, pinot, riesling, chardonnay. Easy to do as a day from Launceston.
-- Pipers River (northeast of Launceston): premium sparkling country (Jansz, House of Arras).
-- East Coast (Bicheno, Swansea, Freycinet): scenic, often paired with Freycinet National Park; pinot and pinot gris dominate.
-- Coal River Valley (~25 min east of Hobart): warmest sub-region; chardonnay, pinot, riesling, cab franc.
-- Derwent Valley (~30-45 min northwest of Hobart): cool, elegant pinot and chardonnay; smaller cellar doors.
-- Huon Valley (~45 min south of Hobart): cool, often pinot and aromatic whites; Channel views.
-
-Typical drive times: Hobart↔Launceston is ~2.5 hours direct. Hobart↔Coal River 25 min. Launceston↔Pipers River 35 min. Launceston↔Tamar Valley cellar doors 20-45 min.
-
-Cruise-ship traffic lands in Hobart — Coal River Valley is the realistic option for a ship-day visit (under 6 hours round-trip).`;
+// REGIONAL_PRIMER used to be a hardcoded Tasmanian block here. It now
+// comes from `region.regionalPrimer` (loaded from regions/{regionId}).
+// See scripts/seed-region-tasmania.js for the exact Tasmanian text now
+// stored in Firestore — bit-for-bit identical to what this constant held.
 
 const DATASET_FORMAT = `## Dataset row formats
 
@@ -477,17 +489,34 @@ Rules:
 
 /**
  * Build the cached system prompt for the concierge call.
+ *
+ * Per-region content is spliced in at two points:
+ *   • BRAND_VOICE — one sentence substitution (region.brandVoiceLine).
+ *   • REGIONAL_PRIMER — the entire block comes from region.regionalPrimer.
+ *
+ * Everything else is constant. The variable head and constant tail are
+ * positioned so that, within a single region, the entire prompt prefix
+ * is cache-stable across turns.
+ *
+ * NOTE: HARD_RULES still contains some Tasmania-flavored wording (the
+ * itinerary-discipline paragraph, references to "the island", "Tasmanian
+ * producer"). Acceptable for the Tasmania-only state we ship today. When
+ * a second region is added, that block becomes region-templated too
+ * (see docs/multi-region-refactor-plan.md §4b for the staged approach).
  */
-export function buildSystemPrompt(worldIndex: string): string {
+export function buildSystemPrompt(
+  worldIndex: string,
+  region: RegionConfig
+): string {
   return [
-    BRAND_VOICE,
+    buildBrandVoice(region),
     TASK_AND_SCOPE,
     HARD_RULES,
     HOURS_RULE,
     STYLE_NOTES,
     LENGTH_DISCIPLINE,
     FEW_SHOT,
-    REGIONAL_PRIMER,
+    region.regionalPrimer,
     DATASET_FORMAT,
     TRIP_PROPOSAL_PROTOCOL,
     WINERY_CARD_PROTOCOL,

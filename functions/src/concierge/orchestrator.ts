@@ -50,6 +50,12 @@ import { routeQuery, type RouteDecision } from "./router";
 import { sortByDriveTime } from "./driveTimes";
 import { buildSystemPrompt } from "./systemPrompt";
 import {
+  buildAdjacencyMap,
+  buildCentroidList,
+  getRegionConfig,
+  type RegionConfig,
+} from "./regionConfig";
+import {
   TRIP_PLAN_OPEN,
   WINERY_CARD_OPEN,
   WINERY_CARD_PREFIX_LOWER,
@@ -97,6 +103,12 @@ export interface AskResult {
 
 // ─── Module-level singletons ────────────────────────────────────────────────
 // Cloud Functions warm starts share these across requests.
+//
+// Multi-region: the context cache is now keyed by regionId. A warm
+// container that has served Tasmania once won't pay the Firestore
+// round-trip on subsequent Tasmania requests; if it later serves a
+// different region, that region's corpus loads on first request and
+// then stays warm too.
 
 interface ConciergeContext {
   wineries: WineryDoc[];
@@ -104,15 +116,16 @@ interface ConciergeContext {
   worldIndex: string;
 }
 
-let _contextPromise: Promise<ConciergeContext> | null = null;
+const _contextByRegion = new Map<string, Promise<ConciergeContext>>();
 let _openai: OpenAI | null = null;
 
-async function getContext(): Promise<ConciergeContext> {
+async function getContext(regionId: string): Promise<ConciergeContext> {
   // Memoise the IN-FLIGHT promise (not just the result) so two concurrent
   // requests on a cold container share a single Firestore round-trip.
-  if (!_contextPromise) {
-    _contextPromise = (async () => {
-      const { wineries } = await loadContext();
+  let p = _contextByRegion.get(regionId);
+  if (!p) {
+    p = (async () => {
+      const { wineries } = await loadContext(regionId);
       const bySlug = new Map<string, WineryDoc>();
       for (const w of wineries) {
         bySlug.set(w.slug || w.id, w);
@@ -121,11 +134,12 @@ async function getContext(): Promise<ConciergeContext> {
       return { wineries, bySlug, worldIndex };
     })();
     // If the load fails, clear the cache so the next request can retry.
-    _contextPromise.catch(() => {
-      _contextPromise = null;
+    p.catch(() => {
+      _contextByRegion.delete(regionId);
     });
+    _contextByRegion.set(regionId, p);
   }
-  return _contextPromise;
+  return p;
 }
 
 function getOpenAI(): OpenAI {
@@ -181,24 +195,9 @@ function renderDetailBlock(candidates: WineryDoc[]): string {
   return candidates.map(compactWinery).join("\n");
 }
 
-const ADJACENT_REGIONS: Record<string, readonly string[]> = {
-  "Tamar Valley": ["Pipers River"],
-  "Pipers River": ["Tamar Valley"],
-  "Coal River Valley": ["Derwent Valley", "Huon Valley", "Huon Valley and Channel"],
-  "Derwent Valley": ["Coal River Valley", "Huon Valley", "Huon Valley and Channel"],
-  "Huon Valley": ["Coal River Valley", "Derwent Valley", "Huon Valley and Channel"],
-  "Huon Valley and Channel": ["Coal River Valley", "Derwent Valley", "Huon Valley"],
-};
-
-const REGION_CENTROIDS = [
-  { name: "Tamar Valley",       lat: -41.4, lon: 147.1 },
-  { name: "Pipers River",       lat: -41.1, lon: 147.3 },
-  { name: "East Coast",         lat: -42.2, lon: 148.0 },
-  { name: "Coal River Valley",  lat: -42.7, lon: 147.5 },
-  { name: "Derwent Valley",     lat: -42.6, lon: 147.0 },
-  { name: "Huon Valley",        lat: -43.0, lon: 146.9 },
-  { name: "North West",         lat: -41.3, lon: 146.0 },
-];
+// Adjacency map + centroid list used to live as hardcoded constants here.
+// They now derive from `RegionConfig.subRegions` per request (cheap — just
+// map/filter calls over the loaded region doc). See regionConfig.ts.
 
 function haversineKm(
   lat1: number, lon1: number,
@@ -214,10 +213,20 @@ function haversineKm(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function nearestRegion(lat: number, lon: number): string {
-  let best = REGION_CENTROIDS[0];
+/**
+ * Map a user's GPS coordinates to the nearest sub-region centroid.
+ * Returns null for flat regions (no centroids) — the caller should
+ * fall back to a region-display-name string.
+ */
+function nearestRegion(
+  lat: number,
+  lon: number,
+  centroids: { name: string; lat: number; lon: number }[]
+): string | null {
+  if (centroids.length === 0) return null;
+  let best = centroids[0];
   let bestDist = haversineKm(lat, lon, best.lat, best.lon);
-  for (const c of REGION_CENTROIDS.slice(1)) {
+  for (const c of centroids.slice(1)) {
     const d = haversineKm(lat, lon, c.lat, c.lon);
     if (d < bestDist) { bestDist = d; best = c; }
   }
@@ -271,15 +280,26 @@ function buildTurnContent(
   wineryBlock: string,
   tastingNotesBlock: string,
   knowledgeBlock: string,
-  userLocation: { latitude: number; longitude: number } | null
+  userLocation: { latitude: number; longitude: number } | null,
+  regionConfig: RegionConfig,
+  centroids: { name: string; lat: number; lon: number }[]
 ): string {
   const today = DAY_NAMES[new Date().getDay()];
   const parts: string[] = [];
   parts.push(`<today>${today}</today>`);
   if (userLocation) {
-    const region = nearestRegion(userLocation.latitude, userLocation.longitude);
+    const subRegion = nearestRegion(
+      userLocation.latitude,
+      userLocation.longitude,
+      centroids
+    );
+    // For regions with sub-regions, anchor to the nearest one. For flat
+    // regions (no centroids), just name the region.
+    const locationDesc = subRegion
+      ? `near the ${subRegion} area of ${regionConfig.displayName}`
+      : `in ${regionConfig.displayName}`;
     parts.push(
-      `<user_location>User is currently near the ${region} area of Tasmania.</user_location>`
+      `<user_location>User is currently ${locationDesc}.</user_location>`
     );
   }
   if (wineryBlock) {
@@ -297,7 +317,8 @@ async function retrieveCandidates(
   userMessage: string,
   decision: RouteDecision,
   context: ConciergeContext,
-  userLocation: { latitude: number; longitude: number } | null
+  userLocation: { latitude: number; longitude: number } | null,
+  adjacencyMap: Record<string, readonly string[]>
 ): Promise<WineryDoc[]> {
   if (decision.intent === "out_of_scope" || decision.limit === 0) {
     return [];
@@ -362,7 +383,7 @@ async function retrieveCandidates(
     if (matchedRegions.size > 0) {
       const adjacentRegions = new Set<string>();
       for (const r of matchedRegions) {
-        for (const adj of ADJACENT_REGIONS[r] ?? []) {
+        for (const adj of adjacencyMap[r] ?? []) {
           if (!matchedRegions.has(adj)) adjacentRegions.add(adj);
         }
       }
@@ -516,12 +537,25 @@ export async function orchestrateTurn(
   userMessage: string,
   history: ChatMessage[],
   userLocation: { latitude: number; longitude: number } | null,
+  regionId: string,
   onDelta: (delta: string) => void,
   opts: OrchestrateOptions = {}
 ): Promise<AskResult> {
-  const context = await getContext();
+  // Load the region config first, in parallel with the winery context.
+  // Both are cached at module scope, so this is a no-op after the first
+  // call per region per warm container.
+  const [regionConfig, context] = await Promise.all([
+    getRegionConfig(regionId),
+    getContext(regionId),
+  ]);
   const client = getOpenAI();
   const model = opts.model || DEFAULT_MODEL;
+
+  // Derive adjacency + centroids from the region's sub-regions. Cheap
+  // (just shape transforms) so we do it per turn rather than caching.
+  // For flat regions, both come back empty and downstream paths no-op.
+  const adjacencyMap = buildAdjacencyMap(regionConfig);
+  const centroids = buildCentroidList(regionConfig);
 
   // 0. Resolve coreference.
   const resolveResult = await resolveCoreference(userMessage, {
@@ -534,12 +568,19 @@ export async function orchestrateTurn(
   const routeResult = await routeQuery(retrievalQuery, {
     client,
     worldIndex: context.worldIndex,
+    region: regionConfig,
   });
   const decision = routeResult.decision;
 
   // 2. Parallel retrieval.
   const [candidates, knowledgeChunks] = await Promise.all([
-    retrieveCandidates(retrievalQuery, decision, context, userLocation),
+    retrieveCandidates(
+      retrievalQuery,
+      decision,
+      context,
+      userLocation,
+      adjacencyMap
+    ),
     retrieveKnowledgeChunks(retrievalQuery),
   ]);
   const tastingNotes = await retrieveTastingNotesForTurn(
@@ -555,7 +596,10 @@ export async function orchestrateTurn(
 
   // 4. Compose messages.
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-    { role: "system", content: buildSystemPrompt(context.worldIndex) },
+    {
+      role: "system",
+      content: buildSystemPrompt(context.worldIndex, regionConfig),
+    },
   ];
   for (const m of history) {
     messages.push({ role: m.role, content: m.content });
@@ -570,7 +614,9 @@ export async function orchestrateTurn(
     contextBlock,
     tastingNotesBlock,
     knowledgeBlock,
-    locationForTurn
+    locationForTurn,
+    regionConfig,
+    centroids
   );
   messages.push({ role: "user", content: currentTurnContent });
 
