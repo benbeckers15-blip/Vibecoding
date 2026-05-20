@@ -52,6 +52,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Per-region config (display name, regional primer, sub-regions, picker
+    // prompts, map bounds). Read on every app launch by RegionContext and
+    // on every concierge cold-start per region. Owned by content team;
+    // writes only via Admin SDK (see scripts/seed-region-*.js).
+    match /regions/{regionId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // ── Per-user collections ─────────────────────────────────────────────────
     // Only the signed-in user may read or write their own document.
 
