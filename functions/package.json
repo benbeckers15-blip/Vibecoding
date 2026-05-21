@@ -19,6 +19,7 @@
     "@upstash/vector": "^1.2.3",
     "firebase-admin": "^13.7.0",
     "firebase-functions": "^6.4.0",
+    "langfuse": "^3.38.0",
     "openai": "^4.77.0",
     "voyageai": "^0.2.1"
   },

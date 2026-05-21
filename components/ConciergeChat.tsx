@@ -39,11 +39,13 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, fonts, radius, spacing, type } from "../constants/theme";
+import { useAuth } from "../context/AuthContext";
 import { useNetwork } from "../context/NetworkContext";
 import { useRegionConfig } from "../context/RegionContext";
 import { useTrips } from "../context/TripContext";
 import { getConcierge } from "../services/concierge/concierge";
 import { reportError } from "../utils/errorReporting";
+import { getOrCreateSessionId } from "../utils/sessionId";
 import type {
   ChatMessage,
   TripProposal,
@@ -72,6 +74,10 @@ export default function ConciergeChat({ visible, onClose }: ConciergeChatProps) 
   const regionConfig = useRegionConfig();
   const SUGGESTIONS = regionConfig.suggestedPrompts;
   const { isConnected } = useNetwork();
+  // Auth state — used purely to forward the Firebase UID to Langfuse
+  // when the user is signed in. Anonymous users still get a session,
+  // just without a `userId` attached.
+  const { user } = useAuth();
 
   const [messages, setMessages] = useState<ChatMessage[]>(concierge.getHistory());
   const [input, setInput] = useState("");
@@ -209,6 +215,38 @@ export default function ConciergeChat({ visible, onClose }: ConciergeChatProps) 
 
   // Tear down the ticker if the modal unmounts mid-stream.
   useEffect(() => stopFlusher, [stopFlusher]);
+
+  // Forward identity (anonymous sessionId + optional Firebase UID) to the
+  // concierge so every server request carries the two fields Langfuse
+  // groups by. Runs:
+  //   • Once on mount, to load the persistent sessionId from AsyncStorage.
+  //   • Whenever the auth state changes, to attach / detach the userId.
+  // Failures here are non-fatal — the concierge will just send the turn
+  // without a sessionId, which means Langfuse groups it under "no session"
+  // for that one call. We never want a missing identity to block chat.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const sessionId = await getOrCreateSessionId();
+        if (!cancelled) {
+          concierge.setIdentity({
+            sessionId,
+            userId: user?.uid ?? null,
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          // Still set the userId — better to have half the identity
+          // than none.
+          concierge.setIdentity({ userId: user?.uid ?? null });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [concierge, user?.uid]);
 
   // Lazy-init the concierge the first time the modal opens.
   useEffect(() => {

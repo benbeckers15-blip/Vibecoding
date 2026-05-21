@@ -13,21 +13,9 @@
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
 
-// ─── Tasmania sub-regions ────────────────────────────────────────────────────
-// Canonical list of Tasmanian sub-region strings used as the `region` field
-// on winery documents. Kept here as the single source of truth — keep in sync
-// if a new sub-region is added in Firestore.
-
-export const TASMANIA_REGIONS = [
-  "Tamar Valley",
-  "Pipers River",
-  "East Coast",
-  "Coal River Valley",
-  "Derwent Valley",
-  "Huon Valley",
-  "Huon Valley and Channel",
-  "North West",
-] as const;
+// Sub-region names are no longer hardcoded here. They live on the active
+// region's config (regions/{regionId}.subRegions[].name) and are read via
+// useRegionConfig() in the UI layer.
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

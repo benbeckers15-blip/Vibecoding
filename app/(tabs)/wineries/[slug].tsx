@@ -442,11 +442,8 @@ function WineryDetailsScreen() {
             </Animated.View>
           )}
 
-          {/* Winery name + region overlaid on hero */}
+          {/* Winery name + rating overlaid on hero */}
           <View style={styles.heroContent}>
-            <Text style={styles.heroRegion}>
-              {region.displayNameUpper} · Estate
-            </Text>
             <Text style={styles.heroTitle}>{winery.name}</Text>
             {winery.rating != null && (
               <View style={styles.heroRatingRow}>
@@ -818,12 +815,6 @@ const styles = StyleSheet.create({
     bottom: spacing.xxxl,                     // 32 — was 28
     left: spacing.xxl,
     right: spacing.xxl,
-  },
-  heroRegion: {
-    ...type.kicker,
-    letterSpacing: 2,
-    color: colors.accentSoft,
-    marginBottom: spacing.sm,
   },
   // Hero text sits over the photo's dark scrim — uses on-dark tokens.
   heroTitle: {

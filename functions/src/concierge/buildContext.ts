@@ -15,18 +15,9 @@
 
 import { getFirestore } from "firebase-admin/firestore";
 
-// ─── Tasmania sub-regions ────────────────────────────────────────────────────
-
-export const TASMANIA_REGIONS = [
-  "Tamar Valley",
-  "Pipers River",
-  "East Coast",
-  "Coal River Valley",
-  "Derwent Valley",
-  "Huon Valley",
-  "Huon Valley and Channel",
-  "North West",
-] as const;
+// Sub-region names are no longer hardcoded here. They live on the active
+// region's config (regions/{regionId}.subRegions[].name) and are exposed
+// through `subRegionNames(regionConfig)` in ./regionConfig.
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

@@ -22,6 +22,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import OpenAI from "openai";
+import { Langfuse } from "langfuse";
 import {
   compactWinery,
   loadContext,
@@ -73,7 +74,7 @@ const IS_DEV = process.env.NODE_ENV !== "production";
 // response leg; the resolver and router use their own model IDs (set in
 // their respective files).
 
-const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-5.4";
+const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-5.4-mini";
 const MAX_TOKENS = 550;
 const MAX_HISTORY_TURNS = 4;
 
@@ -118,6 +119,68 @@ interface ConciergeContext {
 
 const _contextByRegion = new Map<string, Promise<ConciergeContext>>();
 let _openai: OpenAI | null = null;
+
+// Langfuse client is OPTIONAL. If the LANGFUSE_* secrets aren't bound, this
+// returns null and every tracing call in orchestrateTurn is short-circuited
+// by optional chaining. The concierge keeps working — you just don't get
+// observability for those turns. That lets you deploy / run locally without
+// Langfuse configured.
+let _langfuse: Langfuse | null = null;
+let _langfuseChecked = false;
+
+function getLangfuse(): Langfuse | null {
+  if (_langfuseChecked) return _langfuse;
+  _langfuseChecked = true;
+  const publicKey = process.env.LANGFUSE_PUBLIC_KEY;
+  const secretKey = process.env.LANGFUSE_SECRET_KEY;
+  if (!publicKey || !secretKey) {
+    // Log unconditionally — Cloud Functions runs as production, so the
+    // previous IS_DEV gate hid this exact diagnostic in deployed traffic.
+    console.warn(
+      "[concierge] LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY not set — tracing disabled."
+    );
+    return null;
+  }
+  // Langfuse Cloud hosts:
+  //   • https://cloud.langfuse.com         → EU (the original/default host)
+  //   • https://us.cloud.langfuse.com      → US
+  // We default to EU because that matches the SDK's own default; override via
+  // the LANGFUSE_BASEURL secret if your project is on US or self-hosted.
+  const baseUrl = process.env.LANGFUSE_BASEURL || "https://cloud.langfuse.com";
+  // One-line boot log so the function log makes it obvious which Langfuse
+  // host this container is talking to (US vs EU vs self-hosted). Public
+  // key prefix only — secret key is never logged.
+  console.info(
+    `[concierge] Langfuse initialized → ${baseUrl} (pk: ${publicKey.slice(0, 10)}…)`
+  );
+  _langfuse = new Langfuse({
+    publicKey,
+    secretKey,
+    baseUrl,
+    // Flush quickly in the serverless model — we don't want events to sit
+    // in a buffer past the lifetime of a single Cloud Function invocation.
+    flushAt: 1,
+    flushInterval: 1000,
+    // Release tag = the Cloud Run revision name (e.g. "concierge-00007-pet").
+    // Cloud Run injects this as `K_REVISION` on every container, so a
+    // regression after a deploy can be traced back to the exact revision
+    // that introduced it. Override via LANGFUSE_RELEASE if you want to
+    // tag traces with a git SHA or a semver string instead.
+    release: process.env.LANGFUSE_RELEASE || process.env.K_REVISION || undefined,
+  });
+  // Permanent: surface SDK-level errors that flushAsync() otherwise
+  // swallows. The SDK logs internally at a level Cloud Run doesn't
+  // capture by default; this hook promotes any error event to a real
+  // stderr line so we see it in Cloud Logging. Auth failures (wrong
+  // secret key, key/project mismatch, expired key) show up here as
+  // 401s — without this listener the dashboard would silently look
+  // empty even though `flushAsync()` reports success, which is exactly
+  // how we got bitten the first time we set this up. Worth keeping.
+  _langfuse.on("error", (err) => {
+    console.error("[concierge] Langfuse SDK error event:", err);
+  });
+  return _langfuse;
+}
 
 async function getContext(regionId: string): Promise<ConciergeContext> {
   // Memoise the IN-FLIGHT promise (not just the result) so two concurrent
@@ -469,7 +532,8 @@ async function retrieveCandidates(
 async function retrieveTastingNotesForTurn(
   userMessage: string,
   decision: RouteDecision,
-  candidates: WineryDoc[]
+  candidates: WineryDoc[],
+  regionId: string
 ): Promise<TastingNoteHit[]> {
   if (!decision.retrieval.tastingNotes) return [];
   if (candidates.length === 0) return [];
@@ -483,6 +547,7 @@ async function retrieveTastingNotesForTurn(
 
   try {
     return await retrieveTastingNotes(query, {
+      regionId,
       wineryIds,
       topK: decision.intent === "specific_winery" ? 8 : 4,
     });
@@ -498,10 +563,11 @@ async function retrieveTastingNotesForTurn(
 }
 
 async function retrieveKnowledgeChunks(
-  userMessage: string
+  userMessage: string,
+  regionId: string
 ): Promise<KnowledgeChunk[]> {
   try {
-    return await retrieveKnowledge(userMessage);
+    return await retrieveKnowledge(userMessage, { regionId });
   } catch (err) {
     if (IS_DEV) {
       console.warn("[concierge] knowledge retrieval failed:", err);
@@ -539,8 +605,49 @@ export async function orchestrateTurn(
   userLocation: { latitude: number; longitude: number } | null,
   regionId: string,
   onDelta: (delta: string) => void,
+  identity: { sessionId?: string; userId?: string } = {},
   opts: OrchestrateOptions = {}
 ): Promise<AskResult> {
+  // ── Langfuse tracing ─────────────────────────────────────────────────
+  // Open a single trace per concierge turn. Every sub-step (resolve,
+  // route, retrieval, response) is attached as a child generation/span,
+  // grouped under the same sessionId so an entire user conversation
+  // shows up as one thread in the Langfuse dashboard.
+  //
+  // If Langfuse isn't configured (no env vars), `trace` is undefined
+  // and every `.generation()` / `.span()` call below short-circuits via
+  // optional chaining — the concierge keeps working with zero overhead.
+  const langfuse = getLangfuse();
+  // Environment tag follows Langfuse's recommended convention for filtering
+  // dashboards by deployment stage. Cloud Functions sets NODE_ENV=production
+  // at runtime, so deployed traffic gets `env:production` and the local
+  // emulator gets `env:development`.
+  const envTag = process.env.NODE_ENV === "production"
+    ? "env:production"
+    : "env:development";
+  const trace = langfuse?.trace({
+    name: "concierge.turn",
+    sessionId: identity.sessionId,
+    userId: identity.userId,
+    input: userMessage,
+    metadata: {
+      regionId,
+      historyTurns: history.length,
+      hasUserLocation: !!userLocation,
+    },
+    // Tags drive the dashboard's filterable views. We follow the skill's
+    // convention of `<facet>:<value>` so a single tag space stays readable.
+    // Add new tags here when you ship a new surface that calls this
+    // function (e.g. a Slack bot) — never as ad-hoc free strings.
+    tags: [
+      "feature:concierge",
+      envTag,
+      `region:${regionId}`,
+      identity.userId ? "signed-in" : "anonymous",
+    ],
+  });
+
+  try {
   // Load the region config first, in parallel with the winery context.
   // Both are cached at module scope, so this is a no-op after the first
   // call per region per warm container.
@@ -564,6 +671,24 @@ export async function orchestrateTurn(
   });
   const retrievalQuery = resolveResult.rewritten;
 
+  // Log the rewriter call (it's a cheap mini model call — only happens
+  // when there's history; otherwise resolveResult.usage is undefined).
+  if (resolveResult.usage) {
+    trace?.generation({
+      name: "resolve-coreference",
+      model: resolveResult.model,
+      input: userMessage,
+      output: retrievalQuery,
+      usage: {
+        input: resolveResult.usage.prompt_tokens,
+        output: resolveResult.usage.completion_tokens,
+        total:
+          (resolveResult.usage.prompt_tokens ?? 0) +
+          (resolveResult.usage.completion_tokens ?? 0),
+      },
+    });
+  }
+
   // 1. Route.
   const routeResult = await routeQuery(retrievalQuery, {
     client,
@@ -572,7 +697,30 @@ export async function orchestrateTurn(
   });
   const decision = routeResult.decision;
 
+  trace?.generation({
+    name: "router-classify",
+    model: routeResult.model,
+    input: retrievalQuery,
+    output: decision,
+    usage: routeResult.usage
+      ? {
+          input: routeResult.usage.prompt_tokens,
+          output: routeResult.usage.completion_tokens,
+          total:
+            (routeResult.usage.prompt_tokens ?? 0) +
+            (routeResult.usage.completion_tokens ?? 0),
+        }
+      : undefined,
+  });
+
   // 2. Parallel retrieval.
+  // Single parent span for the whole retrieval fan-out so the dashboard
+  // can show "how long did we spend hitting Voyage + Upstash + Firestore"
+  // as one number, broken down by child span.
+  const retrievalSpan = trace?.span({
+    name: "retrieval",
+    input: { query: retrievalQuery, decision },
+  });
   const [candidates, knowledgeChunks] = await Promise.all([
     retrieveCandidates(
       retrievalQuery,
@@ -581,18 +729,30 @@ export async function orchestrateTurn(
       userLocation,
       adjacencyMap
     ),
-    retrieveKnowledgeChunks(retrievalQuery),
+    retrieveKnowledgeChunks(retrievalQuery, regionId),
   ]);
   const tastingNotes = await retrieveTastingNotesForTurn(
     retrievalQuery,
     decision,
-    candidates
+    candidates,
+    regionId
   );
+  retrievalSpan?.end({
+    output: {
+      candidateCount: candidates.length,
+      candidateSlugs: candidates.map((c) => c.slug || c.id),
+      knowledgeChunkCount: knowledgeChunks.length,
+      tastingNoteCount: tastingNotes.length,
+    },
+  });
 
   // 3. Build per-turn payload.
   const contextBlock = renderDetailBlock(candidates);
   const tastingNotesBlock = formatTastingNotesForPrompt(tastingNotes);
-  const knowledgeBlock = formatKnowledgeChunksForPrompt(knowledgeChunks);
+  const knowledgeBlock = formatKnowledgeChunksForPrompt(
+    knowledgeChunks,
+    regionConfig.displayName
+  );
 
   // 4. Compose messages.
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
@@ -621,10 +781,25 @@ export async function orchestrateTurn(
   messages.push({ role: "user", content: currentTurnContent });
 
   // 5. Stream the response.
+  // The response generation is opened BEFORE the stream so we capture
+  // the start time, then closed with `.end()` after we have the final
+  // text + usage. Langfuse computes latency from the open/close gap.
+  const responseGen = trace?.generation({
+    name: "response",
+    model,
+    input: messages,
+    modelParameters: { maxTokens: MAX_TOKENS },
+  });
   const stream = client.beta.chat.completions.stream({
     model,
     max_completion_tokens: MAX_TOKENS,
     messages,
+    // OpenAI streaming responses omit `usage` by default — the final chunk
+    // doesn't carry token counts unless we explicitly opt in. Without this
+    // both the in-app cost monitor and the Langfuse `response` generation
+    // record zero tokens for the answer leg, which makes every cost number
+    // look wrong and breaks per-model cost aggregation in the dashboard.
+    stream_options: { include_usage: true },
   });
 
   // ── Streaming filter: hide TRIP_PLAN / WINERY_CARD blocks ──────────
@@ -728,6 +903,39 @@ export async function orchestrateTurn(
   });
   const cost = buildTurnCost(costEntries);
 
+  // Close out the response generation with the final reply + usage.
+  responseGen?.end({
+    output: reply,
+    usage: finalMessage.usage
+      ? {
+          input: finalMessage.usage.prompt_tokens,
+          output: finalMessage.usage.completion_tokens,
+          total: finalMessage.usage.total_tokens,
+        }
+      : undefined,
+  });
+
+  // Finalize the top-level trace. Setting `output` on the trace itself
+  // makes the dashboard's session view render the assistant reply as
+  // the headline for this turn (instead of "<no output>"). Metadata
+  // captures the headline numbers so they're filterable.
+  trace?.update({
+    output: reply,
+    metadata: {
+      regionId,
+      historyTurns: history.length,
+      hasUserLocation: !!userLocation,
+      candidateCount: candidates.length,
+      knowledgeChunkCount: knowledgeChunks.length,
+      tastingNoteCount: tastingNotes.length,
+      intent: decision.intent,
+      stopReason: finishReason,
+      totalCostUsd: cost.total.usd.total,
+      hasProposal: !!proposal,
+      hasWineryCards: !!wineryCards,
+    },
+  });
+
   return {
     reply,
     usage: finalMessage.usage,
@@ -739,4 +947,37 @@ export async function orchestrateTurn(
     wineryCards,
     history: trimmedHistory,
   };
+  } catch (err) {
+    // Record the failure on the trace so it shows up in the dashboard's
+    // error filter, then re-throw so the HTTP layer can return the
+    // `error` SSE event.
+    trace?.update({
+      output: null,
+      metadata: {
+        error: err instanceof Error ? err.message : String(err),
+      },
+      tags: ["error"],
+    });
+    throw err;
+  } finally {
+    // Always flush. Cloud Functions can be torn down between requests,
+    // so we can't rely on Langfuse's interval flusher — we have to push
+    // before returning. Best-effort: a Langfuse outage shouldn't break
+    // the concierge.
+    if (langfuse) {
+      try {
+        await langfuse.flushAsync();
+        // Confirms the trace reached Langfuse — log unconditionally because
+        // this is the line that tells you tracing is actually working in
+        // production. If you ever wonder "did my last turn get sent?",
+        // search the function log for this trace ID.
+        if (trace?.id) {
+          console.info(`[concierge] Langfuse trace flushed: ${trace.id}`);
+        }
+      } catch (flushErr) {
+        // ALWAYS log — this is the one place tracing can silently die.
+        console.warn("[concierge] Langfuse flush failed:", flushErr);
+      }
+    }
+  }
 }

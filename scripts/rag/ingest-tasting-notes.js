@@ -21,10 +21,17 @@
 //
 // USAGE
 //   node --env-file=.env scripts/rag/ingest-tasting-notes.js
+//   node --env-file=.env scripts/rag/ingest-tasting-notes.js --region tasmania
+//                                                              ← regionId tag (default: tasmania)
 //   node --env-file=.env scripts/rag/ingest-tasting-notes.js --limit 5   ← cap (debug)
 //   node --env-file=.env scripts/rag/ingest-tasting-notes.js --delay 250 ← ms between wines
 //   node --env-file=.env scripts/rag/ingest-tasting-notes.js --dry-run   ← parse only, no API
 //   node --env-file=.env scripts/rag/ingest-tasting-notes.js --force     ← re-embed every wine
+//
+// Multi-region note: every wine gets a `regionId` metadata field on its
+// Upstash vector. The retrieval code in functions/src/concierge/tastingNotes.ts
+// filters on regionId — wines without it will silently be excluded. Re-run
+// to backfill the metadata onto existing wines after a schema upgrade.
 // ────────────────────────────────────────────────────────────────────────────────
 
 'use strict';
@@ -47,6 +54,12 @@ const DELAY_MS = args.delay ?? 250;
 const LIMIT = args.limit ?? Infinity;
 const DRY_RUN = args.dryRun;
 const FORCE = args.force;
+const REGION_ID = args.region ?? 'tasmania';
+
+if (!/^[a-z0-9-]+$/.test(REGION_ID)) {
+  console.error(`Invalid --region "${REGION_ID}". Expected lowercase kebab-case (e.g. "tasmania", "margaret-river").`);
+  process.exit(1);
+}
 
 function parseArgs(argv) {
   const out = { dryRun: false, force: false };
@@ -56,6 +69,7 @@ function parseArgs(argv) {
     else if (a === '--force') out.force = true;
     else if (a === '--limit') out.limit = parseInt(argv[++i], 10);
     else if (a === '--delay') out.delay = parseInt(argv[++i], 10);
+    else if (a === '--region') out.region = String(argv[++i] || '').trim();
   }
   return out;
 }
@@ -125,6 +139,7 @@ function clampMeta(s, max = 2000) {
 (async function main() {
   const t0 = Date.now();
   console.log('🍷 SipLocal tasting-note ingestion');
+  console.log(`   region:   ${REGION_ID}`);
   console.log(`   dry-run:  ${DRY_RUN}`);
   console.log(`   force:    ${FORCE}`);
   console.log(`   delay:    ${DELAY_MS}ms`);
@@ -176,6 +191,9 @@ function clampMeta(s, max = 2000) {
         id: w.id,
         vector,
         metadata: {
+          // regionId is the partition key the retrieval filter in
+          // functions/src/concierge/tastingNotes.ts requires.
+          regionId: REGION_ID,
           wineId: w.id,
           wineryId: String(w.wineryId),
           name: clampMeta(w.name || '', 200),

@@ -19,7 +19,7 @@ A hyper-regional mobile tourism app focused on the **Tasmania** wine region of A
 | Framework | Expo SDK 54 with React Native 0.81, React 19 |
 | Language | TypeScript 5.9 — **strict mode ON** |
 | Router | Expo Router v6 — file-based routing (typed routes + React Compiler enabled) |
-| Database | Firebase Firestore v12 with persistent local cache |
+| Database | Firebase Firestore v12 (in-memory cache; persistent cache unavailable in RN — see firebaseConfig.js) |
 | Auth | Firebase Auth (email/password) with AsyncStorage persistence |
 | Storage | Firebase Cloud Storage |
 | Local persistence | `@react-native-async-storage/async-storage` (saved items, trips) |
@@ -51,8 +51,16 @@ A hyper-regional mobile tourism app focused on the **Tasmania** wine region of A
 │       ├── _layout.tsx             # Custom floating animated tab bar (4 visible tabs)
 │       ├── home/
 │       │   ├── _layout.tsx
-│       │   ├── index.tsx           # Home: hero, search, featured winery, "The Pour"
-│       │   └── pour.tsx            # "The Tassie Pour" editorial reader
+│       │   ├── index.tsx           # Home: hero, search, featured winery, "The Pour", "The Library"
+│       │   ├── pour.tsx            # "The Tassie Pour" editorial reader
+│       │   └── articles/           # "The Library" — editorial article pages (linked from home)
+│       │       ├── sommelier-recommendations.tsx
+│       │       ├── hidden-gems.tsx
+│       │       ├── vintage-reports.tsx
+│       │       ├── behind-the-cellar-door.tsx
+│       │       ├── pairings.tsx
+│       │       └── collections/
+│       │           └── [key].tsx   # Dynamic collection screen (filter by boolean tag)
 │       ├── trips/
 │       │   ├── _layout.tsx
 │       │   ├── index.tsx           # Trips hub: premade trips + my trips + CTA
@@ -70,6 +78,11 @@ A hyper-regional mobile tourism app focused on the **Tasmania** wine region of A
 │           └── index.tsx           # Hidden route (href: null) — preserved for inbound links
 ├── components/
 │   ├── ConciergeChat.tsx           # In-app sommelier chat UI
+│   ├── EmptyState.tsx              # Shared empty-state placeholder
+│   ├── ErrorScreen.tsx             # Shared error screen (retry CTA)
+│   ├── RegionGate.tsx              # Blocks rendering until active region loads
+│   ├── RootErrorBoundary.tsx       # Wraps the entire app tree
+│   ├── ScreenErrorBoundary.tsx     # Per-screen error boundary
 │   ├── SkeletonBox.tsx             # Animated loading placeholder
 │   └── articles/                   # Editorial-article rendering system
 │       ├── ArticleRenderer.tsx     # Layout dispatcher (switches on article.layout)
@@ -80,7 +93,6 @@ A hyper-regional mobile tourism app focused on the **Tasmania** wine region of A
 │       └── types.ts                # Article block types
 ├── constants/
 │   ├── theme.ts                    # SINGLE SOURCE OF TRUTH for colors/fonts/spacing/radii
-│   ├── region.ts                   # REGION_NAME / REGION_NAME_UPPER from EXPO_PUBLIC_REGION_NAME
 │   └── mapStyle.ts                 # Google Maps custom dark style JSON
 ├── context/
 │   ├── AuthContext.tsx             # Firebase auth state + auto-create users/{uid} doc
@@ -106,7 +118,7 @@ A hyper-regional mobile tourism app focused on the **Tasmania** wine region of A
 ├── scripts/                        # Node.js admin / data-pipeline scripts (see below)
 │   └── rag/                        # RAG ingest + retrieve subsystem (Voyage + Upstash)
 ├── assets/images/                  # App icon, splash, logos
-├── firebaseConfig.js               # Initializes app, auth, db (with persistent cache), storage
+├── firebaseConfig.js               # Initializes app, auth, db (memory cache), storage, functions
 ├── firestore.rules                 # Security rules (public read content, owner-only users/*)
 ├── firebase.json / .firebaserc     # Firebase CLI config
 ├── service-account-tasmania.json   # Admin SDK creds for scripts (DO NOT COMMIT)
@@ -210,7 +222,7 @@ A hyper-regional mobile tourism app focused on the **Tasmania** wine region of A
 
 **Config:** `firebaseConfig.js` — reads from `.env` via `EXPO_PUBLIC_` variables. Exports:
 - `auth` — Firebase Auth, persisted via `AsyncStorage` (`getReactNativePersistence`) so users stay signed in across restarts.
-- `db` — Firestore. Initialized with `experimentalForceLongPolling: true` (required for Expo + non-US regions) and `persistentLocalCache({ tabManager: persistentSingleTabManager() })`. Reads hit the cache first, then revalidate in the background; the cache survives app restarts.
+- `db` — Firestore. Initialized with `experimentalForceLongPolling: true` (required for Expo + non-US regions). Cache is **in-memory only** — the Firebase JS SDK's `persistentLocalCache` uses IndexedDB, which doesn't exist in React Native, so the persistent cache config silently degrades to memory and emits a boot-time warning. Reads are still cached within a single app session, but the cache is lost on cold restart. For true offline persistence we would need to migrate to `@react-native-firebase/firestore` (native modules).
 - `storage` — Firebase Cloud Storage.
 
 **Firestore Collections (current):**

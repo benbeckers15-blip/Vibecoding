@@ -77,15 +77,29 @@ export interface KnowledgeChunk {
 }
 
 export interface KnowledgeRetrieveOptions {
+  /**
+   * REQUIRED. Scopes the search to chunks ingested for this region — the
+   * `regionId` metadata field on each Upstash vector. Chunks ingested before
+   * the multi-region migration won't carry this field and so won't match;
+   * re-run `scripts/rag/ingest.js --force` to backfill the metadata before
+   * deploying retrieval code that includes this filter.
+   */
+  regionId: string;
   topK?: number;
   minScore?: number;
+  /** Sub-regions (e.g. "Tamar Valley"). Not the same as regionId. */
   regions?: string[];
   seasons?: string[];
   type?: string;
 }
 
-function buildFilter(opts: KnowledgeRetrieveOptions): string | undefined {
+function buildFilter(opts: KnowledgeRetrieveOptions): string {
   const clauses: string[] = [];
+
+  // Region scope is non-optional. A missing regionId would let Tasmanian
+  // chunks leak into a Margaret River query (and vice versa once a second
+  // region is ingested).
+  clauses.push(`regionId = '${opts.regionId.replace(/'/g, "''")}'`);
 
   if (opts.regions && opts.regions.length > 0) {
     const ors = opts.regions
@@ -105,7 +119,6 @@ function buildFilter(opts: KnowledgeRetrieveOptions): string | undefined {
     clauses.push(`type = '${opts.type.replace(/'/g, "''")}'`);
   }
 
-  if (clauses.length === 0) return undefined;
   return clauses.join(" AND ");
 }
 
@@ -131,7 +144,7 @@ async function hydrateChunks(
 
 export async function retrieveKnowledge(
   query: string,
-  opts: KnowledgeRetrieveOptions = {}
+  opts: KnowledgeRetrieveOptions
 ): Promise<KnowledgeChunk[]> {
   const topK = opts.topK ?? DEFAULT_TOP_K;
   const minScore = opts.minScore ?? DEFAULT_MIN_SCORE;
@@ -153,7 +166,7 @@ export async function retrieveKnowledge(
     vector,
     topK,
     includeMetadata: true,
-    ...(filter ? { filter } : {}),
+    filter,
   });
 
   const kept = hits.filter((h) => h.score >= minScore);
@@ -187,7 +200,10 @@ export async function retrieveKnowledge(
     .filter((c): c is KnowledgeChunk => c !== null);
 }
 
-export function formatKnowledgeChunksForPrompt(chunks: KnowledgeChunk[]): string {
+export function formatKnowledgeChunksForPrompt(
+  chunks: KnowledgeChunk[],
+  regionDisplayName: string
+): string {
   if (chunks.length === 0) return "";
   const blocks = chunks.map((c, i) => {
     const section = c.headingPath.length
@@ -201,7 +217,7 @@ export function formatKnowledgeChunksForPrompt(chunks: KnowledgeChunk[]): string
   });
   return [
     "<knowledge_base>",
-    "The following prose excerpts come from the SipLocal Tasmania",
+    `The following prose excerpts come from the SipLocal ${regionDisplayName}`,
     "knowledge base. Treat them as authoritative regional background.",
     "Quote or paraphrase as useful; do not invent details not present here.",
     "",

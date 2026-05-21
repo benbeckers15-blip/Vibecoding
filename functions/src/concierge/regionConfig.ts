@@ -61,6 +61,17 @@ export interface RegionConfig {
    *  ""        → omit the rule entirely.
    *  "<text>"  → use verbatim. */
   itineraryDisciplineRule?: string;
+  /** Demonym adjective (e.g. "Tasmanian"). Used in TASK_AND_SCOPE and
+   *  HARD_RULES wherever the prompt previously said "Tasmanian X".
+   *  Falls back to `displayName` when absent. */
+  regionAdjective?: string;
+  /** Geographic noun (e.g. "island", "valley", "region"). Used in
+   *  STYLE_NOTES and HARD_RULES wherever the prompt previously said
+   *  "the island". Falls back to "region" when absent. */
+  geographyNoun?: string;
+  /** Curated sub-region names to surface in STYLE_NOTES. Falls back to
+   *  `subRegions.map(s => s.name)`. Empty array → omit the bullet. */
+  promptSubRegions?: string[];
   schemaVersion: number;
 }
 

@@ -102,8 +102,8 @@ const RATING_OPTIONS = [
 ];
 
 // REGION_OPTIONS and TASMANIA_REGION used to be hardcoded here. They now
-// come from the active region's config doc (region.subRegions + region.mapBounds).
-// See constants/region.ts → regions/{regionId} migration.
+// come from the active region's config doc (region.subRegions + region.mapBounds),
+// loaded by RegionContext from `regions/{regionId}` in Firestore.
 
 // ─── Haversine distance ───────────────────────────────────────────────────────
 function distanceKm(
@@ -417,6 +417,19 @@ function WineriesScreen() {
   const renderCard = ({ item }: { item: Winery }) => {
     const hasImage = item.images && item.images.length > 0;
 
+    // TEMPORARY debug: dump the first image URL for every rendered winery
+    // so we can compare working vs broken heroes. Tag with [hero-debug] so
+    // it's easy to filter in Metro's terminal (Cmd-F "hero-debug").
+    // REMOVE once we've identified the URL pattern issue.
+    if (__DEV__) {
+      console.log(
+        "[hero-debug]",
+        item.name,
+        "→",
+        (item.images?.[0] || "(no image)").slice(0, 100)
+      );
+    }
+
     // Distance chip — only when Near Me is active AND winery has finite coords.
     // `typeof NaN === "number"` is true, so the looser check here would render
     // a "NaN km" distance chip on any winery whose lat/lng was stored as NaN.
@@ -497,7 +510,6 @@ function WineriesScreen() {
                 </View>
               )}
 
-              <Text style={styles.cardRegion}>{region.displayNameUpper}</Text>
               <Text style={styles.cardName} numberOfLines={2}>
                 {item.name}
               </Text>
@@ -764,7 +776,221 @@ function WineriesScreen() {
         </View>
       </View>
 
-      {/* ── List ──────────────────────────────────────────────────────────────── */}
+      {/*
+        ── Collapsible filter panel ──────────────────────────────────────
+        Hoisted OUT of the FlatList's ListHeaderComponent so it always
+        sits immediately beneath the search bar, regardless of how far
+        the user has scrolled. (Previously it lived inside the list
+        header, so opening filters while scrolled mid-list expanded the
+        header off-screen above and visibly shifted the list down
+        instead of revealing the panel.) Rendering it here also makes
+        the filter button work in map mode, where there is no FlatList
+        header to host it.
+      */}
+      {filtersOpen && (
+        <Animated.View
+          style={[
+            styles.filterPanel,
+            {
+              opacity: filtersAnim,
+              transform: [
+                {
+                  translateY: filtersAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-8, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          {/* ── Panel header + close button ────────────────────── */}
+          <View style={styles.filterHeader}>
+            <Text style={styles.filterHeaderLabel}>FILTERS</Text>
+            <Pressable
+              onPress={() => setFiltersOpen(false)}
+              style={styles.filterCloseBtn}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Close filters"
+            >
+              <Text style={styles.filterCloseText}>Close</Text>
+              <Ionicons name="chevron-up" size={15} color={colors.textSecondary} />
+            </Pressable>
+          </View>
+
+          {/* ── Sort By ───────────────────────────────────────── */}
+          <View style={styles.categoryBlock}>
+            <Text style={styles.categoryLabel}>SORT BY</Text>
+            <View style={styles.sortRow}>
+              {(["featured", "nearMe", "az"] as const).map((mode) => {
+                const sortLabel =
+                  mode === "featured"
+                    ? "Featured"
+                    : mode === "nearMe"
+                    ? "Near Me"
+                    : "A to Z";
+                return (
+                <Pressable
+                  key={mode}
+                  style={[styles.sortBtn, sortBy === mode && styles.sortBtnActive]}
+                  onPress={() => handleSortBy(mode)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Sort by ${sortLabel}`}
+                  accessibilityState={{ selected: sortBy === mode }}
+                >
+                  <Text
+                    style={[
+                      styles.sortBtnText,
+                      sortBy === mode && styles.sortBtnTextActive,
+                    ]}
+                  >
+                    {mode === "featured"
+                      ? "Featured"
+                      : mode === "nearMe"
+                      ? "Near Me"
+                      : "A–Z"}
+                  </Text>
+                </Pressable>
+                );
+              })}
+            </View>
+            {sortBy === "nearMe" && locationDenied && (
+              <Text style={styles.locationHint}>
+                Location access is off — enable it in Settings.
+              </Text>
+            )}
+            {sortBy === "nearMe" && !hasRefLoc && !locationDenied && (
+              <Text style={styles.locationHint}>
+                Fetching your location…
+              </Text>
+            )}
+          </View>
+
+          {/* ── Sub-region chips (only for regions that HAVE
+               sub-regions; hidden entirely for flat regions). */}
+          {regionOptions.length > 0 && (
+            <View style={styles.categoryBlock}>
+              <Text style={styles.categoryLabel}>REGION</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chipsRow}
+              >
+                {regionOptions.map((subRegion) => {
+                  const active = selectedRegions.has(subRegion);
+                  return (
+                    <Pressable
+                      key={subRegion}
+                      style={[
+                        styles.regionChip,
+                        active && styles.regionChipActive,
+                      ]}
+                      onPress={() => toggleRegion(subRegion)}
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        active
+                          ? `Remove region filter: ${subRegion}`
+                          : `Filter by region: ${subRegion}`
+                      }
+                      accessibilityState={{ selected: active }}
+                    >
+                      <Text
+                        style={[
+                          styles.regionChipText,
+                          active && styles.regionChipTextActive,
+                        ]}
+                      >
+                        {subRegion}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* ── Features (boolean chips) ──────────────────────── */}
+          <View style={styles.categoryBlock}>
+            <Text style={styles.categoryLabel}>FEATURES</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipsRow}
+            >
+              {BOOLEAN_FILTERS.map(({ key, label, icon }) => {
+                const active = activeFilters.has(key);
+                return (
+                  <Pressable
+                    key={String(key)}
+                    style={[styles.chip, active && styles.chipActive]}
+                    onPress={() => toggleFilter(key)}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      active
+                        ? `Remove filter: ${label}`
+                        : `Filter by ${label}`
+                    }
+                    accessibilityState={{ selected: active }}
+                  >
+                    <View style={styles.chipInner}>
+                      <Ionicons
+                        name={icon}
+                        size={13}
+                        color={active ? colors.onAccent : colors.textSecondary}
+                        style={styles.chipIcon}
+                      />
+                      <Text
+                        style={[
+                          styles.chipText,
+                          active && styles.chipTextActive,
+                        ]}
+                      >
+                        {label}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          {/* ── Rating ────────────────────────────────────────── */}
+          <View style={styles.categoryBlock}>
+            <Text style={styles.categoryLabel}>RATING</Text>
+            <View style={styles.ratingBtnsRow}>
+              {RATING_OPTIONS.map(({ label, value }) => (
+                <Pressable
+                  key={value}
+                  style={[
+                    styles.ratingBtn,
+                    minRating === value && styles.ratingBtnActive,
+                  ]}
+                  onPress={() => setMinRating(minRating === value ? 0 : value)}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    minRating === value
+                      ? `Remove minimum rating filter: ${label}`
+                      : `Filter by minimum rating: ${label}`
+                  }
+                  accessibilityState={{ selected: minRating === value }}
+                >
+                  <Text
+                    style={[
+                      styles.ratingBtnText,
+                      minRating === value && styles.ratingBtnTextActive,
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        </Animated.View>
+      )}
+
+      {/* ── List ──────────────────────────────────────────────────────────── */}
       {view === "list" && (
         <FlatList
           data={displayed}
@@ -773,216 +999,7 @@ function WineriesScreen() {
           contentContainerStyle={styles.listContent}
           renderItem={renderCard}
           ItemSeparatorComponent={() => <View style={styles.cardSep} />}
-          ListHeaderComponent={
-            <>
-              {/* ── Collapsible filter panel ──────────────────────────────── */}
-              {filtersOpen && (
-                <Animated.View
-                  style={[
-                    styles.filterPanel,
-                    {
-                      opacity: filtersAnim,
-                      transform: [
-                        {
-                          translateY: filtersAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [-8, 0],
-                          }),
-                        },
-                      ],
-                    },
-                  ]}
-                >
-                  {/* ── Panel header + close button ────────────────────── */}
-                  <View style={styles.filterHeader}>
-                    <Text style={styles.filterHeaderLabel}>FILTERS</Text>
-                    <Pressable
-                      onPress={() => setFiltersOpen(false)}
-                      style={styles.filterCloseBtn}
-                      hitSlop={10}
-                      accessibilityRole="button"
-                      accessibilityLabel="Close filters"
-                    >
-                      <Text style={styles.filterCloseText}>Close</Text>
-                      <Ionicons name="chevron-up" size={15} color={colors.textSecondary} />
-                    </Pressable>
-                  </View>
-
-                  {/* ── Sort By ───────────────────────────────────────── */}
-                  <View style={styles.categoryBlock}>
-                    <Text style={styles.categoryLabel}>SORT BY</Text>
-                    <View style={styles.sortRow}>
-                      {(["featured", "nearMe", "az"] as const).map((mode) => {
-                        const sortLabel =
-                          mode === "featured"
-                            ? "Featured"
-                            : mode === "nearMe"
-                            ? "Near Me"
-                            : "A to Z";
-                        return (
-                        <Pressable
-                          key={mode}
-                          style={[styles.sortBtn, sortBy === mode && styles.sortBtnActive]}
-                          onPress={() => handleSortBy(mode)}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Sort by ${sortLabel}`}
-                          accessibilityState={{ selected: sortBy === mode }}
-                        >
-                          <Text
-                            style={[
-                              styles.sortBtnText,
-                              sortBy === mode && styles.sortBtnTextActive,
-                            ]}
-                          >
-                            {mode === "featured"
-                              ? "Featured"
-                              : mode === "nearMe"
-                              ? "Near Me"
-                              : "A–Z"}
-                          </Text>
-                        </Pressable>
-                        );
-                      })}
-                    </View>
-                    {sortBy === "nearMe" && locationDenied && (
-                      <Text style={styles.locationHint}>
-                        Location access is off — enable it in Settings.
-                      </Text>
-                    )}
-                    {sortBy === "nearMe" && !hasRefLoc && !locationDenied && (
-                      <Text style={styles.locationHint}>
-                        Fetching your location…
-                      </Text>
-                    )}
-                  </View>
-
-                  {/* ── Sub-region chips (only for regions that HAVE
-                       sub-regions; hidden entirely for flat regions). */}
-                  {regionOptions.length > 0 && (
-                    <View style={styles.categoryBlock}>
-                      <Text style={styles.categoryLabel}>REGION</Text>
-                      <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.chipsRow}
-                      >
-                        {regionOptions.map((subRegion) => {
-                          const active = selectedRegions.has(subRegion);
-                          return (
-                            <Pressable
-                              key={subRegion}
-                              style={[
-                                styles.regionChip,
-                                active && styles.regionChipActive,
-                              ]}
-                              onPress={() => toggleRegion(subRegion)}
-                              accessibilityRole="button"
-                              accessibilityLabel={
-                                active
-                                  ? `Remove region filter: ${subRegion}`
-                                  : `Filter by region: ${subRegion}`
-                              }
-                              accessibilityState={{ selected: active }}
-                            >
-                              <Text
-                                style={[
-                                  styles.regionChipText,
-                                  active && styles.regionChipTextActive,
-                                ]}
-                              >
-                                {subRegion}
-                              </Text>
-                            </Pressable>
-                          );
-                        })}
-                      </ScrollView>
-                    </View>
-                  )}
-
-                  {/* ── Features (boolean chips) ──────────────────────── */}
-                  <View style={styles.categoryBlock}>
-                    <Text style={styles.categoryLabel}>FEATURES</Text>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.chipsRow}
-                    >
-                      {BOOLEAN_FILTERS.map(({ key, label, icon }) => {
-                        const active = activeFilters.has(key);
-                        return (
-                          <Pressable
-                            key={String(key)}
-                            style={[styles.chip, active && styles.chipActive]}
-                            onPress={() => toggleFilter(key)}
-                            accessibilityRole="button"
-                            accessibilityLabel={
-                              active
-                                ? `Remove filter: ${label}`
-                                : `Filter by ${label}`
-                            }
-                            accessibilityState={{ selected: active }}
-                          >
-                            <View style={styles.chipInner}>
-                              <Ionicons
-                                name={icon}
-                                size={13}
-                                color={active ? colors.onAccent : colors.textSecondary}
-                                style={styles.chipIcon}
-                              />
-                              <Text
-                                style={[
-                                  styles.chipText,
-                                  active && styles.chipTextActive,
-                                ]}
-                              >
-                                {label}
-                              </Text>
-                            </View>
-                          </Pressable>
-                        );
-                      })}
-                    </ScrollView>
-                  </View>
-
-                  {/* ── Rating ────────────────────────────────────────── */}
-                  <View style={styles.categoryBlock}>
-                    <Text style={styles.categoryLabel}>RATING</Text>
-                    <View style={styles.ratingBtnsRow}>
-                      {RATING_OPTIONS.map(({ label, value }) => (
-                        <Pressable
-                          key={value}
-                          style={[
-                            styles.ratingBtn,
-                            minRating === value && styles.ratingBtnActive,
-                          ]}
-                          onPress={() => setMinRating(minRating === value ? 0 : value)}
-                          accessibilityRole="button"
-                          accessibilityLabel={
-                            minRating === value
-                              ? `Remove minimum rating filter: ${label}`
-                              : `Filter by minimum rating: ${label}`
-                          }
-                          accessibilityState={{ selected: minRating === value }}
-                        >
-                          <Text
-                            style={[
-                              styles.ratingBtnText,
-                              minRating === value && styles.ratingBtnTextActive,
-                            ]}
-                          >
-                            {label}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  </View>
-                </Animated.View>
-              )}
-
-              {/* ── Results count + List/Map toggle ──────────────────── */}
-              {resultsRow}
-            </>
-          }
+          ListHeaderComponent={resultsRow}
           ListEmptyComponent={() => (
             <View style={styles.empty}>
               <Text style={styles.emptyLabel}>NO RESULTS</Text>
@@ -1150,9 +1167,30 @@ const styles = StyleSheet.create({
   },
 
   // ── Collapsible filter panel ────────────────────────────────────────────
+  // Lifted off the page bg so the panel reads as its own surface and the
+  // boundary between filters and list cards is obvious. Three things do
+  // the work:
+  //   1. `surface` bg — a half-step lighter than `background` so the eye
+  //      can see the panel as a discrete block, not bleed into the cards.
+  //   2. Bottom hairline — a hard edge where the panel ends. Without it
+  //      the surface color alone is too subtle to terminate cleanly.
+  //   3. Drop shadow — a soft cast under that hairline that "lifts" the
+  //      drawer and pushes the list visually beneath it.
+  //   4. Bottom padding — small inner gap so the last RATING row doesn't
+  //      sit flush against the hairline.
   filterPanel: {
+    backgroundColor: colors.surface,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
     marginTop: spacing.sm,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderStrong,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 6,
   },
 
   // ── Filter panel header ─────────────────────────────────────────────────
@@ -1465,12 +1503,6 @@ const styles = StyleSheet.create({
     borderLeftWidth: 2,
     borderLeftColor: colors.accent,
     paddingLeft: spacing.lg,
-  },
-  cardRegion: {
-    ...type.kicker,
-    letterSpacing: 1.8,
-    color: colors.textMuted,
-    marginBottom: spacing.xs,
   },
   cardName: {
     ...type.h3,

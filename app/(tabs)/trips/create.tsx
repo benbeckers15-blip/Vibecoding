@@ -29,7 +29,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
-import { useActiveRegionId } from "../../../context/RegionContext";
+import { useActiveRegionId, useRegionConfig } from "../../../context/RegionContext";
 import { useTrips } from "../../../context/TripContext";
 import { db } from "../../../firebaseConfig";
 import { TripStop } from "../../../types/trip";
@@ -51,6 +51,7 @@ function CreateTripScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const regionId = useActiveRegionId();
+  const region = useRegionConfig();
   const { createTrip } = useTrips();
 
   const [wineries, setWineries] = useState<WineryRow[]>([]);
@@ -182,7 +183,7 @@ function CreateTripScreen() {
         <Text style={styles.fieldLabel}>TRIP NAME</Text>
         <TextInput
           style={styles.nameInput}
-          placeholder="My Tasmanian Wine Tour"
+          placeholder={`My ${region.regionAdjective ?? region.displayName} Wine Tour`}
           placeholderTextColor={colors.textMuted}
           value={name}
           onChangeText={setName}

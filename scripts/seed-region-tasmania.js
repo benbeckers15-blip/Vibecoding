@@ -155,6 +155,31 @@ const tasmania = {
   // region. Flat regions added later will set their own value here.
   // itineraryDisciplineRule: undefined,
 
+  // Per-region splices for the cheap Tier 2 prompt blocks
+  // (TASK_AND_SCOPE, HARD_RULES easy mentions, STYLE_NOTES). The seed
+  // values reproduce the legacy hardcoded Tasmanian wording exactly:
+  //   "Tasmanian wine", "Tasmanian food", "real Tasmanian producer",
+  //   "Tasmanian travel concierge", "the island's history", "opposite
+  //   side of the island". Once Margaret River (or any second region)
+  //   is added, it sets its own values here and the same code path
+  //   renders the region-correct wording without any prompt-file edits.
+  regionAdjective: "Tasmanian",
+  geographyNoun: "island",
+
+  // Curated sub-region list for STYLE_NOTES' "Refer to regions by their
+  // proper names" bullet. Matches the legacy hardcoded list exactly —
+  // intentionally excludes "Huon Valley and Channel" (an alias of Huon
+  // Valley used on some winery docs) and "North West" (one isolated
+  // sub-region not surfaced in the Sommelier's conversational vocabulary).
+  promptSubRegions: [
+    "Tamar Valley",
+    "Pipers River",
+    "East Coast",
+    "Coal River Valley",
+    "Derwent Valley",
+    "Huon Valley",
+  ],
+
   // Optional editorial flourish for the home screen / picker. Tasmania
   // can use a region-tuned line; omit and the UI falls back to a generic.
   homeHeadline: "An editorial guide to Tasmanian wine.",

@@ -201,6 +201,15 @@ export class Concierge {
    *  Sent as `regionId` in every askStream() request and used to invalidate
    *  the cached corpus when the user switches region (see `setRegion`). */
   private regionId: string | null = null;
+  /** Persistent anonymous session identifier — generated once per install,
+   *  forwarded to the server so Langfuse can group an entire conversation
+   *  thread (across multiple modal opens) under the same session.
+   *  See utils/sessionId.ts for the mint/persist logic. */
+  private sessionId: string | null = null;
+  /** Firebase UID when the user is signed in, otherwise null. Lets
+   *  Langfuse link an anonymous session to an account once the user
+   *  signs up — both IDs are kept on every trace. */
+  private userId: string | null = null;
 
   /**
    * Load the winery corpus for the given region. Required ONLY so
@@ -264,6 +273,11 @@ export class Concierge {
       history: this.history,
       userLocation: this.userLocation,
       regionId: this.regionId,
+      // Identity fields for Langfuse trace grouping. Both optional on
+      // the server. `sessionId` is the device's persistent UUID;
+      // `userId` is the Firebase UID when signed in, otherwise omitted.
+      sessionId: this.sessionId || undefined,
+      userId: this.userId || undefined,
     };
 
     let result: AskResult | null = null;
@@ -305,6 +319,21 @@ export class Concierge {
   /** Store the user's GPS coordinates so the concierge can prioritise nearby wineries. */
   setUserLocation(loc: { latitude: number; longitude: number } | null): void {
     this.userLocation = loc;
+  }
+
+  /**
+   * Set the identity fields forwarded to the server for Langfuse tracing.
+   *
+   * Call once when the chat opens with the persistent sessionId, and
+   * again whenever the Firebase auth state changes so userId stays in
+   * sync. Either field can be null — anonymous turns keep working.
+   *
+   * Both IDs are echoed into every askStream() request body; nothing
+   * else uses them locally.
+   */
+  setIdentity(identity: { sessionId?: string | null; userId?: string | null }): void {
+    if (identity.sessionId !== undefined) this.sessionId = identity.sessionId;
+    if (identity.userId !== undefined) this.userId = identity.userId;
   }
 
   /** Clear the conversation; keep the loaded winery context. */

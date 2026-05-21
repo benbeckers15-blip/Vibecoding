@@ -31,8 +31,8 @@ import {
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import { fetchRoutePolyline, type LatLng } from "../../../utils/fetchRoutePolyline";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-// REGION_NAME_UPPER was sourced from constants/region.ts — now from the
-// active region config via useRegionConfig() (see imports below).
+// REGION_NAME_UPPER used to come from a constants/region.ts module —
+// it's now pulled from the active region config via useRegionConfig().
 import { MAP_STYLE } from "../../../constants/mapStyle";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
 import { useActiveRegionId, useRegionConfig } from "../../../context/RegionContext";
@@ -506,12 +506,17 @@ function TripDetailScreen() {
                 />
               )}
               {routeDisplayCoords.length > 1 && (
+                // strokeOpacity isn't on react-native-maps@1.20.1's Polyline
+                // type (it was on older versions). Bake the alpha into
+                // strokeColor instead — keeps the visual identical while
+                // letting tsc pass. colors.accentSoft is #9dd560 == rgb(157,213,96).
                 <Polyline
                   key="route-polyline"
                   coordinates={routeDisplayCoords}
-                  strokeColor={colors.accentSoft}
+                  strokeColor={
+                    usingRealRoute ? colors.accentSoft : "rgba(157,213,96,0.45)"
+                  }
                   strokeWidth={usingRealRoute ? 5 : 2}
-                  strokeOpacity={usingRealRoute ? 1 : 0.45}
                   zIndex={2}
                   geodesic
                 />

@@ -131,6 +131,28 @@ export interface RegionConfig {
    *  it inside HARD_RULES, which the model treats as more authoritative. */
   itineraryDisciplineRule?: string;
 
+  /** Demonym-style adjective for the region (e.g. "Tasmanian",
+   *  "Margaret River"). Spliced into the system prompt wherever the
+   *  Sommelier needs to say "Tasmanian wine", "Tasmanian food", "real
+   *  Tasmanian producer", etc. If absent, prompt builders fall back to
+   *  `displayName` (so "Tasmania wine" — grammatical but a bit flat). */
+  regionAdjective?: string;
+
+  /** Noun describing the region's geographic character (e.g. "island"
+   *  for Tasmania, "valley" for Margaret River, "region" as a safe
+   *  generic). Used in phrases like "opposite side of the island" and
+   *  "the island's history". Defaults to "region" when absent. */
+  geographyNoun?: string;
+
+  /** Curated list of sub-region names to surface in the system prompt's
+   *  STYLE_NOTES block ("Refer to regions by their proper names: …").
+   *  Optional — when absent, the prompt builder falls back to
+   *  `subRegions.map(s => s.name)`. Useful when `subRegions` contains
+   *  internal/edge labels (e.g. "Huon Valley and Channel", "North West")
+   *  that shouldn't be advertised to the model as conversational names.
+   *  Empty array → omit the bullet entirely (flat regions). */
+  promptSubRegions?: string[];
+
   /** Schema version. Bump when the shape changes so older clients can
    *  detect a mismatch and either upgrade or fall back gracefully. */
   schemaVersion: number;

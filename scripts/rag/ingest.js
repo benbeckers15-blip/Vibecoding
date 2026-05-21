@@ -20,12 +20,21 @@
 //
 // USAGE
 //   node --env-file=.env scripts/rag/ingest.js
+//   node --env-file=.env scripts/rag/ingest.js --region tasmania  ← regionId tag
+//                                                                   (default: tasmania)
 //   node --env-file=.env scripts/rag/ingest.js --limit 3       ← cap chunks (debug)
 //   node --env-file=.env scripts/rag/ingest.js --delay 500     ← ms between chunks
 //   node --env-file=.env scripts/rag/ingest.js --dry-run       ← parse + chunk only,
 //                                                                no API calls or writes
 //   node --env-file=.env scripts/rag/ingest.js --force         ← re-tag/re-embed even
 //                                                                if already ingested
+//
+// Multi-region note: every chunk gets a `regionId` metadata field on both the
+// Upstash vector and the Firestore knowledge_chunks doc. The retrieval code
+// (functions/src/concierge/knowledgeRetrieve.ts) filters on regionId — chunks
+// without it will silently be excluded. Re-run with --force after upgrading
+// from a pre-multi-region build to backfill the metadata onto existing
+// chunks.
 // ────────────────────────────────────────────────────────────────────────────────
 
 'use strict';
@@ -50,6 +59,12 @@ const DELAY_MS = args.delay ?? 250;
 const LIMIT = args.limit ?? Infinity;
 const DRY_RUN = args.dryRun;
 const FORCE = args.force;
+const REGION_ID = args.region ?? 'tasmania';
+
+if (!/^[a-z0-9-]+$/.test(REGION_ID)) {
+  console.error(`Invalid --region "${REGION_ID}". Expected lowercase kebab-case (e.g. "tasmania", "margaret-river").`);
+  process.exit(1);
+}
 
 function parseArgs(argv) {
   const out = { dryRun: false, force: false };
@@ -59,6 +74,7 @@ function parseArgs(argv) {
     else if (a === '--force') out.force = true;
     else if (a === '--limit')  out.limit = parseInt(argv[++i], 10);
     else if (a === '--delay')  out.delay = parseInt(argv[++i], 10);
+    else if (a === '--region') out.region = String(argv[++i] || '').trim();
   }
   return out;
 }
@@ -69,6 +85,7 @@ function parseArgs(argv) {
   const t0 = Date.now();
   console.log(`📚 SipLocal RAG ingestion`);
   console.log(`   content:  ${CONTENT_DIR}`);
+  console.log(`   region:   ${REGION_ID}`);
   console.log(`   dry-run:  ${DRY_RUN}`);
   console.log(`   force:    ${FORCE}`);
   console.log(`   delay:    ${DELAY_MS}ms`);
@@ -153,11 +170,16 @@ function parseArgs(argv) {
       // b. Voyage embedding (batch of 1 — keeping the pipeline simple)
       const [vector] = await embedDocuments([c.text]);
 
-      // c. Upstash upsert (lightweight metadata only)
+      // c. Upstash upsert (lightweight metadata only).
+      // regionId is the top-level partition key used by the retrieval
+      // filter in functions/src/concierge/knowledgeRetrieve.ts. Distinct
+      // from `regions`, which is the sub-region tag emitted by the
+      // Claude tagger.
       await upsertVectors([{
         id: c.id,
         vector,
         metadata: {
+          regionId:    REGION_ID,
           type:        meta.type,
           seasons:     meta.seasons,
           months:      meta.months,
@@ -171,6 +193,7 @@ function parseArgs(argv) {
       // d. Firestore full record
       await saveChunk({
         id: c.id,
+        regionId: REGION_ID,
         text: c.text,
         sourcePath: c.sourcePath,
         headingPath: c.headingPath,

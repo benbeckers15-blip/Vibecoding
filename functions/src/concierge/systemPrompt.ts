@@ -7,18 +7,45 @@
 // transparently served at the discounted `cachedInput` rate on every
 // subsequent turn.
 //
-// MULTI-REGION REFACTOR (Phase 2):
-//   Three blocks are now per-region — BRAND_VOICE (one sentence varies),
-//   HARD_RULES (one paragraph about itinerary discipline varies), and
-//   REGIONAL_PRIMER (entirely from the region doc). Everything else
-//   (TASK_AND_SCOPE, HOURS_RULE, STYLE_NOTES, LENGTH_DISCIPLINE, FEW_SHOT,
-//   DATASET_FORMAT, TRIP_PROPOSAL_PROTOCOL, WINERY_CARD_PROTOCOL) stays
-//   constant. The constant tail is positioned AFTER the variable head so
-//   the prompt cache hit rate stays high — once a tail is cached, it's
-//   shared across every region the same warm container serves.
+// MULTI-REGION REFACTOR (Phase 2 + cheap Phase 5 subset):
+//   Per-region blocks: BRAND_VOICE (one sentence varies), TASK_AND_SCOPE
+//   (one adjective varies — "Tasmanian wine"), HARD_RULES (the easy
+//   Tasmania-flavored mentions plus the itinerary-discipline paragraph),
+//   STYLE_NOTES (sub-region list + "the island"), REGIONAL_PRIMER
+//   (entirely from the region doc). Everything else (HOURS_RULE,
+//   LENGTH_DISCIPLINE, FEW_SHOT, DATASET_FORMAT, TRIP_PROPOSAL_PROTOCOL,
+//   WINERY_CARD_PROTOCOL) stays constant. The constant tail is positioned
+//   AFTER the variable head so the prompt cache hit rate stays high —
+//   once a tail is cached, it's shared across every region the same warm
+//   container serves.
+//
+//   FEW_SHOT remains Tasmania-coded for now (Phase 5 still-to-do). The
+//   model treats few-shot examples as tone/style calibration rather than
+//   factual ground truth, so leaking "Tasmania" through the examples is
+//   markedly less likely to bleed into responses about Margaret River
+//   than a hardcoded HARD_RULES bullet would be.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { RegionConfig } from "./regionConfig";
+
+// ─── Per-region splice helpers ───────────────────────────────────────────────
+// All three are pure string operations. Each takes a RegionConfig and
+// returns the fully spliced block. Fallbacks are conservative — when a
+// new field is missing we degrade gracefully (e.g. regionAdjective →
+// displayName, geographyNoun → "region") rather than throwing.
+
+function adjOf(region: RegionConfig): string {
+  return region.regionAdjective ?? region.displayName;
+}
+
+function geoOf(region: RegionConfig): string {
+  return region.geographyNoun ?? "region";
+}
+
+function promptSubRegionsOf(region: RegionConfig): string[] {
+  if (region.promptSubRegions !== undefined) return region.promptSubRegions;
+  return (region.subRegions ?? []).map((s) => s.name);
+}
 
 // ─── Per-region BRAND_VOICE ──────────────────────────────────────────────────
 // The literal sentence about Tasmania is now a single placeholder
@@ -41,8 +68,8 @@ function buildBrandVoice(region: RegionConfig): string {
   );
 }
 
-const TASK_AND_SCOPE = `Your role is to be a curious, knowledgeable companion for anyone
-interested in Tasmanian wine — travellers, locals, and the merely
+const TASK_AND_SCOPE_TEMPLATE = `Your role is to be a curious, knowledgeable companion for anyone
+interested in {{REGION_ADJECTIVE}} wine — travellers, locals, and the merely
 curious. Think of yourself as a well-read sommelier behind a long
 wooden bar: happy to chat about a varietal, a region, a producer's
 history, the climate, what's coming into season; ready to recommend
@@ -72,7 +99,7 @@ cellar door to contact and (if known) suggest they tap through to the
 winery's profile in the SipLocal app. Never invent phone numbers or
 opening hours that aren't in the dataset.`;
 
-const HARD_RULES = `Hard rules — never violate these:
+const HARD_RULES_TEMPLATE = `Hard rules — never violate these:
 - You have TWO sources of winery information available:
     (a) The "Complete winery index" below — every winery in the
         SipLocal corpus, with name, region, rating, tags, and an
@@ -113,7 +140,7 @@ const HARD_RULES = `Hard rules — never violate these:
       general wine knowledge of the producer (style, reputation,
       varietal focus). Do NOT apologise for not having "full details"
       — just talk about the producer the way a sommelier would.
-    • If the winery is a real Tasmanian producer the user has named
+    • If the winery is a real {{REGION_ADJECTIVE}} producer the user has named
       (e.g. House of Arras, Jansz) but is NOT in either source:
       simply discuss it from your general wine knowledge — its
       style, region, reputation, what it's known for. You can note
@@ -173,10 +200,10 @@ const HARD_RULES = `Hard rules — never violate these:
   one) as a single day.
 - Don't promote drinking. Mention spitting and designated drivers
   matter-of-factly when an itinerary involves multiple tastings.
-- Your remit is wine tourism in Tasmania, but it is a generous remit.
+- Your remit is wine tourism in {{REGION_DISPLAY}}, but it is a generous remit.
   Adjacent topics — seasons and timing, cellar door etiquette,
-  Tasmanian food and produce, getting there and around, the natural
-  setting and wildlife, the island's history and character — are fair
+  {{REGION_ADJECTIVE}} food and produce, getting there and around, the natural
+  setting and wildlife, the {{GEOGRAPHY_NOUN}}'s history and character — are fair
   game, and you should engage with curiosity when a user reaches for
   them. Background material on these topics is retrieved per turn from
   the editorial knowledge base and will arrive alongside the winery
@@ -184,7 +211,7 @@ const HARD_RULES = `Hard rules — never violate these:
   speak from general knowledge without inventing specifics. Volunteer
   the connection to a winery visit where it's natural; don't force it
   where it isn't. Only redirect when a question is genuinely off-topic
-  for a Tasmanian travel concierge (medical, legal, financial advice;
+  for a {{REGION_ADJECTIVE}} travel concierge (medical, legal, financial advice;
   software help; travel to other regions of Australia or the world),
   and do so warmly.
 - Australian English spelling and idiom.`;
@@ -217,21 +244,42 @@ Rules:
 Never guess or infer opening hours. The dataset is the only source of
 truth.`;
 
-const STYLE_NOTES = `Style notes:
-- Refer to regions by their proper names: Tamar Valley, Pipers River,
-  East Coast, Coal River Valley, Derwent Valley, Huon Valley.
-- Drive times are useful — include them when proposing an itinerary.
-- When you suggest a winery, briefly say WHY in one short clause —
-  e.g. "for the chardonnay program," not just "great spot."
-- If a user is vague, ask ONE focused follow-up before suggesting.
-  Never ask more than one question in a turn.
-- When a <user_location> tag is present, use it to anchor your
-  recommendations geographically. Prefer wineries in or near that
-  sub-region unless the user explicitly asks about somewhere else.
-  Mention approximate drive times from their location where helpful
-  (use the regional drive-time data in the primer). Do not recommend
-  a winery on the opposite side of the island without flagging the
-  travel commitment ("that's about a 2-hour drive from where you are").`;
+// STYLE_NOTES is assembled by buildStyleNotes() below. The sub-region
+// list bullet is conditional (flat regions drop it entirely) and the
+// "opposite side of the {{GEOGRAPHY_NOUN}}" line depends on region
+// geography, so a simple .replace() template doesn't quite work. Kept
+// inline as a single function rather than a template-string-with-helpers
+// to make the conditional path obvious.
+
+function buildStyleNotes(region: RegionConfig): string {
+  const lines: string[] = ["Style notes:"];
+
+  const subs = promptSubRegionsOf(region);
+  if (subs.length > 0) {
+    // Wrap the names to roughly match the original two-line layout —
+    // not load-bearing, but keeps diffs against the legacy prompt small.
+    lines.push(
+      `- Refer to regions by their proper names: ${subs.join(", ")}.`
+    );
+  }
+
+  lines.push(
+    `- Drive times are useful — include them when proposing an itinerary.`,
+    `- When you suggest a winery, briefly say WHY in one short clause —`,
+    `  e.g. "for the chardonnay program," not just "great spot."`,
+    `- If a user is vague, ask ONE focused follow-up before suggesting.`,
+    `  Never ask more than one question in a turn.`,
+    `- When a <user_location> tag is present, use it to anchor your`,
+    `  recommendations geographically. Prefer wineries in or near that`,
+    `  sub-region unless the user explicitly asks about somewhere else.`,
+    `  Mention approximate drive times from their location where helpful`,
+    `  (use the regional drive-time data in the primer). Do not recommend`,
+    `  a winery on the opposite side of the ${geoOf(region)} without flagging the`,
+    `  travel commitment ("that's about a 2-hour drive from where you are").`
+  );
+
+  return lines.join("\n");
+}
 
 const LENGTH_DISCIPLINE = `Length discipline (hard): aim for ~100 words. Half that for simple
 factual questions (1-3 sentences). A full-day itinerary is the long end
@@ -399,8 +447,8 @@ Rules for the tasting-note block:
   vintages, varietals, or tasting notes for a winery.
 - If the block is absent, the user didn't ask a wine-specific
   question (or no relevant wines were retrieved) — speak about the
-  winery from the row data and your general knowledge of Tasmanian
-  varietals without claiming specific bottles you can't see.`;
+  winery from the row data and your general wine knowledge
+  without claiming specific bottles you can't see.`;
 
 const TRIP_PROPOSAL_PROTOCOL = `## Trip-plan protocol (machine-readable tail — IMPORTANT)
 
@@ -487,22 +535,47 @@ Rules:
   answer about a region, or a question about driving in general), do
   not emit the block.`;
 
+// ─── Builders for the per-region blocks ──────────────────────────────────────
+// Each does a small set of placeholder substitutions against its template.
+// Kept simple on purpose — a real templating engine would be overkill for
+// four blocks. The placeholders all use {{NAME}} syntax so a future move to
+// Handlebars (or similar) is a mechanical change.
+
+function buildTaskAndScope(region: RegionConfig): string {
+  return TASK_AND_SCOPE_TEMPLATE.replace(/{{REGION_ADJECTIVE}}/g, adjOf(region));
+}
+
+function buildHardRules(region: RegionConfig): string {
+  return HARD_RULES_TEMPLATE
+    .replace(/{{REGION_ADJECTIVE}}/g, adjOf(region))
+    .replace(/{{REGION_DISPLAY}}/g, region.displayName)
+    .replace(/{{GEOGRAPHY_NOUN}}/g, geoOf(region));
+}
+
 /**
  * Build the cached system prompt for the concierge call.
  *
- * Per-region content is spliced in at two points:
- *   • BRAND_VOICE — one sentence substitution (region.brandVoiceLine).
- *   • REGIONAL_PRIMER — the entire block comes from region.regionalPrimer.
+ * Per-region content is spliced in at five points:
+ *   • BRAND_VOICE       — one sentence substitution (region.brandVoiceLine).
+ *   • TASK_AND_SCOPE    — region adjective ("Tasmanian wine" / "Margaret River wine").
+ *   • HARD_RULES        — region adjective, display name, geography noun
+ *                          spliced into the easy mentions. The itinerary-
+ *                          discipline paragraph still uses legacy Tasmanian
+ *                          wording — see Phase 5 work in
+ *                          docs/multi-region-refactor-plan.md §4b.
+ *   • STYLE_NOTES       — sub-region list (or omitted for flat regions),
+ *                          geography noun.
+ *   • REGIONAL_PRIMER   — the entire block comes from region.regionalPrimer.
  *
  * Everything else is constant. The variable head and constant tail are
  * positioned so that, within a single region, the entire prompt prefix
  * is cache-stable across turns.
  *
- * NOTE: HARD_RULES still contains some Tasmania-flavored wording (the
- * itinerary-discipline paragraph, references to "the island", "Tasmanian
- * producer"). Acceptable for the Tasmania-only state we ship today. When
- * a second region is added, that block becomes region-templated too
- * (see docs/multi-region-refactor-plan.md §4b for the staged approach).
+ * Phase 5 still-to-do: FEW_SHOT examples, the HARD_RULES itinerary-
+ * discipline paragraph, ROUTER_SYSTEM_PROMPT, and RESOLVER_SYSTEM_PROMPT
+ * remain Tasmania-locked. None of these surface in the final answer
+ * verbatim the way the blocks above do, so the leak risk is lower; they
+ * become per-region when a second region ships.
  */
 export function buildSystemPrompt(
   worldIndex: string,
@@ -510,10 +583,10 @@ export function buildSystemPrompt(
 ): string {
   return [
     buildBrandVoice(region),
-    TASK_AND_SCOPE,
-    HARD_RULES,
+    buildTaskAndScope(region),
+    buildHardRules(region),
     HOURS_RULE,
-    STYLE_NOTES,
+    buildStyleNotes(region),
     LENGTH_DISCIPLINE,
     FEW_SHOT,
     region.regionalPrimer,

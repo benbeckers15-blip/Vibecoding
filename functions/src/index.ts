@@ -149,6 +149,10 @@ interface ConciergeRequest {
   history?: unknown;
   userLocation?: unknown;
   regionId?: unknown;
+  // Identity fields used for Langfuse trace grouping. Both optional —
+  // anonymous users only send `sessionId`; signed-in users send both.
+  sessionId?: unknown;
+  userId?: unknown;
 }
 
 function validateRequest(body: ConciergeRequest): {
@@ -157,6 +161,8 @@ function validateRequest(body: ConciergeRequest): {
   history: import("./concierge/orchestrator").ChatMessage[];
   userLocation: { latitude: number; longitude: number } | null;
   regionId: string;
+  sessionId: string | undefined;
+  userId: string | undefined;
 } | { ok: false; error: string } {
   if (!body || typeof body !== "object") {
     return { ok: false, error: "Body must be a JSON object." };
@@ -216,7 +222,38 @@ function validateRequest(body: ConciergeRequest): {
     }
     regionId = body.regionId;
   }
-  return { ok: true, message: body.message, history, userLocation, regionId };
+  // sessionId / userId — both optional strings. We validate shape only; the
+  // client generates a UUID v4 for sessionId and forwards the Firebase UID
+  // (or omits the field) for userId.
+  let sessionId: string | undefined;
+  if (body.sessionId !== undefined && body.sessionId !== null) {
+    if (typeof body.sessionId !== "string" || body.sessionId.length === 0) {
+      return { ok: false, error: "`sessionId` must be a non-empty string when provided." };
+    }
+    if (body.sessionId.length > 128) {
+      return { ok: false, error: "`sessionId` is too long (max 128 chars)." };
+    }
+    sessionId = body.sessionId;
+  }
+  let userId: string | undefined;
+  if (body.userId !== undefined && body.userId !== null) {
+    if (typeof body.userId !== "string" || body.userId.length === 0) {
+      return { ok: false, error: "`userId` must be a non-empty string when provided." };
+    }
+    if (body.userId.length > 128) {
+      return { ok: false, error: "`userId` is too long (max 128 chars)." };
+    }
+    userId = body.userId;
+  }
+  return {
+    ok: true,
+    message: body.message,
+    history,
+    userLocation,
+    regionId,
+    sessionId,
+    userId,
+  };
 }
 
 // Bounded per-IP rate limiter. Cheap, in-process map keyed by remote IP.
@@ -248,12 +285,25 @@ export const concierge = onRequest(
     // enforceAppCheck: true,
 
     // Bind every secret the orchestrator's lazy clients read.
+    // LANGFUSE_* are optional — if not bound, the orchestrator just skips
+    // tracing rather than failing. That lets you deploy the function in
+    // environments where you don't want observability (e.g. local emulator
+    // without Langfuse keys) and still have the concierge work.
     secrets: [
       "OPENAI_API_KEY",
       "VOYAGE_API_KEY",
       "UPSTASH_VECTOR_URL",
       "UPSTASH_VECTOR_TOKEN",
       "GOOGLE_DIRECTIONS_API_KEY",
+      "LANGFUSE_PUBLIC_KEY",
+      "LANGFUSE_SECRET_KEY",
+      // Optional — only needed when your Langfuse project lives somewhere
+      // other than the SDK's default (https://cloud.langfuse.com, which is
+      // EU). Set this secret to https://us.cloud.langfuse.com for US Cloud
+      // or to your self-hosted URL. If unset, the function falls through
+      // to the EU default, which silently splits traces from the dashboard
+      // you're actually looking at.
+      "LANGFUSE_BASEURL",
     ],
 
     // The concierge typically runs 5-15 seconds end-to-end (3 OpenAI calls,
@@ -348,6 +398,10 @@ export const concierge = onRequest(
         validation.userLocation,
         validation.regionId,
         (delta) => send("delta", { text: delta }),
+        {
+          sessionId: validation.sessionId,
+          userId: validation.userId,
+        },
       );
       send("done", result);
       res.end();

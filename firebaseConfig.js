@@ -2,11 +2,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { initializeApp } from "firebase/app";
 import { getReactNativePersistence, initializeAuth } from "firebase/auth";
-import {
-  initializeFirestore,
-  persistentLocalCache,
-  persistentSingleTabManager,
-} from "firebase/firestore";
+import { initializeFirestore } from "firebase/firestore";
 import { getFunctions } from "firebase/functions";
 import { getStorage } from "firebase/storage";
 
@@ -29,15 +25,16 @@ export const auth = initializeAuth(app, {
 
 // Firestore
 //   • experimentalForceLongPolling — required for Expo + non-US regions
-//   • localCache: persistentLocalCache(...) — every read first hits the local
-//     cache and returns instantly, then revalidates against the server in the
-//     background. Cache survives app restarts. Mobile-only app, so the
-//     single-tab manager is correct (no web build).
+//   • Cache: in-memory only. Firestore's `persistentLocalCache(...)` uses
+//     IndexedDB, which doesn't exist in React Native — turning it on
+//     produces the "Error using user provided cache. Falling back to
+//     memory cache" warning on every boot and silently degrades to memory
+//     anyway. Reads are still cached within a single app session; the
+//     cache just doesn't survive a cold restart. If we ever need true
+//     offline persistence, migrate to @react-native-firebase/firestore
+//     (native modules) — the JS SDK can't do it in RN.
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
-  localCache: persistentLocalCache({
-    tabManager: persistentSingleTabManager(),
-  }),
 });
 
 export const storage = getStorage(app);

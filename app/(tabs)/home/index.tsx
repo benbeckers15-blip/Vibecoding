@@ -308,10 +308,14 @@ function HomeScreen() {
         </View>
       </View>
 
-      {/* ── Hero editorial copy — on warm paper below the image ──────────────── */}
+      {/* ── Hero editorial copy — on warm paper below the image ────────────────
+            Headline is `<Region>,\nby the glass.` — the comma-vocative pattern
+            reads well for any region name ("Tasmania, by the glass.",
+            "Margaret River, by the glass."). The line break is preserved
+            in the template literal. */}
       <View style={styles.heroCopySection}>
         <Text style={styles.heroHeadline}>
-          {"Tasmania,\nby the glass."}
+          {`${region.displayName},\nby the glass.`}
         </Text>
       </View>
 
@@ -320,7 +324,7 @@ function HomeScreen() {
         style={styles.searchSection}
         onPress={() => setChatOpen(true)}
         accessibilityRole="button"
-        accessibilityLabel="Ask the Tasmanian wine concierge"
+        accessibilityLabel={`Ask the ${region.regionAdjective ?? region.displayName} wine concierge`}
         accessibilityHint="Opens an in-app chat with the sommelier"
       >
         <View style={styles.searchBar} pointerEvents="none">
@@ -331,7 +335,7 @@ function HomeScreen() {
             style={{ marginRight: 10 }}
           />
           <Text style={styles.searchPlaceholder}>
-            Ask about Tasmanian wine…
+            {`Ask about ${region.regionAdjective ?? region.displayName} wine…`}
           </Text>
           <View style={styles.searchBtn}>
             <Ionicons name="arrow-up" size={14} color={colors.onAccent} />
