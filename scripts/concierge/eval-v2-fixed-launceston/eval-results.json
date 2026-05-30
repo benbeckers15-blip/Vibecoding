@@ -1,0 +1,131 @@
+{
+  "url": "http://127.0.0.1:5001/winery-tourism-tasmania/us-central1/concierge",
+  "regionId": "tasmania",
+  "runAt": "2026-05-28T12:35:01.861Z",
+  "results": [
+    {
+      "id": 14,
+      "expectedBranch": "DISCOVERY",
+      "expectations": [
+        "intent should be DISCOVERY",
+        "clarifyingQuestion should be null (NARROWED rule per stipulation #12)",
+        "reply should give a confident default recommendation"
+      ],
+      "multiTurn": false,
+      "transcript": [
+        {
+          "query": "What's good?",
+          "elapsedMs": 5656,
+          "streamedText": "The Tamar Valley has a wonderful array of cellar doors, and it depends on what you're looking for today, Thursday.\n\nIf you prefer to simply drop in, Highclare Estate Wine Room is open until 6:30 PM, offering a chance to taste wines from a property cleared and planted by the owners themselves. Westella Vineyard is also open until 5 PM, a small operation near the Tamar River known for its focused approach. Swinging Gate Vineyard, with its relaxed cellar door in a converted machinery shed, is open until 5 PM and welcomes walk-ins. Utzinger Wines, on the western edge of the valley, is open until 4 PM today, though I'd recommend calling ahead as tastings are by appointment.\n\nFor those who prefer a more intimate, planned experience, Bundaleera Vineyard and Grey Sands Vineyard both offer tastings by appointment. You'd want to ring ahead to arrange a visit.\n\n",
+          "done": {
+            "reply": "The Tamar Valley has a wonderful array of cellar doors, and it depends on what you're looking for today, Thursday.\n\nIf you prefer to simply drop in, Highclare Estate Wine Room is open until 6:30 PM, offering a chance to taste wines from a property cleared and planted by the owners themselves. Westella Vineyard is also open until 5 PM, a small operation near the Tamar River known for its focused approach. Swinging Gate Vineyard, with its relaxed cellar door in a converted machinery shed, is open until 5 PM and welcomes walk-ins. Utzinger Wines, on the western edge of the valley, is open until 4 PM today, though I'd recommend calling ahead as tastings are by appointment.\n\nFor those who prefer a more intimate, planned experience, Bundaleera Vineyard and Grey Sands Vineyard both offer tastings by appointment. You'd want to ring ahead to arrange a visit.",
+            "usage": {
+              "prompt_tokens": 9999,
+              "completion_tokens": 253,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              }
+            },
+            "stopReason": "stop",
+            "routerDecision": {
+              "selfContainedQuery": "What's good?",
+              "intent": "DISCOVERY",
+              "anchorWinerySlug": null,
+              "anchorWineId": null,
+              "regions": [
+                "Tamar Valley"
+              ],
+              "tags": [],
+              "wineWords": [],
+              "dayOfWeek": null,
+              "clarifyingQuestion": null
+            },
+            "candidateCount": 8,
+            "cost": {
+              "total": {
+                "inputTokens": 10137,
+                "outputTokens": 310,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 3072,
+                "totalTokens": 13519,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.0008534249999999999,
+                  "output": 0.0003324,
+                  "cacheWrite": 0,
+                  "cacheRead": 0.0002304,
+                  "total": 0.0014162249999999997
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 138,
+                    "outputTokens": 57,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 3072,
+                    "totalTokens": 3267,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.0001035,
+                      "output": 0.0002565,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.0002304,
+                      "total": 0.0005903999999999999
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 9999,
+                    "outputTokens": 253,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 0,
+                    "totalTokens": 10252,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.0007499249999999999,
+                      "output": 0.0000759,
+                      "cacheWrite": 0,
+                      "cacheRead": 0,
+                      "total": 0.0008258249999999999
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": null,
+            "wineryCards": {
+              "slugs": [
+                "highclare-estate-wine-room",
+                "westella-vineyard",
+                "swinging-gate-vineyard",
+                "utzinger-wines",
+                "bundaleera-vineyard",
+                "grey-sands-vineyard"
+              ]
+            },
+            "history": [
+              {
+                "role": "user",
+                "content": "What's good?"
+              },
+              {
+                "role": "assistant",
+                "content": "The Tamar Valley has a wonderful array of cellar doors, and it depends on what you're looking for today, Thursday.\n\nIf you prefer to simply drop in, Highclare Estate Wine Room is open until 6:30 PM, offering a chance to taste wines from a property cleared and planted by the owners themselves. Westella Vineyard is also open until 5 PM, a small operation near the Tamar River known for its focused approach. Swinging Gate Vineyard, with its relaxed cellar door in a converted machinery shed, is open until 5 PM and welcomes walk-ins. Utzinger Wines, on the western edge of the valley, is open until 4 PM today, though I'd recommend calling ahead as tastings are by appointment.\n\nFor those who prefer a more intimate, planned experience, Bundaleera Vineyard and Grey Sands Vineyard both offer tastings by appointment. You'd want to ring ahead to arrange a visit."
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

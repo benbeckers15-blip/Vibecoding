@@ -35,7 +35,15 @@ import {
   type RawUsage,
   type TurnCost,
 } from "./costTracker";
-import { hydrateDescriptions } from "./retrieve";
+// `hydrateDescriptions` (from ./retrieve) is intentionally NOT imported.
+// The Upstash `descriptions` index doesn't currently store description
+// text in vector metadata (see scripts/embed-wineries.js — metadata is
+// filter fields only), so every hydration call returned hits with
+// `text: null` and `descriptionChunk` was never populated on any
+// candidate. The Voyage embed + Upstash query were pure waste. To
+// re-enable: (1) update embed-wineries.js to include `description` in
+// metadata, (2) re-run the embed script, (3) reinstate the hydration
+// block in retrieveCandidates below.
 import {
   retrieveTastingNotes,
   formatTastingNotesForPrompt,
@@ -46,8 +54,15 @@ import {
   formatKnowledgeChunksForPrompt,
   type KnowledgeChunk,
 } from "./knowledgeRetrieve";
+import {
+  retrieveWinerySources,
+  formatWinerySourcesForPrompt,
+  defaultsForIntent as winerySourcesDefaultsForIntent,
+  type WinerySourceHit,
+} from "./winerySourcesRetrieve";
 import { resolveCoreference } from "./resolveCoreference";
-import { routeQuery, type RouteDecision } from "./router";
+import { routeQuery, type RouteDecision, type RouteIntent } from "./router";
+import { streamGeminiResponse, GEMINI_RESPONSE_MODEL } from "./geminiResponse";
 import { sortByDriveTime } from "./driveTimes";
 import { buildSystemPrompt } from "./systemPrompt";
 import {
@@ -75,7 +90,49 @@ const IS_DEV = process.env.NODE_ENV !== "production";
 // their respective files).
 
 const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-5.4-mini";
-const MAX_TOKENS = 550;
+
+// Provider switch for the response leg ONLY. Router and resolver
+// continue to use OpenAI — they're structured/tiny calls where the
+// mini/nano tier already costs pennies per turn and migration would
+// not pay off.
+//
+// Default: gemini (rolled out May 2026 for ~10× cost reduction on
+// the response leg, which carries ~92% of per-turn LLM spend).
+// Rollback: redeploy with `LLM_PROVIDER=openai` set in the function's
+// environment to flip back to gpt-5.4-mini without any code change.
+// The OpenAI response path stays compiled into the bundle precisely
+// so this rollback is one env-var flip away.
+type ResponseProvider = "openai" | "gemini";
+const RESPONSE_PROVIDER: ResponseProvider =
+  (process.env.LLM_PROVIDER || "gemini").toLowerCase() === "openai"
+    ? "openai"
+    : "gemini";
+
+// Output-token caps tiered by router intent. Replaces a single 550 cap
+// that was paying for sprawl on factual turns and simultaneously
+// truncating itinerary trip plans (see audit P1 — model could hit the
+// cap mid-`<<TRIP_PLAN>>{...}` block, leaving `parseTripProposal` to
+// silently drop the Start-Trip card). Tightening factual intents
+// trims output spend; bumping itinerary closes the truncation bug.
+//
+// Headroom rule of thumb: leave ~30-80 tokens above expected prose
+// length for the trailing `<<TRIP_PLAN>>` / `<<WINERY_CARD>>` JSON
+// blocks the model appends. trimToCompleteSentence handles partial
+// truncation gracefully when the prose itself overruns.
+const MAX_TOKENS_BY_INTENT: Record<RouteIntent, number> = {
+  specific_winery: 350,  // hours lookups + "tell me about X"; possible winery card
+  feature: 300,          // tag-filter queries, list-style
+  regional: 400,         // multi-winery prose recommendation
+  itinerary: 650,        // multi-stop prose + trip plan tail (bumped from 550)
+  general: 400,          // open-ended discovery
+  out_of_scope: 150,     // polite deflection only; no markers
+};
+const MAX_TOKENS_FALLBACK = 400;
+
+function maxTokensForIntent(intent: RouteIntent): number {
+  return MAX_TOKENS_BY_INTENT[intent] ?? MAX_TOKENS_FALLBACK;
+}
+
 const MAX_HISTORY_TURNS = 4;
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -105,20 +162,56 @@ export interface AskResult {
 // ─── Module-level singletons ────────────────────────────────────────────────
 // Cloud Functions warm starts share these across requests.
 //
-// Multi-region: the context cache is now keyed by regionId. A warm
-// container that has served Tasmania once won't pay the Firestore
-// round-trip on subsequent Tasmania requests; if it later serves a
-// different region, that region's corpus loads on first request and
-// then stays warm too.
+// Multi-region: the corpus cache is keyed by regionId. A warm container
+// that has served Tasmania once won't pay the Firestore round-trip on
+// subsequent Tasmania requests; if it later serves a different region,
+// that region's corpus loads on first request and then stays warm too.
+//
+// World-index cache is SEPARATE and keyed by `${regionId}:${todayShort}`.
+// Why split? The world index contains a `today:open→5pm`-style hint per
+// winery, derived from `new Date()`. When this lived inside the corpus
+// cache, warm containers kept serving yesterday's day across midnight
+// — silently wrong "is X open today?" answers for hours each morning.
+// Splitting lets the corpus stay cached forever while the index
+// recomputes the moment the day rolls over in the region's timezone.
+//
+// Bounded staleness: the corpus cache also has a TTL (CACHE_TTL_MS).
+// Without it, a winery edit (hours, description, tags) in Firestore
+// wouldn't reach the concierge until the Cloud Run container was
+// recycled — could be hours under steady traffic. With a 15-min TTL,
+// edits propagate within a quarter-hour without a redeploy. Cost is
+// trivial: each container does ~1 extra Firestore read per region
+// per 15 min. When the corpus reloads, we also evict the derived
+// world-index entries so the model never sees a row that references
+// a winery the corpus no longer has.
 
 interface ConciergeContext {
   wineries: WineryDoc[];
   bySlug: Map<string, WineryDoc>;
-  worldIndex: string;
 }
 
-const _contextByRegion = new Map<string, Promise<ConciergeContext>>();
+interface CachedContext {
+  /** In-flight or resolved promise. Stored as a promise (not a value)
+   *  so concurrent cold-start requests share a single Firestore round-
+   *  trip rather than racing to issue duplicate reads. */
+  promise: Promise<ConciergeContext>;
+  /** Wall-clock time the load was kicked off — used for TTL comparison.
+   *  We don't wait for the promise to resolve before stamping it; that
+   *  way a slow load doesn't extend its own TTL. */
+  loadedAt: number;
+}
+
+const _contextByRegion = new Map<string, CachedContext>();
+const _worldIndexByKey = new Map<string, string>();
 let _openai: OpenAI | null = null;
+
+// TTL for the corpus cache. Default 15 minutes. Override via
+// CONCIERGE_CACHE_TTL_MS — set to a low value in local dev to iterate
+// on Firestore content quickly. The same env var also drives the
+// region-config cache TTL in regionConfig.ts.
+const DEFAULT_CACHE_TTL_MS = 15 * 60 * 1000;
+const CACHE_TTL_MS =
+  Number(process.env.CONCIERGE_CACHE_TTL_MS) || DEFAULT_CACHE_TTL_MS;
 
 // Langfuse client is OPTIONAL. If the LANGFUSE_* secrets aren't bound, this
 // returns null and every tracing call in orchestrateTurn is short-circuited
@@ -183,26 +276,124 @@ function getLangfuse(): Langfuse | null {
 }
 
 async function getContext(regionId: string): Promise<ConciergeContext> {
-  // Memoise the IN-FLIGHT promise (not just the result) so two concurrent
-  // requests on a cold container share a single Firestore round-trip.
-  let p = _contextByRegion.get(regionId);
-  if (!p) {
-    p = (async () => {
-      const { wineries } = await loadContext(regionId);
-      const bySlug = new Map<string, WineryDoc>();
-      for (const w of wineries) {
-        bySlug.set(w.slug || w.id, w);
-      }
-      const worldIndex = renderWorldIndex(wineries);
-      return { wineries, bySlug, worldIndex };
-    })();
-    // If the load fails, clear the cache so the next request can retry.
-    p.catch(() => {
-      _contextByRegion.delete(regionId);
-    });
-    _contextByRegion.set(regionId, p);
+  const now = Date.now();
+  const entry = _contextByRegion.get(regionId);
+
+  // Fresh hit. Concurrent requests during an in-flight load share the
+  // same promise — `set` happens BEFORE the load completes (see below).
+  if (entry && now - entry.loadedAt < CACHE_TTL_MS) {
+    return entry.promise;
   }
-  return p;
+
+  // Expired or absent. Drop derived world-index entries first — they
+  // were built from the old corpus and may reference wineries that
+  // have since been added, removed, or had their fields edited.
+  for (const key of _worldIndexByKey.keys()) {
+    if (key.startsWith(`${regionId}:`)) {
+      _worldIndexByKey.delete(key);
+    }
+  }
+
+  const promise = (async () => {
+    const { wineries } = await loadContext(regionId);
+    const bySlug = new Map<string, WineryDoc>();
+    for (const w of wineries) {
+      bySlug.set(w.slug || w.id, w);
+    }
+    return { wineries, bySlug };
+  })();
+
+  // Stamp + store BEFORE awaiting so concurrent requests reuse this
+  // promise instead of issuing duplicate Firestore reads.
+  _contextByRegion.set(regionId, { promise, loadedAt: now });
+
+  // On failure: drop ONLY if our entry is still the latest — another
+  // request may have already replaced it with a successful retry.
+  promise.catch(() => {
+    const current = _contextByRegion.get(regionId);
+    if (current?.promise === promise) {
+      _contextByRegion.delete(regionId);
+    }
+  });
+
+  return promise;
+}
+
+/**
+ * Return the cached world-index string for a region on a given day.
+ *
+ * Cache key is `${regionId}:${todayShort}` — so a warm container that
+ * served Tasmania on Mon → Sun in the same calendar week ends up with at
+ * most 7 entries per region (trivial memory). When the day rolls over in
+ * the region's timezone, the next turn computes a fresh string and the
+ * model sees the right "today:" hints.
+ *
+ * Synchronous: no IO. `renderWorldIndex` is a pure string concat over
+ * the already-loaded corpus.
+ */
+function getWorldIndex(
+  regionId: string,
+  wineries: WineryDoc[],
+  todayShort: string
+): string {
+  const key = `${regionId}:${todayShort}`;
+  let s = _worldIndexByKey.get(key);
+  if (s !== undefined) return s;
+  s = renderWorldIndex(wineries, todayShort);
+  _worldIndexByKey.set(key, s);
+  return s;
+}
+
+// ─── Timezone-aware "today" helpers ─────────────────────────────────────────
+// Cloud Functions runs in UTC by default. For a Tasmanian user at 8am AEST
+// (UTC+10) that's 10pm UTC the PREVIOUS day — server `new Date().getDay()`
+// would return Monday when the user means Tuesday. We anchor "today" to the
+// region's timezone instead, using Intl.DateTimeFormat (Node 22 has full
+// ICU). en-US's `weekday: "short"` returns exactly "Mon"|"Tue"|…|"Sun" —
+// the same format the rest of the codebase uses for day-of-week keys.
+
+function todayShortInTimezone(timezone: string | undefined): string {
+  const tz = timezone || "UTC";
+  if (!timezone) {
+    // Surface this loudly — a missing region timezone re-introduces the
+    // bug this helper exists to fix. Log unconditionally (production
+    // included) so a fresh region doc without the field is obvious in
+    // Cloud Logging the first time it serves a turn.
+    console.warn(
+      "[concierge] region timezone not configured — falling back to UTC. " +
+        "Set `timezone` on regions/{regionId} (e.g. 'Australia/Hobart')."
+    );
+  }
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      weekday: "short",
+      timeZone: tz,
+    }).format(new Date());
+  } catch (err) {
+    // Bad/unknown timezone string. Fall back to UTC. Better wrong day
+    // than a crash.
+    console.warn(
+      `[concierge] invalid timezone "${tz}" — falling back to UTC:`,
+      err
+    );
+    return new Intl.DateTimeFormat("en-US", { weekday: "short" }).format(
+      new Date()
+    );
+  }
+}
+
+function todayLongInTimezone(timezone: string | undefined): string {
+  const tz = timezone || "UTC";
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      weekday: "long",
+      timeZone: tz,
+    }).format(new Date());
+  } catch {
+    return new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(
+      new Date()
+    );
+  }
 }
 
 function getOpenAI(): OpenAI {
@@ -249,6 +440,38 @@ const ROUTER_TAG_TO_FIELD: Record<string, keyof WineryDoc> = {
 };
 
 const FULL_DETAIL_SLICE_THRESHOLD = 5;
+
+// Intents for which the editorial knowledge base (regional history, food
+// culture, etiquette, seasons, etc.) is worth retrieving. Specific-
+// winery, feature, and out-of-scope turns don't benefit from prose
+// chunks — they're factual lookups, filter queries, and deflections
+// respectively — so we skip the Voyage embed + Upstash query + Firestore
+// getAll + ~1K tokens of fresh prompt input on those turns.
+//
+// Module-scope so we don't allocate a Set per turn.
+const INTENTS_NEEDING_KNOWLEDGE: ReadonlySet<RouteIntent> = new Set([
+  "general",
+  "regional",
+  "itinerary",
+]);
+
+// Intents that benefit from per-winery source-grounded prose chunks
+// (founder names, vineyard details, distinctive character) pulled from
+// the `winery_sources` Upstash namespace. Skipped on `general` and
+// `out_of_scope`:
+//   • general — open-ended curiosity (e.g. "why is Tasmania good for
+//     sparkling?") doesn't reference any specific winery, so there's
+//     no candidate list to scope source retrieval to. The knowledge
+//     namespace covers these.
+//   • out_of_scope — short polite deflection, no winery context needed.
+//
+// Module-scope ReadonlySet so we don't allocate per turn.
+const INTENTS_NEEDING_WINERY_SOURCES: ReadonlySet<RouteIntent> = new Set([
+  "specific_winery",
+  "regional",
+  "feature",
+  "itinerary",
+]);
 
 function renderDetailBlock(candidates: WineryDoc[]): string {
   if (candidates.length === 0) return "";
@@ -336,20 +559,22 @@ function pickFallbackSampler(wineries: WineryDoc[], limit: number): WineryDoc[] 
   return [...featured, ...rest].slice(0, Math.max(1, limit));
 }
 
-const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-
 function buildTurnContent(
   userMessage: string,
   wineryBlock: string,
   tastingNotesBlock: string,
   knowledgeBlock: string,
+  sourceExcerptsBlock: string,
   userLocation: { latitude: number; longitude: number } | null,
   regionConfig: RegionConfig,
-  centroids: { name: string; lat: number; lon: number }[]
+  centroids: { name: string; lat: number; lon: number }[],
+  todayLong: string
 ): string {
-  const today = DAY_NAMES[new Date().getDay()];
   const parts: string[] = [];
-  parts.push(`<today>${today}</today>`);
+  // `todayLong` is the full weekday name ("Monday", "Tuesday", …) in
+  // the region's timezone — computed once per turn in orchestrateTurn
+  // and passed in so this function stays a pure string builder.
+  parts.push(`<today>${todayLong}</today>`);
   if (userLocation) {
     const subRegion = nearestRegion(
       userLocation.latitude,
@@ -370,8 +595,73 @@ function buildTurnContent(
   }
   if (tastingNotesBlock) parts.push(tastingNotesBlock);
   if (knowledgeBlock) parts.push(knowledgeBlock);
+  // Source excerpts AFTER knowledge so the model reads grounded prose
+  // about THIS winery before any general regional context. The
+  // formatter inlines its own Firestore-wins-for-structured-fields
+  // reminder so the rule stays at the point of use.
+  if (sourceExcerptsBlock) parts.push(sourceExcerptsBlock);
   parts.push(userMessage);
   return parts.join("\n\n");
+}
+
+// ─── Fuzzy name-matching fallback ─────────────────────────────────────────────
+
+// Wine-industry generic words that AREN'T distinctive winery identifiers.
+// Used by findFuzzyWineryMatches to avoid false positives like matching
+// "Coal Valley Vineyard" on a "Coal River Valley" region mention, or
+// "Bream Creek" on any sentence mentioning a creek.
+const FUZZY_MATCH_STOPWORDS: ReadonlySet<string> = new Set([
+  "winery", "wineries", "vineyard", "vineyards", "wines", "wine",
+  "cellar", "door", "estate", "estates", "company", "tasmania",
+  "tasmanian", "tas", "farm", "house", "creek", "valley", "bay",
+  "ridge", "hill", "hills", "rock", "river", "island", "point",
+  "north", "south", "east", "west", "and", "the", "of", "tasmania,",
+]);
+
+/**
+ * Fallback winery-name detection. The router's job is to extract
+ * nameKeywords from the user message, but it occasionally misses obvious
+ * references — observed in production on
+ * "What's the vineyard size at Tolpuddle in hectares?", which returned
+ * nameKeywords=[] and silently dropped Tolpuddle from the candidate
+ * list. This is the safety net.
+ *
+ * For each winery, take its name's "distinctive" words (≥4 chars, not a
+ * wine-industry stopword). If any distinctive word appears as a discrete
+ * token (word-boundary match) in the user message, treat that winery as
+ * named.
+ *
+ * Word-boundary regex avoids substring false positives ("rose" → wouldn't
+ * match inside "moorilla"). The stopword list bounds false positives on
+ * generic region/place words.
+ *
+ * Used as FALLBACK ONLY — only kicks in when router.nameKeywords is
+ * empty, so the router stays the primary extraction path and we don't
+ * accidentally double-extract.
+ */
+function findFuzzyWineryMatches(
+  userMessage: string,
+  wineries: WineryDoc[],
+): WineryDoc[] {
+  const messageWords = new Set(
+    userMessage.toLowerCase().match(/\b[a-z][a-z\-']{2,}\b/g) || [],
+  );
+  if (messageWords.size === 0) return [];
+
+  const matches: WineryDoc[] = [];
+  for (const w of wineries) {
+    const name = (w.name || "").toLowerCase();
+    if (!name) continue;
+    const nameWords = (name.match(/\b[a-z][a-z\-']{2,}\b/g) || [])
+      .filter((word) => word.length >= 4 && !FUZZY_MATCH_STOPWORDS.has(word));
+    for (const word of nameWords) {
+      if (messageWords.has(word)) {
+        matches.push(w);
+        break;
+      }
+    }
+  }
+  return matches;
 }
 
 // ─── Retrieval (lifted from Concierge.retrieveCandidates) ───────────────────
@@ -404,19 +694,64 @@ async function retrieveCandidates(
     return true;
   });
 
-  // 2. Force-include named wineries.
-  if (decision.nameKeywords.length > 0) {
+  // 2. Determine effective name keywords. The router's nameKeywords are
+  //    the primary signal; when it returns nothing AND the user message
+  //    actually names a winery, fall back to a word-boundary fuzzy match
+  //    so we don't silently drop the user's named winery from the
+  //    candidate list. Real bug this fixes: "What's the vineyard size at
+  //    Tolpuddle in hectares?" — router returned [], Tolpuddle was
+  //    dropped, model deflected on a question the source had the answer
+  //    for.
+  let effectiveNameKeywords = decision.nameKeywords;
+  if (effectiveNameKeywords.length === 0) {
+    const fuzzyHits = findFuzzyWineryMatches(userMessage, wineries);
+    if (fuzzyHits.length > 0) {
+      if (IS_DEV) {
+        console.log(
+          "[concierge] router missed name extraction; fuzzy fallback caught:",
+          fuzzyHits.map((w) => w.slug || w.id).join(", "),
+        );
+      }
+      // Convert fuzzy hits into name keywords the downstream logic can
+      // use as-is (it matches by `name.includes(kw)` so any of the
+      // winery's distinctive words works). Use the longest distinctive
+      // word per winery — most specific match.
+      effectiveNameKeywords = fuzzyHits
+        .map((w) => {
+          const distinctive = (w.name || "")
+            .toLowerCase()
+            .match(/\b[a-z][a-z\-']{2,}\b/g)
+            ?.filter(
+              (word) =>
+                word.length >= 4 && !FUZZY_MATCH_STOPWORDS.has(word),
+            )
+            .sort((a, b) => b.length - a.length)[0];
+          return distinctive || "";
+        })
+        .filter(Boolean);
+    }
+  }
+
+  // 3. Force-include named wineries (router-extracted OR fuzzy-fallback).
+  //    Track them in `forcedSlugs` so step 7 (cap) can protect them
+  //    from being sorted past the limit and silently dropped.
+  const forcedSlugs = new Set<string>();
+  if (effectiveNameKeywords.length > 0) {
     const have = new Set(candidates.map((c) => c.slug || c.id));
     const forced: WineryDoc[] = [];
     for (const w of wineries) {
       const id = w.slug || w.id;
-      if (have.has(id)) continue;
       const name = (w.name || "").toLowerCase();
       const slug = (w.slug || w.id || "").toLowerCase();
-      for (const kw of decision.nameKeywords) {
+      for (const kw of effectiveNameKeywords) {
         if (name.includes(kw) || slug.includes(kw)) {
-          forced.push(w);
-          have.add(id);
+          if (!have.has(id)) {
+            forced.push(w);
+            have.add(id);
+          }
+          // Mark as forced REGARDLESS of whether it was already in
+          // candidates — this is what the cap step uses to protect it.
+          forcedSlugs.add(id);
           break;
         }
       }
@@ -426,17 +761,17 @@ async function retrieveCandidates(
     }
   }
 
-  // 3. Neighbour expansion for itinerary / specific-winery turns.
+  // 4. Neighbour expansion for itinerary / specific-winery turns.
   if (
     (decision.intent === "itinerary" ||
       decision.intent === "specific_winery") &&
-    decision.nameKeywords.length > 0
+    effectiveNameKeywords.length > 0
   ) {
     const matchedRegions = new Set<string>();
     for (const c of candidates) {
       const name = (c.name || "").toLowerCase();
       const slug = (c.slug || c.id || "").toLowerCase();
-      for (const kw of decision.nameKeywords) {
+      for (const kw of effectiveNameKeywords) {
         if (name.includes(kw) || slug.includes(kw)) {
           if (c.region) matchedRegions.add(c.region);
           break;
@@ -478,13 +813,13 @@ async function retrieveCandidates(
     }
   }
 
-  // 4. Owner-controlled sort.
+  // 5. Owner-controlled sort.
   candidates.sort((a, b) =>
     (b.boost ?? 0) - (a.boost ?? 0) ||
     (b.rating ?? 0) - (a.rating ?? 0)
   );
 
-  // 5. Drive-time sort.
+  // 6. Drive-time sort.
   if (
     userLocation &&
     shouldUseUserLocation(userMessage, decision) &&
@@ -494,33 +829,48 @@ async function retrieveCandidates(
     candidates = await sortByDriveTime(userLocation, candidates);
   }
 
-  // 6. Cap.
-  candidates = candidates.slice(0, decision.limit);
-
-  // 7. Description hydration.
-  if (decision.retrieval.descriptions && candidates.length > 0) {
-    try {
-      const slugs = candidates.map((c) => c.slug || c.id);
-      const hits = await hydrateDescriptions(userMessage, slugs);
-      const bySlug = new Map<string, string>();
-      for (const h of hits) {
-        if (h.text) bySlug.set(h.slug, h.text);
-      }
-      if (bySlug.size > 0) {
-        candidates = candidates.map((c) => {
-          const chunk = bySlug.get(c.slug || c.id);
-          return chunk ? { ...c, descriptionChunk: chunk } : c;
-        });
-      }
-    } catch (err) {
-      if (IS_DEV) {
-        console.warn(
-          "[concierge] description hydration failed (continuing without prose):",
-          err
-        );
-      }
-    }
+  // 7. Cap, PROTECTING forced (named) wineries.
+  //
+  //   Why this matters: step 5's rating sort can push a named winery
+  //   below the cap if other candidates have higher ratings. Without
+  //   protection, the user asking about a specific (lower-rated) winery
+  //   gets that winery silently dropped — the model never sees its
+  //   source chunks and deflects on a question we have the answer for.
+  //
+  //   Partition into forced vs non-forced. Forced wineries are always
+  //   preserved; non-forced fill the remaining slots up to
+  //   decision.limit. If the user named MORE wineries than the cap
+  //   (e.g. compared 5 producers), all named ones are returned — better
+  //   to send extra context than silently drop a named winery.
+  if (candidates.length > decision.limit) {
+    const forced = candidates.filter((c) =>
+      forcedSlugs.has(c.slug || c.id),
+    );
+    const rest = candidates.filter(
+      (c) => !forcedSlugs.has(c.slug || c.id),
+    );
+    const slotsForRest = Math.max(0, decision.limit - forced.length);
+    candidates = [...forced, ...rest.slice(0, slotsForRest)];
   }
+
+  // 8. Description hydration — DISABLED.
+  // Previously: when decision.retrieval.descriptions was true we'd embed
+  // the user query with Voyage and pull top-K from the Upstash
+  // `descriptions` index, then attach the returned chunk to each
+  // candidate as `descriptionChunk` for the renderer to use.
+  //
+  // Reality check (May 2026): scripts/embed-wineries.js writes only
+  // filter fields into the Upstash metadata — no `description` or
+  // `text`. So every hit came back with text: null, bySlug stayed
+  // empty, and `descriptionChunk` was never set on any candidate. We
+  // paid for one Voyage embed + one Upstash query per
+  // retrieveDescriptions=true turn for nothing.
+  //
+  // The router still emits the flag and the renderer still has a
+  // fallback branch for `descriptionChunk` — both are no-ops today,
+  // kept intact so the flag stays meaningful when we re-ingest with
+  // description text in metadata and re-enable this block. See the
+  // import comment at the top of this file for the re-enable steps.
 
   if (candidates.length === 0) {
     return pickFallbackSampler(wineries, decision.limit);
@@ -571,6 +921,44 @@ async function retrieveKnowledgeChunks(
   } catch (err) {
     if (IS_DEV) {
       console.warn("[concierge] knowledge retrieval failed:", err);
+    }
+    return [];
+  }
+}
+
+/**
+ * Per-turn winery_sources retrieval. Scopes to the candidate list the
+ * filter/sort/drive-time pass identified — only wineries already
+ * considered relevant get their source chunks pulled, so we don't
+ * waste rerank budget on irrelevant producers.
+ *
+ * Per-intent defaults (topK + per-winery cap) come from
+ * winerySourcesDefaultsForIntent so the orchestrator stays out of the
+ * tuning business — see winerySourcesRetrieve.ts for the table.
+ *
+ * Fail-soft: a Voyage / Upstash hiccup returns [] rather than failing
+ * the turn. The model will still have the structured winery rows in
+ * <relevant_wineries> — losing source excerpts is a precision
+ * regression, not an availability one.
+ */
+async function retrieveWinerySourcesForTurn(
+  userMessage: string,
+  decision: RouteDecision,
+  candidateSlugs: string[],
+  regionId: string
+): Promise<WinerySourceHit[]> {
+  if (candidateSlugs.length === 0) return [];
+  const { topK, maxPerWinery } = winerySourcesDefaultsForIntent(decision.intent);
+  try {
+    return await retrieveWinerySources(userMessage, {
+      regionId,
+      wineryIds: candidateSlugs,
+      topK,
+      maxPerWinery,
+    });
+  } catch (err) {
+    if (IS_DEV) {
+      console.warn("[concierge] winery-sources retrieval failed:", err);
     }
     return [];
   }
@@ -664,6 +1052,15 @@ export async function orchestrateTurn(
   const adjacencyMap = buildAdjacencyMap(regionConfig);
   const centroids = buildCentroidList(regionConfig);
 
+  // Today in the region's timezone — computed once per turn so the world
+  // index can refresh at the actual day boundary the user experiences,
+  // not at UTC midnight. todayShort feeds the per-winery `today:` hints
+  // in the world index; todayLong feeds the `<today>` tag the system
+  // prompt's hours rules reference.
+  const todayShort = todayShortInTimezone(regionConfig.timezone);
+  const todayLong = todayLongInTimezone(regionConfig.timezone);
+  const worldIndex = getWorldIndex(regionId, context.wineries, todayShort);
+
   // 0. Resolve coreference.
   const resolveResult = await resolveCoreference(userMessage, {
     client,
@@ -690,9 +1087,11 @@ export async function orchestrateTurn(
   }
 
   // 1. Route.
+  // `worldIndex` is intentionally NOT passed — the router is a structured
+  // classifier and never needs to know the corpus contents. See the
+  // header comment in router.ts for the cost rationale.
   const routeResult = await routeQuery(retrievalQuery, {
     client,
-    worldIndex: context.worldIndex,
     region: regionConfig,
   });
   const decision = routeResult.decision;
@@ -717,10 +1116,25 @@ export async function orchestrateTurn(
   // Single parent span for the whole retrieval fan-out so the dashboard
   // can show "how long did we spend hitting Voyage + Upstash + Firestore"
   // as one number, broken down by child span.
+  //
+  // Knowledge retrieval is intent-gated. We skip it for specific_winery,
+  // feature, and out_of_scope turns — those don't benefit from editorial
+  // prose chunks and the unconditional call was burning ~1K fresh-input
+  // tokens + a Voyage embed + an Upstash query + a Firestore getAll on
+  // every turn for nothing. Resolved to [] for gated turns so the
+  // downstream formatter / Langfuse logging code paths are unchanged.
+  const wantKnowledge = INTENTS_NEEDING_KNOWLEDGE.has(decision.intent);
+  const wantWinerySources = INTENTS_NEEDING_WINERY_SOURCES.has(decision.intent);
   const retrievalSpan = trace?.span({
     name: "retrieval",
-    input: { query: retrievalQuery, decision },
+    input: { query: retrievalQuery, decision, wantKnowledge, wantWinerySources },
   });
+  // Candidates + knowledge fire in parallel (independent of each other).
+  // Tasting notes and winery sources are scoped to the candidate list,
+  // so they have to wait for candidates to land — but they can run in
+  // parallel with each other once candidates are in hand. Two-stage
+  // fan-out keeps total retrieval latency to roughly the max of the
+  // slowest leg in each stage.
   const [candidates, knowledgeChunks] = await Promise.all([
     retrieveCandidates(
       retrievalQuery,
@@ -729,20 +1143,34 @@ export async function orchestrateTurn(
       userLocation,
       adjacencyMap
     ),
-    retrieveKnowledgeChunks(retrievalQuery, regionId),
+    wantKnowledge
+      ? retrieveKnowledgeChunks(retrievalQuery, regionId)
+      : Promise.resolve([] as KnowledgeChunk[]),
   ]);
-  const tastingNotes = await retrieveTastingNotesForTurn(
-    retrievalQuery,
-    decision,
-    candidates,
-    regionId
-  );
+  const candidateSlugs = candidates.map((c) => c.slug || c.id);
+  const [tastingNotes, winerySources] = await Promise.all([
+    retrieveTastingNotesForTurn(
+      retrievalQuery,
+      decision,
+      candidates,
+      regionId
+    ),
+    wantWinerySources && candidateSlugs.length > 0
+      ? retrieveWinerySourcesForTurn(
+          retrievalQuery,
+          decision,
+          candidateSlugs,
+          regionId
+        )
+      : Promise.resolve([] as WinerySourceHit[]),
+  ]);
   retrievalSpan?.end({
     output: {
       candidateCount: candidates.length,
-      candidateSlugs: candidates.map((c) => c.slug || c.id),
+      candidateSlugs,
       knowledgeChunkCount: knowledgeChunks.length,
       tastingNoteCount: tastingNotes.length,
+      winerySourceCount: winerySources.length,
     },
   });
 
@@ -753,12 +1181,13 @@ export async function orchestrateTurn(
     knowledgeChunks,
     regionConfig.displayName
   );
+  const sourceExcerptsBlock = formatWinerySourcesForPrompt(winerySources);
 
   // 4. Compose messages.
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     {
       role: "system",
-      content: buildSystemPrompt(context.worldIndex, regionConfig),
+      content: buildSystemPrompt(worldIndex, regionConfig, decision.intent),
     },
   ];
   for (const m of history) {
@@ -774,9 +1203,11 @@ export async function orchestrateTurn(
     contextBlock,
     tastingNotesBlock,
     knowledgeBlock,
+    sourceExcerptsBlock,
     locationForTurn,
     regionConfig,
-    centroids
+    centroids,
+    todayLong
   );
   messages.push({ role: "user", content: currentTurnContent });
 
@@ -784,31 +1215,30 @@ export async function orchestrateTurn(
   // The response generation is opened BEFORE the stream so we capture
   // the start time, then closed with `.end()` after we have the final
   // text + usage. Langfuse computes latency from the open/close gap.
+  //
+  // Provider switch: `RESPONSE_PROVIDER` (env-controlled, default
+  // "gemini") picks between the OpenAI and Gemini code paths below.
+  // Both paths share the marker-filter closure so TRIP_PLAN /
+  // WINERY_CARD suppression behaves identically regardless of provider.
+  const maxTokens = maxTokensForIntent(decision.intent);
+  const responseModel =
+    RESPONSE_PROVIDER === "gemini" ? GEMINI_RESPONSE_MODEL : model;
   const responseGen = trace?.generation({
     name: "response",
-    model,
+    model: responseModel,
     input: messages,
-    modelParameters: { maxTokens: MAX_TOKENS },
-  });
-  const stream = client.beta.chat.completions.stream({
-    model,
-    max_completion_tokens: MAX_TOKENS,
-    messages,
-    // OpenAI streaming responses omit `usage` by default — the final chunk
-    // doesn't carry token counts unless we explicitly opt in. Without this
-    // both the in-app cost monitor and the Langfuse `response` generation
-    // record zero tokens for the answer leg, which makes every cost number
-    // look wrong and breaks per-model cost aggregation in the dashboard.
-    stream_options: { include_usage: true },
+    modelParameters: { maxTokens, provider: RESPONSE_PROVIDER },
   });
 
-  // ── Streaming filter: hide TRIP_PLAN / WINERY_CARD blocks ──────────
-  // Same lookahead-buffer logic as the client. Holds back enough chars
-  // to detect either opening marker split across deltas, then suppresses
-  // everything from the marker onward.
+  // ── Shared marker filter ────────────────────────────────────────────
+  // Holds a small lookahead buffer to detect <<TRIP_PLAN>> or
+  // <<WINERY_CARD>> markers that may be split across stream chunks,
+  // then suppresses everything from the marker onward (the parsers
+  // pick those blocks off the rawReply later — the chat UI must never
+  // see them stream in).
+  const HOLD_LEN = Math.max(TRIP_PLAN_OPEN.length, WINERY_CARD_OPEN.length) - 1;
   let pending = "";
   let suppressing = false;
-  const HOLD_LEN = Math.max(TRIP_PLAN_OPEN.length, WINERY_CARD_OPEN.length) - 1;
 
   const safeEmit = (text: string) => {
     if (!text) return;
@@ -821,7 +1251,7 @@ export async function orchestrateTurn(
     }
   };
 
-  stream.on("content", (delta: string) => {
+  const pushDelta = (delta: string) => {
     if (suppressing) return;
     pending += delta;
 
@@ -849,19 +1279,62 @@ export async function orchestrateTurn(
       safeEmit(pending.slice(0, emitUpTo));
       pending = pending.slice(emitUpTo);
     }
-  });
+  };
 
-  const finalMessage = await stream.finalChatCompletion();
+  const flushPending = () => {
+    if (!suppressing && pending.length > 0) {
+      safeEmit(pending);
+      pending = "";
+    }
+  };
 
-  // Flush whatever the lookahead buffer is still holding when the stream ends.
-  if (!suppressing && pending.length > 0) {
-    safeEmit(pending);
-    pending = "";
+  // ── Provider-specific streaming ─────────────────────────────────────
+  let rawReply = "";
+  let finishReason: string | null = null;
+  let responseUsage: RawUsage | undefined;
+
+  if (RESPONSE_PROVIDER === "openai") {
+    const stream = client.beta.chat.completions.stream({
+      model,
+      max_completion_tokens: maxTokens,
+      messages,
+      // OpenAI streaming responses omit `usage` by default — the final chunk
+      // doesn't carry token counts unless we explicitly opt in. Without this
+      // both the in-app cost monitor and the Langfuse `response` generation
+      // record zero tokens for the answer leg, which makes every cost number
+      // look wrong and breaks per-model cost aggregation in the dashboard.
+      stream_options: { include_usage: true },
+    });
+
+    stream.on("content", (delta: string) => pushDelta(delta));
+
+    const finalMessage = await stream.finalChatCompletion();
+    flushPending();
+
+    rawReply = (finalMessage.choices[0]?.message?.content ?? "").trim();
+    finishReason = finalMessage.choices[0]?.finish_reason ?? null;
+    responseUsage = extractUsage(finalMessage.usage);
+  } else {
+    // Gemini path. Messages are mapped from OpenAI's shape to Gemini's
+    // (systemInstruction + contents) inside streamGeminiResponse.
+    // Content is always a plain string in our orchestrator — we never
+    // build multipart content — so the simple narrow below is safe.
+    const geminiMessages = messages.map((m) => ({
+      role: m.role as "system" | "user" | "assistant",
+      content: typeof m.content === "string" ? m.content : "",
+    }));
+
+    const result = await streamGeminiResponse({
+      messages: geminiMessages,
+      maxTokens,
+      onDelta: pushDelta,
+    });
+    flushPending();
+
+    rawReply = result.text.trim();
+    finishReason = result.finishReason;
+    responseUsage = result.usage;
   }
-
-  // 6. Post-process.
-  const rawReply = (finalMessage.choices[0]?.message?.content ?? "").trim();
-  const finishReason = finalMessage.choices[0]?.finish_reason ?? null;
 
   const trimmedReply =
     finishReason === "length"
@@ -898,19 +1371,27 @@ export async function orchestrateTurn(
   });
   costEntries.push({
     label: "Response (reply)",
-    usage: extractUsage(finalMessage.usage),
-    model,
+    usage: responseUsage,
+    // Bill against the provider that actually answered this turn —
+    // Gemini-2.5-flash on the default path, gpt-5.4-mini on rollback.
+    // costTracker.ts has entries for both families.
+    model: responseModel,
   });
   const cost = buildTurnCost(costEntries);
 
   // Close out the response generation with the final reply + usage.
+  // responseUsage is in OpenAI RawUsage shape for both providers (the
+  // Gemini wrapper normalises before returning), so Langfuse sees one
+  // consistent usage shape regardless of which provider answered.
   responseGen?.end({
     output: reply,
-    usage: finalMessage.usage
+    usage: responseUsage
       ? {
-          input: finalMessage.usage.prompt_tokens,
-          output: finalMessage.usage.completion_tokens,
-          total: finalMessage.usage.total_tokens,
+          input: responseUsage.prompt_tokens,
+          output: responseUsage.completion_tokens,
+          total:
+            (responseUsage.prompt_tokens ?? 0) +
+            (responseUsage.completion_tokens ?? 0),
         }
       : undefined,
   });
@@ -928,6 +1409,7 @@ export async function orchestrateTurn(
       candidateCount: candidates.length,
       knowledgeChunkCount: knowledgeChunks.length,
       tastingNoteCount: tastingNotes.length,
+      winerySourceCount: winerySources.length,
       intent: decision.intent,
       stopReason: finishReason,
       totalCostUsd: cost.total.usd.total,
@@ -938,7 +1420,10 @@ export async function orchestrateTurn(
 
   return {
     reply,
-    usage: finalMessage.usage,
+    // Same normalised RawUsage shape for both providers — see
+    // geminiResponse.ts. The chat UI's CostMonitor reads this directly,
+    // so consistency matters more than provider-specific richness.
+    usage: responseUsage,
     stopReason: finishReason,
     routerDecision: decision,
     candidateCount: candidates.length,

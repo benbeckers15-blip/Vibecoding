@@ -16,6 +16,7 @@
     "logs": "firebase functions:log"
   },
   "dependencies": {
+    "@google/genai": "^2.6.0",
     "@upstash/vector": "^1.2.3",
     "firebase-admin": "^13.7.0",
     "firebase-functions": "^6.4.0",

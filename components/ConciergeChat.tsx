@@ -51,20 +51,25 @@ import type {
   TripProposal,
   WineryCardSuggestion,
 } from "../services/concierge/concierge";
-import {
-  formatTokens,
-  formatUsd,
-  type TurnCost,
-} from "../services/concierge/costTracker";
 import type { TripStop } from "../types/trip";
 import { optimiseRoute } from "../utils/routePlanner";
 
 interface ConciergeChatProps {
   visible: boolean;
   onClose: () => void;
+  // Optional prompt handed in from the home-screen suggestion chips. When
+  // the modal opens with this set, we auto-send it (skipping the empty
+  // state) and call onPromptConsumed so the parent can clear it.
+  initialPrompt?: string | null;
+  onPromptConsumed?: () => void;
 }
 
-export default function ConciergeChat({ visible, onClose }: ConciergeChatProps) {
+export default function ConciergeChat({
+  visible,
+  onClose,
+  initialPrompt,
+  onPromptConsumed,
+}: ConciergeChatProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const concierge = getConcierge();
@@ -128,28 +133,6 @@ export default function ConciergeChat({ visible, onClose }: ConciergeChatProps) 
   const [streaming, setStreaming] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  // ── Cost monitor (testing / demo phase) ────────────────────────────────
-  // `lastCost` holds the breakdown for the most recent turn so the user
-  // sees the cost of the question they just asked. `sessionTotals` is a
-  // running aggregate across every turn in this modal-open lifetime.
-  // Both reset when the user taps the Reset (refresh) button.
-  const [lastCost, setLastCost] = useState<TurnCost | null>(null);
-  const [sessionTotals, setSessionTotals] = useState<{
-    turns: number;
-    usd: number;
-    inputTokens: number;
-    outputTokens: number;
-    cacheReadTokens: number;
-    cacheWriteTokens: number;
-  }>({
-    turns: 0,
-    usd: 0,
-    inputTokens: 0,
-    outputTokens: 0,
-    cacheReadTokens: 0,
-    cacheWriteTokens: 0,
-  });
 
   const scrollRef = useRef<ScrollView>(null);
 
@@ -402,17 +385,6 @@ export default function ConciergeChat({ visible, onClose }: ConciergeChatProps) 
         if (result.wineryCards && assistantId) {
           setWineryCards((prev) => ({ ...prev, [assistantId]: result.wineryCards! }));
         }
-        setLastCost(result.cost);
-        setSessionTotals((prev) => ({
-          turns: prev.turns + 1,
-          usd: prev.usd + result.cost.total.usd.total,
-          inputTokens: prev.inputTokens + result.cost.total.inputTokens,
-          outputTokens: prev.outputTokens + result.cost.total.outputTokens,
-          cacheReadTokens:
-            prev.cacheReadTokens + result.cost.total.cacheReadTokens,
-          cacheWriteTokens:
-            prev.cacheWriteTokens + result.cost.total.cacheWriteTokens,
-        }));
       } catch (err) {
         // Tear down the typewriter — concierge.history is the source
         // of truth on error (it won't include the failed turn), so a
@@ -456,6 +428,25 @@ export default function ConciergeChat({ visible, onClose }: ConciergeChatProps) 
     ]
   );
 
+  // Auto-send a prompt handed in from the home-screen suggestion chips.
+  // Fires once per open: when the modal becomes visible with an
+  // initialPrompt we send it immediately (skipping the empty state) and
+  // tell the parent to clear it. The ref guard prevents a re-fire when
+  // onPromptConsumed nulls the prop; it resets when the modal closes so a
+  // later chip tap fires again.
+  const initialPromptFiredRef = useRef(false);
+  useEffect(() => {
+    if (!visible) {
+      initialPromptFiredRef.current = false;
+      return;
+    }
+    if (initialPrompt && !initialPromptFiredRef.current) {
+      initialPromptFiredRef.current = true;
+      void send(initialPrompt);
+      onPromptConsumed?.();
+    }
+  }, [visible, initialPrompt, onPromptConsumed, send]);
+
   const handleReset = () => {
     concierge.reset();
     // Tear down any in-flight typewriter state too — a Reset mid-stream
@@ -471,17 +462,6 @@ export default function ConciergeChat({ visible, onClose }: ConciergeChatProps) 
     setWineryCards({});
     setStartingTripId(null);
     setError(null);
-    // Reset the cost monitor too — a "Reset" should mean a clean slate
-    // for both the conversation AND the running cost tally.
-    setLastCost(null);
-    setSessionTotals({
-      turns: 0,
-      usd: 0,
-      inputTokens: 0,
-      outputTokens: 0,
-      cacheReadTokens: 0,
-      cacheWriteTokens: 0,
-    });
   };
 
   // ── Start Trip from a sommelier-proposed itinerary ─────────────────────
@@ -652,12 +632,6 @@ export default function ConciergeChat({ visible, onClose }: ConciergeChatProps) 
         </View>
 
         <View style={styles.headerRule} />
-
-        {/* ── Cost monitor (dev / demo overlay) ───────────────────────────── */}
-        {/* Always visible during the testing phase so each query's token
-            and USD cost is right there next to the answer. Remove or
-            wrap in __DEV__ before shipping. */}
-        <CostMonitor lastCost={lastCost} totals={sessionTotals} />
 
         {/* ── Body ─────────────────────────────────────────────────────────── */}
         <KeyboardAvoidingView
@@ -861,80 +835,6 @@ export default function ConciergeChat({ visible, onClose }: ConciergeChatProps) 
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
-
-// Dev / demo overlay. Shows:
-//   • The latest turn's cost (USD) and token totals — what the user
-//     just paid to get the answer on screen.
-//   • A running session total (turns × cost × tokens).
-//   • A per-call breakdown so router-vs-response cost is visible.
-// Renders a "—" placeholder before the first turn so the panel is
-// always present (avoids layout jump when the first reply lands).
-function CostMonitor({
-  lastCost,
-  totals,
-}: {
-  lastCost: TurnCost | null;
-  totals: {
-    turns: number;
-    usd: number;
-    inputTokens: number;
-    outputTokens: number;
-    cacheReadTokens: number;
-    cacheWriteTokens: number;
-  };
-}) {
-  const last = lastCost?.total;
-  return (
-    <View style={styles.costMonitor}>
-      <View style={styles.costRow}>
-        <Text style={styles.costKicker}>DEV · LAST TURN</Text>
-        <Text style={styles.costKickerRight}>
-          {totals.turns > 0 ? `SESSION · ${totals.turns} TURN${totals.turns === 1 ? "" : "S"}` : "SESSION"}
-        </Text>
-      </View>
-
-      <View style={styles.costRow}>
-        <Text style={styles.costFigure}>
-          {last ? formatUsd(last.usd.total) : "—"}
-        </Text>
-        <Text style={styles.costFigure}>
-          {formatUsd(totals.usd)}
-        </Text>
-      </View>
-
-      <View style={styles.costRow}>
-        <Text style={styles.costDetail}>
-          {last
-            ? `${formatTokens(last.inputTokens)} in · ${formatTokens(last.outputTokens)} out · ${formatTokens(last.cacheReadTokens)} cached`
-            : "ask a question to see the cost"}
-        </Text>
-        <Text style={styles.costDetail}>
-          {totals.turns > 0
-            ? `${formatTokens(totals.inputTokens)} in · ${formatTokens(totals.outputTokens)} out`
-            : ""}
-        </Text>
-      </View>
-
-      {lastCost && lastCost.parts.length > 0 && (
-        <View style={styles.costParts}>
-          {lastCost.parts.map((p) => (
-            <Text key={p.label} style={styles.costPartLine}>
-              {p.label}: {formatUsd(p.breakdown.usd.total)} ·{" "}
-              {formatTokens(p.breakdown.inputTokens)} in /{" "}
-              {formatTokens(p.breakdown.outputTokens)} out
-              {p.breakdown.cacheReadTokens > 0
-                ? ` · ${formatTokens(p.breakdown.cacheReadTokens)} cached`
-                : ""}
-              {p.breakdown.cacheWriteTokens > 0
-                ? ` · ${formatTokens(p.breakdown.cacheWriteTokens)} write`
-                : ""}
-            </Text>
-          ))}
-        </View>
-      )}
-    </View>
-  );
-}
 
 function MessageBubble({ role, content }: { role: ChatMessage["role"]; content: string }) {
   const isUser = role === "user";
@@ -1296,65 +1196,6 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: colors.border,
     marginHorizontal: spacing.xxl,
-  },
-
-  // ── Cost monitor (dev overlay) ─────────────────────────────────────────
-  // Deliberately a little visually loud — different surface colour, sharp
-  // edges, monospace-y vibe — so it's obviously a debug widget and not a
-  // production UI element. Strip these styles (and the component above)
-  // when shipping a public build.
-  costMonitor: {
-    marginHorizontal: spacing.xxl,
-    marginTop: spacing.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.card,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderLeftWidth: 2,
-    borderLeftColor: colors.accent,
-    gap: 2,
-  },
-  costRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "baseline",
-  },
-  costKicker: {
-    ...type.kicker,
-    color: colors.accent,
-    fontSize: 9,
-  },
-  costKickerRight: {
-    ...type.kicker,
-    color: colors.textMuted,
-    fontSize: 9,
-  },
-  costFigure: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 16,
-    color: colors.textPrimary,
-    letterSpacing: -0.2,
-  },
-  costDetail: {
-    fontFamily: fonts.sans,
-    fontSize: 11,
-    color: colors.textMuted,
-    letterSpacing: 0.2,
-  },
-  costParts: {
-    marginTop: 4,
-    paddingTop: 4,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    gap: 2,
-  },
-  costPartLine: {
-    fontFamily: fonts.sans,
-    fontSize: 10,
-    color: colors.textSecondary,
-    letterSpacing: 0.1,
   },
 
   // ── Scroll body ────────────────────────────────────────────────────────

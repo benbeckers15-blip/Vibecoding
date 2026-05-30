@@ -72,44 +72,85 @@ export interface RegionConfig {
   /** Curated sub-region names to surface in STYLE_NOTES. Falls back to
    *  `subRegions.map(s => s.name)`. Empty array → omit the bullet. */
   promptSubRegions?: string[];
-  schemaVersion: number;
+  /** IANA timezone identifier for the region (e.g. "Australia/Hobart").
+   *  Used to compute "today" for the user — both in the cached world
+   *  index ("today:open→5pm" hints per winery) and in the per-turn
+   *  `<today>` tag. Without this the server falls back to UTC, which is
+   *  ~10 hours behind Tasmania and a full day off for users in their
+   *  morning. Optional in the type for back-compat with older docs;
+   *  missing → UTC + warning log. Set on every region doc. */
+  timezone?: string;
 }
 
 // ─── Cache ───────────────────────────────────────────────────────────────────
 
-const _cache = new Map<string, Promise<RegionConfig>>();
+interface CachedRegion {
+  /** In-flight or resolved promise. Concurrent cold-start requests
+   *  share this so a single Firestore round-trip serves them all. */
+  promise: Promise<RegionConfig>;
+  /** Wall-clock time the load was kicked off — used for TTL. We stamp
+   *  at kick-off (not at resolve) so a slow load doesn't extend its
+   *  own TTL. */
+  loadedAt: number;
+}
+
+const _cache = new Map<string, CachedRegion>();
+
+// TTL for the region-config cache. Default 15 minutes; same default as
+// the corpus cache (see orchestrator.ts), and overridden by the same
+// CONCIERGE_CACHE_TTL_MS env var. Without this, an edit to the
+// `regions/{regionId}` doc (regional primer, brand voice line,
+// sub-regions, picker prompts) wouldn't reach the concierge until the
+// Cloud Run container was recycled — could be hours under steady
+// traffic. With the TTL, edits propagate within a quarter-hour.
+const DEFAULT_CACHE_TTL_MS = 15 * 60 * 1000;
+const CACHE_TTL_MS =
+  Number(process.env.CONCIERGE_CACHE_TTL_MS) || DEFAULT_CACHE_TTL_MS;
 
 /**
- * Load a region's config doc. Cached at module scope, so subsequent calls
- * on a warm container are free. Concurrent cold-start requests share the
- * in-flight promise.
+ * Load a region's config doc. Cached at module scope with a bounded
+ * TTL — subsequent calls within the TTL window are free; calls after
+ * the window re-read Firestore so edits propagate without a redeploy.
+ * Concurrent cold-start requests share the in-flight promise.
  *
  * Throws if regions/{regionId} doesn't exist. The HTTP handler converts
  * this into a 400 with a clear error message — better than serving a
  * concierge response with a half-formed system prompt.
  */
 export async function getRegionConfig(regionId: string): Promise<RegionConfig> {
-  let p = _cache.get(regionId);
-  if (!p) {
-    p = (async () => {
-      const db = getFirestore();
-      const snap = await db.collection("regions").doc(regionId).get();
-      if (!snap.exists) {
-        throw new Error(
-          `Unknown regionId="${regionId}" — no regions/${regionId} document in Firestore.`
-        );
-      }
-      const data = snap.data() as Omit<RegionConfig, "regionId">;
-      return { regionId, ...data };
-    })();
-    // On failure, drop the cache entry so the next request retries
-    // rather than serving the same error forever.
-    p.catch(() => {
-      _cache.delete(regionId);
-    });
-    _cache.set(regionId, p);
+  const now = Date.now();
+  const entry = _cache.get(regionId);
+  if (entry && now - entry.loadedAt < CACHE_TTL_MS) {
+    return entry.promise;
   }
-  return p;
+
+  const promise = (async () => {
+    const db = getFirestore();
+    const snap = await db.collection("regions").doc(regionId).get();
+    if (!snap.exists) {
+      throw new Error(
+        `Unknown regionId="${regionId}" — no regions/${regionId} document in Firestore.`
+      );
+    }
+    const data = snap.data() as Omit<RegionConfig, "regionId">;
+    return { regionId, ...data };
+  })();
+
+  // Stamp + store BEFORE awaiting so concurrent requests reuse the
+  // in-flight load.
+  _cache.set(regionId, { promise, loadedAt: now });
+
+  // On failure: drop ONLY if our entry is still the latest. Another
+  // request may have already replaced it with a successful retry, and
+  // we don't want to evict that one.
+  promise.catch(() => {
+    const current = _cache.get(regionId);
+    if (current?.promise === promise) {
+      _cache.delete(regionId);
+    }
+  });
+
+  return promise;
 }
 
 // ─── Helpers derived from RegionConfig.subRegions ───────────────────────────

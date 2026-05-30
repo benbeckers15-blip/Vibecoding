@@ -61,6 +61,19 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Concierge per-session daily quota counters. Written by the Cloud
+    // Function on every concierge turn (via firebase-admin, bypassing
+    // rules). Clients have no business reading or writing these — a
+    // client that could read them could enumerate other users' session
+    // IDs, and one that could write could zero its own counter. Locked
+    // down to admin-only.
+    //
+    // Cleanup: configure a Firestore TTL policy on the `expiresAt`
+    // field for this collection (one-time setup, see rateLimit.ts).
+    match /concierge_rate_limits/{doc} {
+      allow read, write: if false;
+    }
+
     // ── Per-user collections ─────────────────────────────────────────────────
     // Only the signed-in user may read or write their own document.
 

@@ -12,7 +12,7 @@
 //      string we want a user query to match against. Rich and prose-y, not
 //      the compact pipe format the LLM consumes. Embedding models score
 //      readable sentences far better than key:value lines.
-//   3. Batch-embed via Voyage (`voyage-3-lite`, 1024 dims, ~$0.02/1M tokens).
+//   3. Batch-embed via Voyage (`voyage-3-lite`, 512 dims, ~$0.02/1M tokens).
 //   4. Upsert vectors to Upstash Vector with the small subset of metadata we
 //      need to apply hard post-filters at query time (region, tag flags).
 //
@@ -53,7 +53,9 @@ const vectorIndex = new Index({ url: UPSTASH_URL, token: UPSTASH_TOKEN });
 
 // ─── Config ────────────────────────────────────────────────────────────────────
 
-const EMBED_MODEL  = 'voyage-3-lite';   // 1024 dims, cheap, plenty good for ~73 docs
+const EMBED_MODEL  = 'voyage-3-lite';   // 512 dims (Matryoshka), cheap, plenty good for ~73 docs.
+                                        // Matches the Upstash index dimension — switching to voyage-3
+                                        // (1024 dims) would require recreating the index from scratch.
 const BATCH_SIZE   = 64;                // Voyage allows up to 128; 64 is a comfortable fit
 const ARGS         = parseArgs(process.argv.slice(2));
 

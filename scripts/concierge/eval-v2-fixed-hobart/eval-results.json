@@ -1,0 +1,129 @@
+{
+  "url": "http://127.0.0.1:5001/winery-tourism-tasmania/us-central1/concierge",
+  "regionId": "tasmania",
+  "runAt": "2026-05-28T12:34:40.750Z",
+  "results": [
+    {
+      "id": 14,
+      "expectedBranch": "DISCOVERY",
+      "expectations": [
+        "intent should be DISCOVERY",
+        "clarifyingQuestion should be null (NARROWED rule per stipulation #12)",
+        "reply should give a confident default recommendation"
+      ],
+      "multiTurn": false,
+      "transcript": [
+        {
+          "query": "What's good?",
+          "elapsedMs": 5605,
+          "streamedText": "The Coal River Valley is a wonderful choice for a tasting today, Thursday. It's close to Hobart and offers a range of styles.\n\nFor a relaxed, award-winning experience, Pressing Matters Cellar Door is open until 5pm. Their tasting room is nestled right within the vineyard, offering a true sense of place with every sip.\n\nIf you appreciate a grander setting with stunning views, Caledon Estate is also open until 5pm and boasts an architecturally striking cellar door with views toward kunanyi. They also have a restaurant for lunch.\n\nFor something a little more intimate, Sisu Wines is open until 4:30pm. They're part of a larger farm where a significant portion is left wild, which speaks to their thoughtful approach to winemaking.\n\nCharles Reuben Estate is another good option, open until 3pm today, and they also offer tours if you're interested in seeing behind the scenes.\n\n",
+          "done": {
+            "reply": "The Coal River Valley is a wonderful choice for a tasting today, Thursday. It's close to Hobart and offers a range of styles.\n\nFor a relaxed, award-winning experience, Pressing Matters Cellar Door is open until 5pm. Their tasting room is nestled right within the vineyard, offering a true sense of place with every sip.\n\nIf you appreciate a grander setting with stunning views, Caledon Estate is also open until 5pm and boasts an architecturally striking cellar door with views toward kunanyi. They also have a restaurant for lunch.\n\nFor something a little more intimate, Sisu Wines is open until 4:30pm. They're part of a larger farm where a significant portion is left wild, which speaks to their thoughtful approach to winemaking.\n\nCharles Reuben Estate is another good option, open until 3pm today, and they also offer tours if you're interested in seeing behind the scenes.",
+            "usage": {
+              "prompt_tokens": 10014,
+              "completion_tokens": 243,
+              "prompt_tokens_details": {
+                "cached_tokens": 9204
+              }
+            },
+            "stopReason": "stop",
+            "routerDecision": {
+              "selfContainedQuery": "What's good?",
+              "intent": "DISCOVERY",
+              "anchorWinerySlug": null,
+              "anchorWineId": null,
+              "regions": [
+                "Coal River Valley"
+              ],
+              "tags": [],
+              "wineWords": [],
+              "dayOfWeek": null,
+              "clarifyingQuestion": null
+            },
+            "candidateCount": 8,
+            "cost": {
+              "total": {
+                "inputTokens": 948,
+                "outputTokens": 300,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 12276,
+                "totalTokens": 13524,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.00016424999999999998,
+                  "output": 0.0003294,
+                  "cacheWrite": 0,
+                  "cacheRead": 0.00040297499999999997,
+                  "total": 0.000896625
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 138,
+                    "outputTokens": 57,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 3072,
+                    "totalTokens": 3267,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.0001035,
+                      "output": 0.0002565,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.0002304,
+                      "total": 0.0005903999999999999
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 810,
+                    "outputTokens": 243,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 9204,
+                    "totalTokens": 10257,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.00006074999999999999,
+                      "output": 0.0000729,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.000172575,
+                      "total": 0.00030622500000000003
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": null,
+            "wineryCards": {
+              "slugs": [
+                "pressing-matters-cellar-door",
+                "caledon-estate",
+                "sisu-wines",
+                "charles-reuben-estate"
+              ]
+            },
+            "history": [
+              {
+                "role": "user",
+                "content": "What's good?"
+              },
+              {
+                "role": "assistant",
+                "content": "The Coal River Valley is a wonderful choice for a tasting today, Thursday. It's close to Hobart and offers a range of styles.\n\nFor a relaxed, award-winning experience, Pressing Matters Cellar Door is open until 5pm. Their tasting room is nestled right within the vineyard, offering a true sense of place with every sip.\n\nIf you appreciate a grander setting with stunning views, Caledon Estate is also open until 5pm and boasts an architecturally striking cellar door with views toward kunanyi. They also have a restaurant for lunch.\n\nFor something a little more intimate, Sisu Wines is open until 4:30pm. They're part of a larger farm where a significant portion is left wild, which speaks to their thoughtful approach to winemaking.\n\nCharles Reuben Estate is another good option, open until 3pm today, and they also offer tours if you're interested in seeing behind the scenes."
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

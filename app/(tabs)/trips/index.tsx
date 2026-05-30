@@ -157,6 +157,56 @@ function TripsIndexScreen() {
           </Pressable>
         )}
 
+        {/* ── My trips (now at the top) ──────────────────────────────────── */}
+        <View style={styles.sectionHeaderRow}>
+          <View style={styles.goldLine} />
+          <Text style={styles.sectionLabel}>MY TRIPS</Text>
+        </View>
+
+        {userTrips.length === 0 ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyText}>
+              You haven’t built a trip yet.
+            </Text>
+          </View>
+        ) : (
+          userTrips.map((t) => (
+            <UserTripCard
+              key={t.id}
+              trip={t}
+              onPress={() =>
+                router.push({
+                  pathname: "/(tabs)/trips/[id]",
+                  params: { id: t.id, kind: "user" },
+                })
+              }
+            />
+          ))
+        )}
+
+        {/* Small Build Your Own pill — clearly nested inside the section,
+            below the trips list (or empty state) but above the next divider. */}
+        <View style={styles.buildOwnRow}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.buildOwnPill,
+              pressed && styles.cardPressed,
+            ]}
+            onPress={() => router.push("/(tabs)/trips/create")}
+            accessibilityRole="button"
+            accessibilityLabel="Build your own trip"
+            hitSlop={8}
+          >
+            <Ionicons
+              name="add"
+              size={14}
+              color={colors.accent}
+              style={{ marginRight: 4 }}
+            />
+            <Text style={styles.buildOwnPillText}>Build Your Own</Text>
+          </Pressable>
+        </View>
+
         {/* ── Loading state for both curated rails ────────────────────────── */}
         {premadeLoading ? (
           <View style={styles.sectionLoading}>
@@ -227,47 +277,9 @@ function TripsIndexScreen() {
           </>
         )}
 
-        {/* ── My trips ───────────────────────────────────────────────────── */}
-        <View style={styles.sectionHeaderRow}>
-          <View style={styles.goldLine} />
-          <Text style={styles.sectionLabel}>MY TRIPS</Text>
-        </View>
-
-        {userTrips.length === 0 ? (
-          <View style={styles.empty}>
-            <Text style={styles.emptyText}>
-              You haven’t built a trip yet. Tap the button below to start one.
-            </Text>
-          </View>
-        ) : (
-          userTrips.map((t) => (
-            <UserTripCard
-              key={t.id}
-              trip={t}
-              onPress={() =>
-                router.push({
-                  pathname: "/(tabs)/trips/[id]",
-                  params: { id: t.id, kind: "user" },
-                })
-              }
-            />
-          ))
-        )}
-
-        {/* spacer so the floating CTA never sits on top of the last card */}
-        <View style={{ height: 140 }} />
+        {/* spacer so the floating tab bar never overlaps the last card */}
+        <View style={{ height: 100 }} />
       </ScrollView>
-
-      {/* ── Floating CTA ─────────────────────────────────────────────────── */}
-      <Pressable
-        style={styles.fab}
-        onPress={() => router.push("/(tabs)/trips/create")}
-        accessibilityRole="button"
-        accessibilityLabel="Build your own trip"
-      >
-        <Ionicons name="add" size={20} color={colors.onAccent} />
-        <Text style={styles.fabText}>Build Your Own</Text>
-      </Pressable>
     </View>
   );
 }
@@ -595,7 +607,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.sm,
     paddingHorizontal: spacing.xxl,
-    marginTop: spacing.hero,
+    marginTop: spacing.xxxl,
     marginBottom: spacing.lg,
   },
   goldLine: {
@@ -640,7 +652,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   halfImgWrap: {
-    height: 150,
+    // 180 (was 150) — gives the photo enough vertical room that `cover`
+    // doesn't have to zoom in heavily on a 3:2 / 4:3 source to fill the
+    // 260-wide card. Tuned so a typical landscape photo crops gently
+    // rather than aggressively magnifying the middle slice.
+    height: 180,
     position: "relative",
     backgroundColor: colors.surfaceDeep,
   },
@@ -738,7 +754,10 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   fullImgWrap: {
-    height: 200,
+    // 240 (was 200) — taller frame means `cover` zooms less on a normal
+    // landscape photo to fill the full-card width. Keeps the editorial
+    // photo-with-text-overlay look but lets more of the image breathe.
+    height: 240,
     position: "relative",
     backgroundColor: colors.surfaceDeep,
   },
@@ -850,28 +869,31 @@ const styles = StyleSheet.create({
     opacity: 0.92,
   },
 
-  // ── Floating CTA ────────────────────────────────────────────────────────
-  fab: {
-    position: "absolute",
-    right: spacing.xxl,
-    bottom: 100, // above the floating tab bar
-    backgroundColor: colors.accent,
-    borderRadius: radius.pill,
+  // ── Build Your Own — small pill nested inside the MY TRIPS section ─────
+  buildOwnRow: {
+    paddingHorizontal: spacing.xxl,
+    marginTop: spacing.xs,
+    flexDirection: "row",
+    // Right-aligned so the pill sits on the right edge of the section,
+    // reading as a small action tucked into the corner rather than a full
+    // width CTA.
+    justifyContent: "flex-end",
+  },
+  buildOwnPill: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.xs,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    elevation: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    backgroundColor: "transparent",
   },
-  fabText: {
-    ...type.kicker,
-    color: colors.onAccent,
-    fontWeight: weights.emphasis,
+  buildOwnPillText: {
+    ...type.caption,
+    color: colors.accent,
+    fontFamily: fonts.sansMedium,
+    letterSpacing: 0.2,
   },
 });
 

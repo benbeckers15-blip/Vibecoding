@@ -144,6 +144,21 @@ export interface RegionConfig {
    *  "the island's history". Defaults to "region" when absent. */
   geographyNoun?: string;
 
+  /** IANA timezone identifier for the region (e.g. "Australia/Hobart"
+   *  for Tasmania, "Australia/Perth" for Margaret River). The concierge
+   *  uses this to determine the current day-of-week for the user, both
+   *  in the cached world index ("today:open→5pm" hints per winery) and
+   *  in the per-turn `<today>` tag the system prompt reads.
+   *
+   *  Why required-in-practice: server `new Date().getDay()` runs in UTC.
+   *  For a Tasmanian user at 8am AEST (10pm UTC the previous day), UTC
+   *  would tell the model "today is Monday" when the user means Tuesday.
+   *  The model would then answer hours questions for the wrong day.
+   *
+   *  Optional in the type for backward compat — when missing, the server
+   *  falls back to UTC and logs a warning. Set this on every region doc. */
+  timezone?: string;
+
   /** Curated list of sub-region names to surface in the system prompt's
    *  STYLE_NOTES block ("Refer to regions by their proper names: …").
    *  Optional — when absent, the prompt builder falls back to

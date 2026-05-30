@@ -11,6 +11,7 @@ import {
   Animated,
   FlatList,
   Linking,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,6 +21,7 @@ import {
 } from "react-native";
 import * as Location from "expo-location";
 import { Image } from "expo-image";
+import Slider from "@react-native-community/slider";
 import MapView from "react-native-map-clustering";
 import { Callout, Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -68,6 +70,11 @@ type Winery = {
 
 type SortMode = "featured" | "nearMe" | "az";
 
+// Filter pill / bottom-sheet identifiers. `null` means no sheet open.
+// "all" opens a combined sheet stacking every category; the others scope
+// the sheet to a single category.
+type FilterSheetKind = "sort" | "region" | "features" | "rating" | "all";
+
 // ─── Filter config ────────────────────────────────────────────────────────────
 const BOOLEAN_FILTERS: {
   key: keyof Winery;
@@ -100,6 +107,14 @@ const RATING_OPTIONS = [
   { label: "4.3+", value: 4.3 },
   { label: "4.5+", value: 4.5 },
 ];
+
+// Distance-from-me slider bounds (km, haversine). Tasmania's longest
+// span is ~300 km but the wineries cluster heavily in the south + east,
+// so 200 km comfortably covers every doc in the region. At 200 km we
+// treat the slider as "no distance constraint" so it disappears from
+// the filter logic — same intent as the old "Any" rating option.
+const DISTANCE_MIN_KM = 1;
+const DISTANCE_MAX_KM = 200;
 
 // REGION_OPTIONS and TASMANIA_REGION used to be hardcoded here. They now
 // come from the active region's config doc (region.subRegions + region.mapBounds),
@@ -167,19 +182,13 @@ function WineriesScreen() {
   const [minRating, setMinRating] = useState(0);
   const [selectedRegions, setSelectedRegions] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<SortMode>("featured");
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const filtersAnim = useRef(new Animated.Value(0)).current;
+  // Distance-from-me cutoff in km. DISTANCE_MAX_KM = "no constraint";
+  // any value strictly less than that filters the list.
+  const [maxDistanceKm, setMaxDistanceKm] = useState(DISTANCE_MAX_KM);
+  // Which filter bottom-sheet is currently open. `null` = none.
+  const [activeSheet, setActiveSheet] = useState<FilterSheetKind | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
-
-  // Animate the collapsible filter panel open/closed
-  useEffect(() => {
-    Animated.timing(filtersAnim, {
-      toValue: filtersOpen ? 1 : 0,
-      duration: 240,
-      useNativeDriver: false,
-    }).start();
-  }, [filtersOpen, filtersAnim]);
 
   // Request location — called when the user selects "Near Me" sort
   const ensureUserLocation = useCallback(async () => {
@@ -270,14 +279,6 @@ function WineriesScreen() {
           .map((d) => ({ id: d.id, ...(d.data() as Omit<Winery, "id">) }))
           .sort((a, b) => a.name.localeCompare(b.name));
 
-        // Demo: if no winery in Firestore has featured:true yet, mark the
-        // first alphabetical one so the Featured sort is demonstrable.
-        // Remove this block once you've set featured:true on the correct
-        // winery document(s) in Firestore.
-        if (data.length > 0 && !data.some((w) => w.featured)) {
-          data[0] = { ...data[0], featured: true };
-        }
-
         setWineries(data);
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
@@ -342,6 +343,17 @@ function WineriesScreen() {
     if (selectedRegions.size > 0) {
       if (!w.region || !selectedRegions.has(w.region)) return false;
     }
+    // Distance-from-me filter. Only active when the user has set the
+    // slider below its max AND we have a usable reference location.
+    // Wineries without finite coords are excluded — we can't verify
+    // they're within range and the user explicitly asked for one.
+    if (maxDistanceKm < DISTANCE_MAX_KM && hasRefLoc) {
+      if (!Number.isFinite(w.latitude) || !Number.isFinite(w.longitude)) {
+        return false;
+      }
+      const d = distanceKm(refLat, refLng, w.latitude as number, w.longitude as number);
+      if (d > maxDistanceKm) return false;
+    }
     return true;
   });
 
@@ -381,12 +393,6 @@ function WineriesScreen() {
   const mappableWineries = filtered.filter(
     (w) => Number.isFinite(w.latitude) && Number.isFinite(w.longitude)
   );
-
-  // Count active filters for the badge on the filter button
-  const activeFilterCount =
-    activeFilters.size +
-    selectedRegions.size +
-    (minRating > 0 ? 1 : 0);
 
   // ── Loading state ──────────────────────────────────────────────────────────
   if (loading) {
@@ -664,6 +670,414 @@ function WineriesScreen() {
     );
   };
 
+  // ── Filter pills ────────────────────────────────────────────────────────
+  // Per-category active flags. Treated as booleans rather than counts —
+  // the pill UI only cares "is this category contributing to the filter
+  // or not?" (active = accent fill).
+  // Sort pill is "active" when sort mode != default OR the distance
+  // slider is below its max (the slider lives inside the Sort sheet).
+  const distanceConstrained = maxDistanceKm < DISTANCE_MAX_KM;
+  const sortActive     = sortBy !== "featured" || distanceConstrained;
+  const regionActive   = selectedRegions.size > 0;
+  const featuresActive = activeFilters.size > 0;
+  const ratingActive   = minRating > 0;
+  const anyActive      = sortActive || regionActive || featuresActive || ratingActive;
+
+  // Pill definitions, rendered in declared order. Skipping the REGION
+  // pill when the active region has no sub-regions (flat regions like
+  // a single-AVA setup) — otherwise it opens a useless empty sheet.
+  type PillDef = {
+    kind: FilterSheetKind;
+    label: string;
+    active: boolean;
+    skip?: boolean;
+    // Optional leading icon rendered inside the pill, to the left of the
+    // label. Currently only the "All" pill uses one (the same options
+    // glyph that used to sit on the search bar).
+    icon?: keyof typeof Ionicons.glyphMap;
+  };
+  const pillDefs: PillDef[] = [
+    // "All" leads the row so it's the first pill the eye lands on when
+    // reading the row left-to-right — frames the category pills that
+    // follow as drill-downs from the master filter.
+    { kind: "all",      label: "All",      active: anyActive, icon: "options-outline" },
+    { kind: "sort",     label: "Sort by",  active: sortActive    },
+    { kind: "region",   label: "Region",   active: regionActive, skip: regionOptions.length === 0 },
+    { kind: "features", label: "Features", active: featuresActive },
+    { kind: "rating",   label: "Rating",   active: ratingActive, icon: "logo-google" },
+  ];
+
+  const openSheet = (kind: FilterSheetKind) =>
+    setActiveSheet((prev) => (prev === kind ? null : kind));
+  const closeSheet = () => setActiveSheet(null);
+
+  const filterPillsRow = (
+    <View style={styles.pillsWrap}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.pillsRow}
+      >
+        {pillDefs
+          .filter((p) => !p.skip)
+          .map(({ kind, label, active, icon }) => (
+            <Pressable
+              key={kind}
+              onPress={() => openSheet(kind)}
+              style={[styles.pill, active && styles.pillActive]}
+              accessibilityRole="button"
+              accessibilityLabel={
+                active ? `${label} filter — active. Tap to edit.` : `Open ${label} filter`
+              }
+              accessibilityState={{ selected: active, expanded: activeSheet === kind }}
+            >
+              {icon && (
+                <Ionicons
+                  name={icon}
+                  size={13}
+                  color={active ? colors.onAccent : colors.textSecondary}
+                  style={styles.pillLeadingIcon}
+                />
+              )}
+              <Text style={[styles.pillText, active && styles.pillTextActive]}>
+                {label}
+              </Text>
+              <Ionicons
+                name="chevron-down"
+                size={12}
+                color={active ? colors.onAccent : colors.textSecondary}
+                style={styles.pillCaret}
+              />
+            </Pressable>
+          ))}
+      </ScrollView>
+    </View>
+  );
+
+  // ── Filter sheet content blocks ─────────────────────────────────────────
+  // Each block renders one category's controls. They're reused across the
+  // category-specific sheets AND stacked together inside the "All" sheet.
+  // Inside individual category sheets the green title at the top already
+  // tells the user which category they're in, so the inner gray
+  // category label would just repeat itself. Show the inner label only
+  // when we're rendering inside the "All" sheet, where the labels act
+  // as section dividers between stacked blocks.
+  const showCategoryLabels = activeSheet === "all";
+
+  const sortBlock = (
+    <View style={styles.sheetCategoryBlock}>
+      {showCategoryLabels && (
+        <Text style={styles.categoryLabel}>SORT BY</Text>
+      )}
+      <View style={styles.sortRow}>
+        {(["featured", "nearMe", "az"] as const).map((mode) => {
+          const sortLabel =
+            mode === "featured" ? "Featured" : mode === "nearMe" ? "Near Me" : "A to Z";
+          return (
+            <Pressable
+              key={mode}
+              style={[styles.sortBtn, sortBy === mode && styles.sortBtnActive]}
+              onPress={() => handleSortBy(mode)}
+              accessibilityRole="button"
+              accessibilityLabel={`Sort by ${sortLabel}`}
+              accessibilityState={{ selected: sortBy === mode }}
+            >
+              <Text
+                style={[
+                  styles.sortBtnText,
+                  sortBy === mode && styles.sortBtnTextActive,
+                ]}
+              >
+                {mode === "featured" ? "Featured" : mode === "nearMe" ? "Near Me" : "A–Z"}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      {sortBy === "nearMe" && locationDenied && (
+        <Text style={styles.locationHint}>
+          Location access is off — enable it in Settings.
+        </Text>
+      )}
+      {sortBy === "nearMe" && !hasRefLoc && !locationDenied && (
+        <Text style={styles.locationHint}>Fetching your location…</Text>
+      )}
+
+      {/* ── Distance-from-me slider ───────────────────────────────
+          Lives below the sort buttons since it's the same family of
+          location-aware controls. Works independently of sort mode
+          (you can constrain distance while still sorting Featured),
+          but touching it kicks off the same location request as the
+          Near Me sort if it hasn't been granted yet. */}
+      <View style={styles.distanceSliderBlock}>
+        <View style={styles.distanceSliderHeader}>
+          <Text style={styles.distanceSliderLabel}>DISTANCE FROM ME</Text>
+          <Text style={styles.distanceSliderValue}>
+            {distanceConstrained ? `Within ${maxDistanceKm} km` : "Any distance"}
+          </Text>
+        </View>
+        <Slider
+          style={styles.distanceSlider}
+          minimumValue={DISTANCE_MIN_KM}
+          maximumValue={DISTANCE_MAX_KM}
+          step={1}
+          value={maxDistanceKm}
+          onValueChange={(v: number) => {
+            // Request location lazily — the first time the user
+            // actually touches the slider. Avoids prompting on
+            // mount for users who never use this control.
+            if (!userLocation && !locationDenied) ensureUserLocation();
+            setMaxDistanceKm(Math.round(v));
+          }}
+          minimumTrackTintColor={colors.accent}
+          maximumTrackTintColor={colors.border}
+          thumbTintColor={colors.accentSoft}
+          accessibilityLabel="Maximum distance from me, in kilometres"
+        />
+        {distanceConstrained && !hasRefLoc && !locationDenied && (
+          <Text style={styles.locationHint}>
+            Waiting for your location to apply distance filter…
+          </Text>
+        )}
+        {distanceConstrained && locationDenied && (
+          <Text style={styles.locationHint}>
+            Location is off — enable it in Settings to filter by distance.
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+
+  const regionBlock = regionOptions.length > 0 && (
+    <View style={styles.sheetCategoryBlock}>
+      {showCategoryLabels && (
+        <Text style={styles.categoryLabel}>REGION</Text>
+      )}
+      <View style={styles.sheetWrappingChips}>
+        {regionOptions.map((subRegion) => {
+          const active = selectedRegions.has(subRegion);
+          return (
+            <Pressable
+              key={subRegion}
+              style={[styles.regionChip, active && styles.regionChipActive]}
+              onPress={() => toggleRegion(subRegion)}
+              accessibilityRole="button"
+              accessibilityLabel={
+                active
+                  ? `Remove region filter: ${subRegion}`
+                  : `Filter by region: ${subRegion}`
+              }
+              accessibilityState={{ selected: active }}
+            >
+              <Text
+                style={[
+                  styles.regionChipText,
+                  active && styles.regionChipTextActive,
+                ]}
+              >
+                {subRegion}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+
+  const featuresBlock = (
+    <View style={styles.sheetCategoryBlock}>
+      {showCategoryLabels && (
+        <Text style={styles.categoryLabel}>FEATURES</Text>
+      )}
+      <View style={styles.sheetWrappingChips}>
+        {BOOLEAN_FILTERS.map(({ key, label, icon }) => {
+          const active = activeFilters.has(key);
+          return (
+            <Pressable
+              key={String(key)}
+              style={[styles.chip, active && styles.chipActive]}
+              onPress={() => toggleFilter(key)}
+              accessibilityRole="button"
+              accessibilityLabel={
+                active ? `Remove filter: ${label}` : `Filter by ${label}`
+              }
+              accessibilityState={{ selected: active }}
+            >
+              <View style={styles.chipInner}>
+                <Ionicons
+                  name={icon}
+                  size={13}
+                  color={active ? colors.onAccent : colors.textSecondary}
+                  style={styles.chipIcon}
+                />
+                <Text
+                  style={[styles.chipText, active && styles.chipTextActive]}
+                >
+                  {label}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+
+  const ratingBlock = (
+    <View style={styles.sheetCategoryBlock}>
+      {/* Inside the All sheet the RATING section keeps its own G + label
+          header so the rating block reads as a distinct, Google-sourced
+          section. Inside the single Rating sheet the green title at the
+          top already plays that role (and gets its own G via
+          `sheetTitleIcon`), so this header would just duplicate. */}
+      {showCategoryLabels && (
+        <View style={styles.sheetCategoryHeader}>
+          <Ionicons
+            name="logo-google"
+            size={12}
+            color={colors.textMuted}
+            style={styles.sheetCategoryHeaderIcon}
+          />
+          <Text style={styles.categoryLabel}>RATING</Text>
+        </View>
+      )}
+      <View style={styles.ratingBtnsRow}>
+        {RATING_OPTIONS.map(({ label, value }) => (
+          <Pressable
+            key={value}
+            style={[
+              styles.ratingBtn,
+              minRating === value && styles.ratingBtnActive,
+            ]}
+            onPress={() => setMinRating(minRating === value ? 0 : value)}
+            accessibilityRole="button"
+            accessibilityLabel={
+              minRating === value
+                ? `Remove minimum rating filter: ${label}`
+                : `Filter by minimum rating: ${label}`
+            }
+            accessibilityState={{ selected: minRating === value }}
+          >
+            <Text
+              style={[
+                styles.ratingBtnText,
+                minRating === value && styles.ratingBtnTextActive,
+              ]}
+            >
+              {label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+
+  // Reset every category to defaults. Used by the "Clear all" affordance
+  // inside the All-filters sheet.
+  const clearAllFilters = () => {
+    setSortBy("featured");
+    setSelectedRegions(new Set());
+    setActiveFilters(new Set());
+    setMinRating(0);
+    setMaxDistanceKm(DISTANCE_MAX_KM);
+  };
+
+  // Map sheet kind → title + body. `all` stacks every block; the others
+  // show a single block. Region is skipped from `all` for flat regions.
+  const sheetTitle =
+    activeSheet === "sort"     ? "SORT BY"  :
+    activeSheet === "region"   ? "REGION"   :
+    activeSheet === "features" ? "FEATURES" :
+    activeSheet === "rating"   ? "RATING"   :
+    activeSheet === "all"      ? "ALL FILTERS" :
+    "";
+
+  // Optional icon shown next to the sheet title. Mirrors the leading
+  // icon on each pill so the source/category cue stays consistent
+  // between the pill (entry point) and the sheet (the controls).
+  const sheetTitleIcon: keyof typeof Ionicons.glyphMap | null =
+    activeSheet === "rating" ? "logo-google"     :
+    activeSheet === "all"    ? "options-outline" :
+    null;
+
+  const sheetBody =
+    activeSheet === "sort"     ? sortBlock     :
+    activeSheet === "region"   ? regionBlock   :
+    activeSheet === "features" ? featuresBlock :
+    activeSheet === "rating"   ? ratingBlock   :
+    activeSheet === "all" ? (
+      <>
+        {sortBlock}
+        {regionBlock}
+        {featuresBlock}
+        {ratingBlock}
+      </>
+    ) : null;
+
+  const filterSheet = (
+    <Modal
+      visible={activeSheet !== null}
+      transparent
+      animationType="slide"
+      onRequestClose={closeSheet}
+    >
+      <Pressable
+        style={styles.sheetBackdrop}
+        onPress={closeSheet}
+        accessibilityRole="button"
+        accessibilityLabel="Close filters"
+      >
+        {/* Inner pressable swallows taps so they don't bubble to the
+            backdrop and dismiss the sheet while the user is interacting
+            with controls inside it. */}
+        <Pressable style={styles.sheet} onPress={() => {}} accessible={false}>
+          <View style={styles.sheetHandle} />
+
+          <View style={styles.sheetHeader}>
+            <View style={styles.sheetTitleRow}>
+              {sheetTitleIcon && (
+                <Ionicons
+                  name={sheetTitleIcon}
+                  size={15}
+                  color={colors.accentSoft}
+                  style={styles.sheetTitleIcon}
+                />
+              )}
+              <Text style={styles.sheetTitle}>{sheetTitle}</Text>
+            </View>
+            {activeSheet === "all" && anyActive && (
+              <Pressable
+                onPress={clearAllFilters}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Clear all filters"
+              >
+                <Text style={styles.sheetClearText}>Clear all</Text>
+              </Pressable>
+            )}
+          </View>
+
+          <ScrollView
+            style={styles.sheetScroll}
+            contentContainerStyle={styles.sheetScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {sheetBody}
+          </ScrollView>
+
+          <Pressable
+            style={styles.sheetDoneBtn}
+            onPress={closeSheet}
+            accessibilityRole="button"
+            accessibilityLabel="Apply filters and close"
+          >
+            <Text style={styles.sheetDoneBtnText}>Done</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+
   // Results count + List/Map toggle. Hoisted out of the conditional view
   // branches so TypeScript doesn't narrow `view` to a single literal inside
   // them — and so we don't duplicate this JSX between the list and map paths.
@@ -722,7 +1136,7 @@ function WineriesScreen() {
         <Text style={styles.headerTitle}>Our Wineries</Text>
       </View>
 
-      {/* ── Glass search bar + filter button ──────────────────────────────────── */}
+      {/* ── Glass search bar ──────────────────────────────────────────────────── */}
       <View style={styles.searchWrap}>
         <View style={styles.searchBar}>
           <Ionicons
@@ -741,254 +1155,29 @@ function WineriesScreen() {
           {search.length > 0 && (
             <Pressable
               onPress={() => setSearch("")}
-              style={{ marginRight: 8 }}
+              hitSlop={6}
               accessibilityRole="button"
               accessibilityLabel="Clear search"
             >
               <Ionicons name="close-circle" size={16} color={colors.textMuted} />
             </Pressable>
           )}
-          <Pressable
-            onPress={() => setFiltersOpen((v) => !v)}
-            style={[styles.filterBtn, filtersOpen && styles.filterBtnActive]}
-            hitSlop={6}
-            accessibilityRole="button"
-            accessibilityLabel={
-              filtersOpen
-                ? "Hide filters"
-                : activeFilterCount > 0
-                ? `Show filters, ${activeFilterCount} active`
-                : "Show filters"
-            }
-            accessibilityState={{ expanded: filtersOpen }}
-          >
-            <Ionicons
-              name="options-outline"
-              size={14}
-              color={colors.onAccent}
-            />
-            {activeFilterCount > 0 && (
-              <View style={styles.filterBadge}>
-                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
-              </View>
-            )}
-          </Pressable>
         </View>
       </View>
 
       {/*
-        ── Collapsible filter panel ──────────────────────────────────────
-        Hoisted OUT of the FlatList's ListHeaderComponent so it always
-        sits immediately beneath the search bar, regardless of how far
-        the user has scrolled. (Previously it lived inside the list
-        header, so opening filters while scrolled mid-list expanded the
-        header off-screen above and visibly shifted the list down
-        instead of revealing the panel.) Rendering it here also makes
-        the filter button work in map mode, where there is no FlatList
-        header to host it.
+        ── Filter pills + bottom-sheet system ─────────────────────────────
+        Replaces the old collapsible drop-down panel. Each pill targets a
+        single filter category (or "All" for everything); tapping a pill
+        opens a bottom sheet with that category's controls. Tapping the
+        same pill again, or the backdrop, dismisses the sheet.
+
+        Pill states are simple — "active" (any filter set in that
+        category) just swaps to an accent fill so the row reads at a
+        glance. No labels mutate.
       */}
-      {filtersOpen && (
-        <Animated.View
-          style={[
-            styles.filterPanel,
-            {
-              opacity: filtersAnim,
-              transform: [
-                {
-                  translateY: filtersAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [-8, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          {/* ── Panel header + close button ────────────────────── */}
-          <View style={styles.filterHeader}>
-            <Text style={styles.filterHeaderLabel}>FILTERS</Text>
-            <Pressable
-              onPress={() => setFiltersOpen(false)}
-              style={styles.filterCloseBtn}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel="Close filters"
-            >
-              <Text style={styles.filterCloseText}>Close</Text>
-              <Ionicons name="chevron-up" size={15} color={colors.textSecondary} />
-            </Pressable>
-          </View>
-
-          {/* ── Sort By ───────────────────────────────────────── */}
-          <View style={styles.categoryBlock}>
-            <Text style={styles.categoryLabel}>SORT BY</Text>
-            <View style={styles.sortRow}>
-              {(["featured", "nearMe", "az"] as const).map((mode) => {
-                const sortLabel =
-                  mode === "featured"
-                    ? "Featured"
-                    : mode === "nearMe"
-                    ? "Near Me"
-                    : "A to Z";
-                return (
-                <Pressable
-                  key={mode}
-                  style={[styles.sortBtn, sortBy === mode && styles.sortBtnActive]}
-                  onPress={() => handleSortBy(mode)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Sort by ${sortLabel}`}
-                  accessibilityState={{ selected: sortBy === mode }}
-                >
-                  <Text
-                    style={[
-                      styles.sortBtnText,
-                      sortBy === mode && styles.sortBtnTextActive,
-                    ]}
-                  >
-                    {mode === "featured"
-                      ? "Featured"
-                      : mode === "nearMe"
-                      ? "Near Me"
-                      : "A–Z"}
-                  </Text>
-                </Pressable>
-                );
-              })}
-            </View>
-            {sortBy === "nearMe" && locationDenied && (
-              <Text style={styles.locationHint}>
-                Location access is off — enable it in Settings.
-              </Text>
-            )}
-            {sortBy === "nearMe" && !hasRefLoc && !locationDenied && (
-              <Text style={styles.locationHint}>
-                Fetching your location…
-              </Text>
-            )}
-          </View>
-
-          {/* ── Sub-region chips (only for regions that HAVE
-               sub-regions; hidden entirely for flat regions). */}
-          {regionOptions.length > 0 && (
-            <View style={styles.categoryBlock}>
-              <Text style={styles.categoryLabel}>REGION</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.chipsRow}
-              >
-                {regionOptions.map((subRegion) => {
-                  const active = selectedRegions.has(subRegion);
-                  return (
-                    <Pressable
-                      key={subRegion}
-                      style={[
-                        styles.regionChip,
-                        active && styles.regionChipActive,
-                      ]}
-                      onPress={() => toggleRegion(subRegion)}
-                      accessibilityRole="button"
-                      accessibilityLabel={
-                        active
-                          ? `Remove region filter: ${subRegion}`
-                          : `Filter by region: ${subRegion}`
-                      }
-                      accessibilityState={{ selected: active }}
-                    >
-                      <Text
-                        style={[
-                          styles.regionChipText,
-                          active && styles.regionChipTextActive,
-                        ]}
-                      >
-                        {subRegion}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          )}
-
-          {/* ── Features (boolean chips) ──────────────────────── */}
-          <View style={styles.categoryBlock}>
-            <Text style={styles.categoryLabel}>FEATURES</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.chipsRow}
-            >
-              {BOOLEAN_FILTERS.map(({ key, label, icon }) => {
-                const active = activeFilters.has(key);
-                return (
-                  <Pressable
-                    key={String(key)}
-                    style={[styles.chip, active && styles.chipActive]}
-                    onPress={() => toggleFilter(key)}
-                    accessibilityRole="button"
-                    accessibilityLabel={
-                      active
-                        ? `Remove filter: ${label}`
-                        : `Filter by ${label}`
-                    }
-                    accessibilityState={{ selected: active }}
-                  >
-                    <View style={styles.chipInner}>
-                      <Ionicons
-                        name={icon}
-                        size={13}
-                        color={active ? colors.onAccent : colors.textSecondary}
-                        style={styles.chipIcon}
-                      />
-                      <Text
-                        style={[
-                          styles.chipText,
-                          active && styles.chipTextActive,
-                        ]}
-                      >
-                        {label}
-                      </Text>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
-
-          {/* ── Rating ────────────────────────────────────────── */}
-          <View style={styles.categoryBlock}>
-            <Text style={styles.categoryLabel}>RATING</Text>
-            <View style={styles.ratingBtnsRow}>
-              {RATING_OPTIONS.map(({ label, value }) => (
-                <Pressable
-                  key={value}
-                  style={[
-                    styles.ratingBtn,
-                    minRating === value && styles.ratingBtnActive,
-                  ]}
-                  onPress={() => setMinRating(minRating === value ? 0 : value)}
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    minRating === value
-                      ? `Remove minimum rating filter: ${label}`
-                      : `Filter by minimum rating: ${label}`
-                  }
-                  accessibilityState={{ selected: minRating === value }}
-                >
-                  <Text
-                    style={[
-                      styles.ratingBtnText,
-                      minRating === value && styles.ratingBtnTextActive,
-                    ]}
-                  >
-                    {label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        </Animated.View>
-      )}
+      {filterPillsRow}
+      {filterSheet}
 
       {/* ── List ──────────────────────────────────────────────────────────── */}
       {view === "list" && (
@@ -1133,97 +1322,163 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
 
-  // ── Filter button ────────────────────────────────────────────────────────
-  filterBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  filterBtnActive: {
-    backgroundColor: colors.accentSoft ?? colors.accent,
-  },
-  filterBadge: {
-    position: "absolute",
-    top: -3,
-    right: -3,
-    minWidth: 16,
-    height: 16,
-    paddingHorizontal: 4,
-    borderRadius: 8,
-    backgroundColor: colors.error ?? "#c0392b",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1.5,
-    borderColor: colors.background,
-  },
-  filterBadgeText: {
-    color: colors.onAccent,
-    fontSize: 10,
-    fontWeight: "700",
-    lineHeight: 12,
-  },
-
-  // ── Collapsible filter panel ────────────────────────────────────────────
-  // Lifted off the page bg so the panel reads as its own surface and the
-  // boundary between filters and list cards is obvious. Three things do
-  // the work:
-  //   1. `surface` bg — a half-step lighter than `background` so the eye
-  //      can see the panel as a discrete block, not bleed into the cards.
-  //   2. Bottom hairline — a hard edge where the panel ends. Without it
-  //      the surface color alone is too subtle to terminate cleanly.
-  //   3. Drop shadow — a soft cast under that hairline that "lifts" the
-  //      drawer and pushes the list visually beneath it.
-  //   4. Bottom padding — small inner gap so the last RATING row doesn't
-  //      sit flush against the hairline.
-  filterPanel: {
-    backgroundColor: colors.surface,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.md,
-    marginTop: spacing.sm,
+  // ── Filter pills (below the search bar) ─────────────────────────────────
+  // Horizontal scrollable row of small oval pills, one per filter
+  // category plus an "All" entry. Tapping a pill opens a bottom sheet.
+  // Active pills swap to an accent fill so the row reads at a glance
+  // without changing labels.
+  pillsWrap: {
     marginBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderStrong,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    elevation: 6,
+  },
+  pillsRow: {
+    paddingHorizontal: spacing.xxl,
+    gap: spacing.sm,
+    alignItems: "center",
+  },
+  pill: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  pillActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  pillText: {
+    ...type.caption,
+    color: colors.textPrimary,
+    fontWeight: weights.body,
+    letterSpacing: 0.2,
+  },
+  pillTextActive: {
+    color: colors.onAccent,
+    fontWeight: weights.emphasis,
+  },
+  pillCaret: {
+    marginLeft: 6,
+  },
+  pillLeadingIcon: {
+    marginRight: 6,
   },
 
-  // ── Filter panel header ─────────────────────────────────────────────────
-  filterHeader: {
+  // ── Filter bottom sheet (Modal) ─────────────────────────────────────────
+  // Slides up from the bottom over a dimmed backdrop. Body is one of the
+  // category blocks (or all of them stacked for the "All" pill). Reuses
+  // the existing sort/region/feature/rating control styles below so the
+  // controls themselves match the rest of the app.
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: colors.scrim,
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: spacing.xl,
+    borderTopRightRadius: spacing.xl,
+    borderTopWidth: 1,
+    borderColor: colors.border,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.hero,
+    paddingHorizontal: spacing.xxl,
+    // Cap the sheet so it never eats the whole screen — keeps the
+    // backdrop tappable and the list peeking behind for context.
+    maxHeight: "85%",
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: colors.border,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: spacing.lg,
+  },
+  sheetHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: spacing.xxl,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
-  filterHeaderLabel: {
-    ...type.kicker,
-    color: colors.textMuted,
-    letterSpacing: 2,
-  },
-  filterCloseBtn: {
+  // Row that wraps the optional icon + title text inside the sheet header.
+  sheetTitleRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.xs,
-    paddingVertical: spacing.xs,
-    paddingLeft: spacing.md,
   },
-  filterCloseText: {
+  sheetTitleIcon: {
+    marginRight: 8,
+  },
+  // Bumped from kicker (10pt) to a more substantial section-header size
+  // so it reads as the primary header of the sheet rather than a small
+  // overline. Keeps uppercase + tracking for editorial consistency.
+  sheetTitle: {
+    fontFamily: fonts.sansBold,
+    fontSize: 14,
+    letterSpacing: 2.5,
+    color: colors.accentSoft,
+    textTransform: "uppercase",
+  },
+  sheetClearText: {
     ...type.caption,
     color: colors.textSecondary,
     fontWeight: weights.emphasis,
+    letterSpacing: 0.3,
+  },
+  sheetScroll: {
+    flexGrow: 0,
+  },
+  sheetScrollContent: {
+    paddingBottom: spacing.lg,
+  },
+  // Each category block inside the sheet. No horizontal padding (the
+  // sheet itself provides it) — separated by a bottom margin only.
+  sheetCategoryBlock: {
+    marginBottom: spacing.xl,
+  },
+  // Used for category headers that need an icon next to the label
+  // (currently just RATING with the Google "G"). The label keeps its
+  // own marginBottom for spacing to the controls below.
+  sheetCategoryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  sheetCategoryHeaderIcon: {
+    marginRight: 6,
+    // Lift the icon a tiny bit so the optical baseline sits closer to
+    // the kicker text (kicker has a small x-height; without this nudge
+    // the icon reads as floating high).
+    marginBottom: spacing.sm,
+  },
+  // Region + feature chips inside the sheet wrap onto multiple rows
+  // (instead of the horizontal ScrollView used in the old panel). Inside
+  // a sheet the user expects to see everything at once.
+  sheetWrappingChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  sheetDoneBtn: {
+    marginTop: spacing.lg,
+    alignSelf: "stretch",
+    paddingVertical: 14,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: spacing.hitTarget,
+  },
+  sheetDoneBtnText: {
+    ...type.kicker,
+    fontSize: 12,
+    letterSpacing: 2,
+    color: colors.onAccent,
+    fontWeight: weights.emphasis,
   },
 
-  // ── Category blocks ─────────────────────────────────────────────────────
-  categoryBlock: {
-    paddingHorizontal: spacing.xxl,
-    marginBottom: spacing.lg,
-  },
+  // ── Category labels (used inside each sheet block) ──────────────────────
   categoryLabel: {
     ...type.kicker,
     color: colors.textMuted,
@@ -1267,6 +1522,36 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
 
+  // ── Distance-from-me slider ─────────────────────────────────────────────
+  distanceSliderBlock: {
+    marginTop: spacing.lg,
+  },
+  distanceSliderHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: spacing.xs,
+  },
+  distanceSliderLabel: {
+    ...type.kicker,
+    color: colors.textMuted,
+  },
+  // The live numeric value sits right of the label so the user sees
+  // exactly what the slider's pointing at while they drag. Accent-soft
+  // matches the thumb so the eye links the two.
+  distanceSliderValue: {
+    ...type.caption,
+    color: colors.accentSoft,
+    fontWeight: weights.emphasis,
+    letterSpacing: 0.3,
+  },
+  distanceSlider: {
+    // Slight horizontal "pull-in" so the thumb's edge stays inside the
+    // sheet's padded content area at both extremes.
+    width: "100%",
+    height: 32,
+  },
+
   // ── Region ──────────────────────────────────────────────────────────────
   regionChip: {
     paddingHorizontal: spacing.md,
@@ -1293,10 +1578,6 @@ const styles = StyleSheet.create({
   },
 
   // ── Feature chips ────────────────────────────────────────────────────────
-  chipsRow: {
-    gap: spacing.sm,
-    alignItems: "center",
-  },
   chip: {
     paddingHorizontal: spacing.lg,
     paddingVertical: 11,
@@ -1640,8 +1921,11 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   markerPin: {
+    // Matches the lime logo-pin.png aspect (36×48 → 0.75). The asset's
+    // tip is at the bottom-center, so `anchor={{ x: 0.5, y: 1 }}` on the
+    // Marker drops the tip exactly on the coordinate.
     width: 36,
-    height: 42,
+    height: 48,
   },
   callout: {
     backgroundColor: colors.background,

@@ -184,6 +184,14 @@ const tasmania = {
   // can use a region-tuned line; omit and the UI falls back to a generic.
   homeHeadline: "An editorial guide to Tasmanian wine.",
 
+  // IANA timezone for Tasmania. The concierge uses this to compute
+  // "today" for the user — both in the cached world index ("today:open"
+  // hints per winery) and in the per-turn <today> tag in the system
+  // prompt. Server `new Date()` runs in UTC, which is 10–11 hours
+  // behind Tasmania; without this field, every morning ~10 hours of
+  // hours/day questions get answered for the wrong weekday.
+  timezone: "Australia/Hobart",
+
   schemaVersion: 1,
 };
 

@@ -23,7 +23,6 @@ import {
   Animated,
   Dimensions,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -45,15 +44,23 @@ const HERO_FALLBACK =
   "https://images.unsplash.com/photo-1734517648070-2e8d4ed686ac?q=80&w=1035&auto=format&fit=crop";
 
 // ─── Hero parallax constants ──────────────────────────────────────────────────
-const HERO_HEIGHT = 320;
+const SCREEN_W = Dimensions.get("window").width;
+const SCREEN_H = Dimensions.get("window").height;
+
+// Rounded top corners on the content card that overlaps the hero image
+const CARD_OVERLAP = 24;
+const CARD_RADIUS  = 8;   // unified home-screen card radius
+
+// Hero is sized so its *visible* portion (the part above the overlapping
+// content card) is a dominant 75% of the screen. We add CARD_OVERLAP because
+// the bottom CARD_OVERLAP points of the hero container sit underneath the
+// rounded-corner card, so HERO_HEIGHT must be a bit taller than the target
+// visible height.
+const HERO_VISIBLE_RATIO = 0.62;
+const HERO_HEIGHT = Math.round(SCREEN_H * HERO_VISIBLE_RATIO) + CARD_OVERLAP;
 const PARALLAX_EXTRA = 100;       // extra px the image extends beyond the container
 const PARALLAX_TRANSLATE = 10;    // max px the image translates as the hero scrolls away (very subtle)
 const PARALLAX_TOP_BIAS = 100;    // how far above the hero container the image starts (shifts image up)
-
-const SCREEN_W = Dimensions.get("window").width;
-// Rounded top corners on the content card that overlaps the hero image
-const CARD_OVERLAP = 24;
-const CARD_RADIUS  = 20;
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -78,13 +85,17 @@ interface FeaturedPour {
   heroImage: string;
 }
 
+// Home-page Library rail entry. The thumbnail-* fields are the new, clearly
+// labeled shape persisted in Firestore. Legacy fields (image/title/blurb/
+// kicker/cadence) are still accepted as a fallback so a partial migration of
+// the `explore_articles` collection doesn't break the rail.
 type ArticleEntry = {
   key: string;
-  kicker: string;
-  title: string;
-  blurb: string;
-  image: string;
-  cadence: string;            // e.g. "Weekly", "Monthly", "Series"
+  thumbnailKicker: string;
+  thumbnailTitle: string;
+  thumbnailBlurb: string;
+  thumbnailImage: string;
+  thumbnailCadence: string;
   href?: string;              // tap target — undefined ⇒ shows "Coming soon"
   order: number;
 };
@@ -114,6 +125,10 @@ function HomeScreen() {
   // State lives on the home screen so the entry point and the modal stay
   // tightly coupled; the modal itself manages all chat state internally.
   const [chatOpen, setChatOpen] = useState(false);
+  // A suggestion chip stuffs its prompt here and opens the chat; ConciergeChat
+  // auto-sends it on open, then calls onPromptConsumed to clear it. Null when
+  // the chat is opened via the bare search bar (no pre-filled prompt).
+  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
 
   // Reopen-chat trigger. When the user taps a winery card inside the
   // concierge, navigates to the detail screen, and then taps "Chat"
@@ -208,7 +223,27 @@ function HomeScreen() {
         setArticles(
           snap.docs
             .filter((d) => d.data().active !== false)
-            .map((d) => ({ key: d.id, ...(d.data() as Omit<ArticleEntry, "key">) }))
+            .map((d) => {
+              // Read clearly labeled `thumbnail*` fields first; fall back to
+              // legacy `image / title / blurb / kicker / cadence` for docs
+              // that haven't been re-seeded yet.
+              const data = d.data();
+              return {
+                key: d.id,
+                thumbnailImage:
+                  data.thumbnailImage ?? data.image ?? "",
+                thumbnailTitle:
+                  data.thumbnailTitle ?? data.title ?? "",
+                thumbnailBlurb:
+                  data.thumbnailBlurb ?? data.blurb ?? "",
+                thumbnailKicker:
+                  data.thumbnailKicker ?? data.kicker ?? "",
+                thumbnailCadence:
+                  data.thumbnailCadence ?? data.cadence ?? "",
+                href: data.href,
+                order: data.order ?? 0,
+              } as ArticleEntry;
+            })
         );
       } catch {
         // Silently fail — article list stays empty.
@@ -300,48 +335,66 @@ function HomeScreen() {
             transition={200}
           />
         </Animated.View>
-        {/* Brand header overlaid on photo */}
+
+        {/* Dark gradient on the top edge of the hero — anchors the logo against
+            light/bright photography. Sits above the image but below the UI. */}
+        <LinearGradient
+          colors={["rgba(0,0,0,0.55)", "rgba(0,0,0,0)"]}
+          style={styles.heroTopGradient}
+          pointerEvents="none"
+        />
+
+        {/* Dark gradient on the bottom edge of the hero — fades the photo into
+            the editorial copy section below and adds contrast under the search
+            bar when it sits near the bottom of bright imagery. */}
+        <LinearGradient
+          colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.6)"]}
+          style={styles.heroBottomGradient}
+          pointerEvents="none"
+        />
+
+        {/* Region title overlaid on the photo, top-left — the local-focus
+            anchor in Bebas Neue (replaces the old SipLocal wordmark). */}
         <View style={[styles.heroHeader, { paddingTop: insets.top + 10 }]}>
-          <Text style={styles.logo}>
-            Sip<Text style={styles.logoAccent}>Local</Text>
-          </Text>
-        </View>
-      </View>
-
-      {/* ── Hero editorial copy — on warm paper below the image ────────────────
-            Headline is `<Region>,\nby the glass.` — the comma-vocative pattern
-            reads well for any region name ("Tasmania, by the glass.",
-            "Margaret River, by the glass."). The line break is preserved
-            in the template literal. */}
-      <View style={styles.heroCopySection}>
-        <Text style={styles.heroHeadline}>
-          {`${region.displayName},\nby the glass.`}
-        </Text>
-      </View>
-
-      {/* ── Concierge search bar ─────────────────────────────────────────────── */}
-      <Pressable
-        style={styles.searchSection}
-        onPress={() => setChatOpen(true)}
-        accessibilityRole="button"
-        accessibilityLabel={`Ask the ${region.regionAdjective ?? region.displayName} wine concierge`}
-        accessibilityHint="Opens an in-app chat with the sommelier"
-      >
-        <View style={styles.searchBar} pointerEvents="none">
-          <Ionicons
-            name="chatbubble-ellipses-outline"
-            size={15}
-            color={colors.textSecondary}
-            style={{ marginRight: 10 }}
-          />
-          <Text style={styles.searchPlaceholder}>
-            {`Ask about ${region.regionAdjective ?? region.displayName} wine…`}
-          </Text>
-          <View style={styles.searchBtn}>
-            <Ionicons name="arrow-up" size={14} color={colors.onAccent} />
+          <View style={styles.heroTitleWrap}>
+            <Text style={styles.heroTitle}>{region.displayNameUpper}</Text>
+            <View style={styles.heroTitleDivider} />
+            <Text style={styles.heroSubtitle}>WINE COUNTRY</Text>
           </View>
         </View>
-      </Pressable>
+
+        {/* ── Concierge entry — search bar anchored near the vertical center of
+              the hero. Tapping it opens a chat with the sommelier. */}
+        <View style={styles.searchSection}>
+          <Pressable
+            style={styles.searchBar}
+            onPress={() => {
+              setPendingPrompt(null);
+              setChatOpen(true);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`Ask the ${region.regionAdjective ?? region.displayName} wine concierge`}
+            accessibilityHint="Opens an in-app chat with the sommelier"
+          >
+            <Ionicons
+              name="chatbubble-ellipses-outline"
+              size={15}
+              color={colors.textOnLightMuted}
+              style={{ marginRight: 10 }}
+            />
+            <Text style={styles.searchPlaceholder} numberOfLines={1}>
+              Ask me anything
+            </Text>
+            <View style={styles.searchBtn}>
+              <Ionicons name="arrow-up" size={14} color={colors.onAccent} />
+            </View>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* ── Rounded card overlay — softens the bottom of the hero photo
+            with rounded top corners that lip over the image. */}
+      <View style={styles.heroCopySection} />
 
       {/* ── Featured winery card ─────────────────────────────────────────────── */}
       {featuredWinery && (
@@ -388,7 +441,12 @@ function HomeScreen() {
                     : ""}
                 </Text>
               )}
-              <Text style={styles.featCta}>Visit cellar door →</Text>
+              <View style={styles.ctaRow}>
+                <View style={styles.readBtn}>
+                  <Text style={styles.readBtnText}>VISIT</Text>
+                  <Ionicons name="arrow-forward" size={12} color={colors.onAccent} />
+                </View>
+              </View>
             </View>
           </Pressable>
         </View>
@@ -430,9 +488,6 @@ function HomeScreen() {
                 style={StyleSheet.absoluteFill}
               />
               <View style={styles.featuredOverlay}>
-                <Text style={styles.featuredIssue}>
-                  {pour.issueLabel} · {pour.kicker}
-                </Text>
                 <Text style={styles.featuredHeadline} numberOfLines={3}>
                   {pour.headline}
                 </Text>
@@ -475,7 +530,6 @@ function HomeScreen() {
                 style={StyleSheet.absoluteFill}
               />
               <View style={styles.featuredOverlay}>
-                <Text style={styles.featuredIssue}>THE POUR · WEEKLY</Text>
                 <Text style={styles.featuredHeadline}>
                   A weekly taste of local vineyards, vintages, and voices.
                 </Text>
@@ -517,30 +571,37 @@ function HomeScreen() {
             disabled={!item.href}
             accessibilityRole="button"
             accessibilityLabel={
-              item.href ? `Read ${item.title}` : `${item.title}, coming soon`
+              item.href
+                ? `Read ${item.thumbnailTitle}`
+                : `${item.thumbnailTitle}, coming soon`
             }
             accessibilityState={{ disabled: !item.href }}
           >
-            <Image source={{ uri: item.image }} style={styles.articleCardImg} contentFit="cover" transition={150} />
+            <Image
+              source={{ uri: item.thumbnailImage }}
+              style={styles.articleCardImg}
+              contentFit="cover"
+              transition={150}
+            />
             <View style={styles.articleCardBody}>
-              <View style={styles.articleKickerRow}>
-                <Text style={styles.articleKicker}>{item.kicker}</Text>
-                <Text style={styles.articleCadence}>· {item.cadence}</Text>
-              </View>
               <Text style={styles.articleTitle} numberOfLines={2}>
-                {item.title}
+                {item.thumbnailTitle}
               </Text>
+              <View style={styles.articleKickerRow}>
+                <Text style={styles.articleKicker}>{item.thumbnailKicker}</Text>
+                <Text style={styles.articleCadence}>· {item.thumbnailCadence}</Text>
+              </View>
               <Text style={styles.articleBlurb} numberOfLines={2}>
-                {item.blurb}
+                {item.thumbnailBlurb}
               </Text>
               <View style={styles.articleFooter}>
                 {item.href ? (
-                  <View style={styles.readMore}>
-                    <Text style={styles.readMoreText}>READ</Text>
+                  <View style={styles.readBtn}>
+                    <Text style={styles.readBtnText}>READ</Text>
                     <Ionicons
                       name="arrow-forward"
-                      size={11}
-                      color={colors.accent}
+                      size={12}
+                      color={colors.onAccent}
                     />
                   </View>
                 ) : (
@@ -553,7 +614,12 @@ function HomeScreen() {
       </View>
     </Animated.ScrollView>
 
-      <ConciergeChat visible={chatOpen} onClose={() => setChatOpen(false)} />
+      <ConciergeChat
+        visible={chatOpen}
+        onClose={() => setChatOpen(false)}
+        initialPrompt={pendingPrompt}
+        onPromptConsumed={() => setPendingPrompt(null)}
+      />
     </View>
   );
 }
@@ -580,57 +646,98 @@ const styles = StyleSheet.create({
     height: HERO_HEIGHT,
     overflow: "hidden",                   // clip the parallax image
   },
+  // Dark vignette at the top of the hero — gives the SipLocal logo a readable
+  // backdrop against bright/light photography. Sized to cover roughly the top
+  // quarter of the hero.
+  heroTopGradient: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    height: Math.round(HERO_HEIGHT * 0.28),
+  },
+  // Dark vignette at the bottom of the hero — softens the join with the
+  // content card below and adds contrast under the search bar / lower edge.
+  heroBottomGradient: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: Math.round(HERO_HEIGHT * 0.32),
+  },
   heroHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: spacing.xxl,
   },
-  logo: {
-    fontFamily: fonts.display,          // Bebas Neue — tall condensed brand mark
-    fontSize: 28,                       // bumped slightly — Bebas reads smaller per-pt
-    color: colors.textOnDark,           // hardcoded light — overlaid on photograph
-    letterSpacing: 1.2,                 // wide tracking suits Bebas's narrow letterforms
-  },
-  logoAccent: {
-    fontFamily: fonts.display,          // keep the same family so the wordmark reads as one
-    color: colors.accentSoft,
-  },
   // Card overlay that floats over the bottom of the hero photo with rounded
-  // top corners, replacing the old telescope/curve-box trick.
+  // top corners that lip over the image for a soft transition into content.
   heroCopySection: {
     backgroundColor: colors.background,
     borderTopLeftRadius: CARD_RADIUS,
     borderTopRightRadius: CARD_RADIUS,
     marginTop: -CARD_OVERLAP,
-    paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.sm,
+    height: CARD_OVERLAP + 8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.18,
     shadowRadius: 10,
     elevation: 8,
   },
-  heroKicker: {
-    ...type.kicker,
-    color: colors.accent,
-  },
-  heroHeadline: {
-    ...type.display,                          // 54 / 58 / 1.5 / Bebas Neue
-    color: colors.textPrimary,                // soft off-white on dark slate — pops confidently
-    marginTop: spacing.xs,                    // pulled tighter under the kicker
-  },
 
-  // ── Search + chips ────────────────────────────────────────────────────────
+  // ── Search bar ──────────────────────────────────────────────────────────
+  // The concierge entry (search bar) is anchored toward the vertical center of
+  // the hero via `bottom`, scaling with hero height so it stays roughly
+  // centered across every device size.
   searchSection: {
-    marginTop: spacing.xl,
+    position: "absolute",
+    left: 0,
+    right: 0,
+    // Anchored a touch below the vertical center of the visible hero image
+    // (~34% of the hero height from the bottom).
+    bottom: Math.round(HERO_HEIGHT * 0.22),
     paddingHorizontal: spacing.xxl,           // standardised to 24
+  },
+  // Region name overlaid on the hero in Bebas Neue — the local-focus anchor.
+  // A subtle text shadow keeps it legible over bright/light photography where
+  // the hero gradients don't reach.
+  heroTitleWrap: {
+    marginTop: spacing.md,
+    marginBottom: spacing.xl,
+  },
+  // Thin white rule between the region name and "WINE COUNTRY".
+  heroTitleDivider: {
+    width: 56,
+    height: 1,
+    backgroundColor: colors.textOnDark,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  heroTitle: {
+    fontFamily: fonts.display,                // Bebas Neue
+    fontSize: 76,
+    lineHeight: 76,
+    color: colors.textOnDark,
+    letterSpacing: 2,
+    textShadowColor: "rgba(0,0,0,0.45)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 12,
+  },
+  heroSubtitle: {
+    fontFamily: fonts.sansMedium,
+    fontSize: type.body.fontSize,
+    letterSpacing: 5,
+    color: colors.textOnDark,
+    marginTop: spacing.xs,
+    textShadowColor: "rgba(0,0,0,0.45)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 8,
   },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.inputSurface,
+    backgroundColor: colors.inputSurfaceLight,
     borderRadius: 32,
     borderWidth: 1,
     borderColor: colors.border,
@@ -640,7 +747,7 @@ const styles = StyleSheet.create({
   searchPlaceholder: {
     flex: 1,
     fontSize: type.body.fontSize,
-    color: colors.textMuted,
+    color: colors.textOnLightMuted,
   },
   searchBtn: {
     width: 36,                                 // bumped from 30 to 36
@@ -663,8 +770,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   goldLine: {
-    width: 24,
-    height: 1,
+    width: 32,
+    height: 2,
     backgroundColor: colors.accent,
   },
   sectionKicker: {
@@ -675,7 +782,8 @@ const styles = StyleSheet.create({
   // ── Featured winery ───────────────────────────────────────────────────────
   featImgWrap: {
     height: 200,
-    borderRadius: radius.card,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
     overflow: "hidden",
   },
   featImg: {
@@ -687,6 +795,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderLeftWidth: 2,
     borderLeftColor: colors.accent,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
   },
   featRegion: {
     ...type.kicker,
@@ -705,11 +815,9 @@ const styles = StyleSheet.create({
     fontWeight: weights.emphasis,
     marginTop: spacing.sm,
   },
-  featCta: {
-    ...type.caption,
-    color: colors.accentSoft,
-    fontWeight: weights.emphasis,
-    marginTop: spacing.md,
+  ctaRow: {
+    flexDirection: "row",
+    marginTop: spacing.lg,
   },
 
   // ── Featured (The Pour) — relocated from the explore tab ────────────────
@@ -719,14 +827,14 @@ const styles = StyleSheet.create({
   featuredLoading: {
     height: 280,
     marginHorizontal: spacing.xxl,            // 24
-    borderRadius: 6,
+    borderRadius: 8,
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
   featuredCard: {
     marginHorizontal: spacing.xxl,
-    borderRadius: 6,
+    borderRadius: 8,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: colors.border,
@@ -748,8 +856,6 @@ const styles = StyleSheet.create({
   featuredHeadline: {
     fontFamily: fonts.serif,
     fontSize: 24,
-    fontStyle: "italic",
-    fontWeight: weights.body,
     color: colors.textOnDark,
     lineHeight: 30,
     letterSpacing: -0.4,
@@ -772,9 +878,8 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     backgroundColor: colors.accent,
     paddingHorizontal: spacing.md,
-    paddingVertical: 11,
+    paddingVertical: 6,
     borderRadius: radius.pill,
-    minHeight: spacing.hitTarget,
   },
   readBtnText: {
     ...type.kicker,
@@ -790,7 +895,7 @@ const styles = StyleSheet.create({
   articleCard: {
     marginHorizontal: spacing.xxl,            // 24 — matches featured card
     marginBottom: spacing.md,
-    borderRadius: radius.cardLg,
+    borderRadius: 8,
     overflow: "hidden",
     backgroundColor: colors.surfaceElevated,
     shadowColor: colors.shadow,
@@ -828,12 +933,12 @@ const styles = StyleSheet.create({
   },
   articleTitle: {
     fontFamily: fonts.serif,
-    fontSize: type.lede.fontSize,             // 17
+    fontSize: type.h3.fontSize,               // 22 — bumped from lede (17) for stronger hierarchy
     fontWeight: weights.emphasis,
     color: colors.textPrimary,
-    lineHeight: 23,
-    letterSpacing: -0.2,
-    marginBottom: spacing.sm,
+    lineHeight: 28,
+    letterSpacing: -0.3,
+    marginBottom: spacing.xs,
   },
   articleBlurb: {
     ...type.caption,                          // 12 / 16
@@ -842,17 +947,9 @@ const styles = StyleSheet.create({
   },
   articleFooter: {
     marginTop: spacing.md,
-  },
-  readMore: {
     flexDirection: "row",
+    justifyContent: "flex-end",
     alignItems: "center",
-    gap: spacing.xs,
-  },
-  readMoreText: {
-    ...type.kicker,
-    letterSpacing: 1.8,
-    fontWeight: weights.emphasis,
-    color: colors.accent,
   },
   comingSoon: {
     ...type.kicker,

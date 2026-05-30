@@ -13,6 +13,7 @@
 // impact is bounded to the duration of the active trip.
 
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Location from "expo-location";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -277,6 +278,13 @@ export default function TripActiveScreen() {
           text: "End Trip",
           style: "destructive",
           onPress: () => {
+            // Suppress the auto-completion alert + its router.back(). The
+            // user just confirmed via this dialog, so the secondary "Trip
+            // complete · Cheers!" alert would (a) double-confirm and (b)
+            // race a second router.back() into a stack that's already been
+            // popped by the manual back() below — which is the
+            // NavigationContainer onUnhandledAction crash we were seeing.
+            completedShown.current = true;
             completeTrip(trip.id);
             router.back();
           },
@@ -407,15 +415,30 @@ export default function TripActiveScreen() {
                       longitude: s.longitude,
                     }}
                     title={`${idx + 1}. ${s.name}`}
-                    // visited → muted, current target → bright lime, upcoming → forest
-                    pinColor={
-                      visited
-                        ? colors.textMuted
-                        : isCurrent
-                        ? colors.accentSoft
-                        : colors.accent
-                    }
-                  />
+                    // The lime logo-pin's tip is at bottom-center; this
+                    // anchor drops the tip on the coordinate.
+                    anchor={{ x: 0.5, y: 1 }}
+                    // The default RN Maps Marker re-renders aggressively
+                    // on Android when a child View changes. The pin's
+                    // appearance only depends on `visited`/`isCurrent`,
+                    // both of which already trigger a parent re-render,
+                    // so we can opt out of the per-frame view tracking
+                    // and avoid Android Marker stutter.
+                    tracksViewChanges={false}
+                  >
+                    {/* visited → faded, current → enlarged for emphasis,
+                        upcoming → default. Single SVG-derived PNG asset
+                        keeps the brand mark consistent across states. */}
+                    <Image
+                      source={require("../assets/images/logo-pin.png")}
+                      style={[
+                        styles.markerPin,
+                        isCurrent && styles.markerPinCurrent,
+                        visited && styles.markerPinVisited,
+                      ]}
+                      contentFit="contain"
+                    />
+                  </Marker>
                 );
               })}
             </MapView>
@@ -631,6 +654,15 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   map: { width: "100%", height: "100%" },
+  // Lime logo pin. Asset is 36×48 native px so the displayed size below
+  // matches 1:1 — no scaling, no aspect letterbox.
+  markerPin: { width: 36, height: 48 },
+  // Bigger pin for the active stop. Marker `anchor={{x:0.5,y:1}}` is
+  // relative to the View's dimensions, so the tip stays on the
+  // coordinate even though the box grows.
+  markerPinCurrent: { width: 46, height: 61 },
+  // Faded pin for stops already visited.
+  markerPinVisited: { opacity: 0.4 },
   mapLoadingOverlay: {
     position: "absolute",
     bottom: 8,

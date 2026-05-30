@@ -333,7 +333,23 @@ export function compactIndexEntry(w: WineryDoc, todayShort?: string): string {
   return fields.join(" | ");
 }
 
-export function renderWorldIndex(wineries: WineryDoc[]): string {
+/**
+ * Render the cached "world index" block — every winery in compact form,
+ * including a `today:<state>` hint per row.
+ *
+ * `todayShort` MUST be the 3-letter weekday ("Mon", "Tue", …, "Sun")
+ * computed in the USER's timezone, not the server's. We don't read
+ * `new Date()` here anymore: this function used to, and the result was
+ * memoised forever in the orchestrator. Warm containers that survived
+ * midnight kept serving yesterday's day. Callers now compute `todayShort`
+ * per turn (cheap) using the region's timezone and pass it in, so the
+ * orchestrator can cache by `${regionId}:${todayShort}` and the string
+ * automatically refreshes when the day rolls over.
+ */
+export function renderWorldIndex(
+  wineries: WineryDoc[],
+  todayShort: string
+): string {
   if (!wineries.length) return "";
   const sorted = [...wineries].sort((a, b) => {
     const ra = a.region || "~";
@@ -341,9 +357,6 @@ export function renderWorldIndex(wineries: WineryDoc[]): string {
     if (ra !== rb) return ra.localeCompare(rb);
     return (a.name || "").localeCompare(b.name || "");
   });
-  const todayShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
-    new Date().getDay()
-  ];
   return [
     "## Complete winery index",
     "",

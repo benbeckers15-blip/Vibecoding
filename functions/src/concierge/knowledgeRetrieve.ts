@@ -15,12 +15,26 @@
 import { Index } from "@upstash/vector";
 import { VoyageAIClient } from "voyageai";
 import { getFirestore } from "firebase-admin/firestore";
+import { rerankDocuments } from "./rerank";
 
 const EMBED_MODEL = "voyage-3-lite";
 const NAMESPACE = "knowledge";
 const COLLECTION = "knowledge_chunks";
-const DEFAULT_TOP_K = 4;
-const DEFAULT_MIN_SCORE = 0.65;
+// Final number of chunks that ship to the response model. Trimmed from
+// the previous DEFAULT_TOP_K=4 because the cross-encoder reranker (see
+// rerank.ts) lets us trust precision more — fewer chunks, less noise,
+// less prompt input cost.
+const DEFAULT_TOP_K = 3;
+// Wider candidate pool the reranker scores. We fetch up to this many
+// from Upstash, then narrow to DEFAULT_TOP_K via Voyage Rerank.
+// 12 is comfortable headroom for the reranker to pick a sharp top-3
+// without bloating the rerank call's own token budget.
+const VECTOR_FETCH_K = 12;
+// Looser score floor on the vector-search side, because the reranker
+// is now the precision gate. Previously 0.65; loosened to 0.45 so a
+// late-stage reranker can still pull in a relevant chunk that the
+// embedding model rated as borderline.
+const DEFAULT_MIN_SCORE = 0.45;
 
 let _voyage: VoyageAIClient | null = null;
 let _index: Index | null = null;
@@ -146,7 +160,14 @@ export async function retrieveKnowledge(
   query: string,
   opts: KnowledgeRetrieveOptions
 ): Promise<KnowledgeChunk[]> {
-  const topK = opts.topK ?? DEFAULT_TOP_K;
+  // Final cap on chunks shipped to the response model. The caller can
+  // override per-turn (rare); default 3 with rerank-as-precision-gate.
+  const finalTopK = opts.topK ?? DEFAULT_TOP_K;
+  // How many candidates we fetch from Upstash before the reranker
+  // narrows them down. We over-fetch so the reranker has signal to
+  // work with — never pull just `finalTopK`, otherwise rerank degenerates
+  // into a no-op.
+  const fetchK = Math.max(VECTOR_FETCH_K, finalTopK * 3);
   const minScore = opts.minScore ?? DEFAULT_MIN_SCORE;
 
   const voyage = getVoyage();
@@ -164,7 +185,7 @@ export async function retrieveKnowledge(
   const filter = buildFilter(opts);
   const hits = await ns.query<KnowledgeVectorMetadata>({
     vector,
-    topK,
+    topK: fetchK,
     includeMetadata: true,
     filter,
   });
@@ -175,7 +196,10 @@ export async function retrieveKnowledge(
   const ids = kept.map((h) => String(h.id));
   const byId = await hydrateChunks(ids);
 
-  return kept
+  // Hydrate all surviving candidates (still wider than finalTopK). The
+  // Firestore getAll() over ~12 docs is cheap; we'd rather pay for one
+  // batch read than rerank without text.
+  const candidates: KnowledgeChunk[] = kept
     .map((h) => {
       const doc = byId.get(String(h.id));
       if (!doc) {
@@ -198,6 +222,18 @@ export async function retrieveKnowledge(
       } satisfies KnowledgeChunk;
     })
     .filter((c): c is KnowledgeChunk => c !== null);
+
+  // Cross-encoder rerank against the user query. Fail-soft: a Voyage
+  // outage returns the vector ordering instead of the reranked one, so
+  // a degraded reranker never costs us a turn — just precision.
+  const { items } = await rerankDocuments(
+    query,
+    candidates,
+    (c) => c.text,
+    finalTopK,
+    "knowledge-rerank"
+  );
+  return items;
 }
 
 export function formatKnowledgeChunksForPrompt(

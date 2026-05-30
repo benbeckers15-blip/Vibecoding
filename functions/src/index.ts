@@ -11,7 +11,9 @@
 
 import { onRequest } from "firebase-functions/v2/https";
 import { initializeApp } from "firebase-admin/app";
+import { getAppCheck } from "firebase-admin/app-check";
 import { logger } from "firebase-functions/v2";
+import { checkAndIncrementDailyQuota } from "./concierge/rateLimit";
 
 // Initialise the Admin SDK once per cold start. Required by buildContext.ts
 // and knowledgeRetrieve.ts, which read Firestore via firebase-admin.
@@ -256,10 +258,22 @@ function validateRequest(body: ConciergeRequest): {
   };
 }
 
-// Bounded per-IP rate limiter. Cheap, in-process map keyed by remote IP.
-// Resets every RATE_WINDOW_MS. Survives within a single container's warm
-// lifespan; a request landing on a different container starts a fresh
-// bucket — that's acceptable as a coarse first-line defence.
+// Layer 1 — Bounded per-IP burst limiter. Cheap, in-process map keyed by
+// remote IP. Resets every RATE_WINDOW_MS. Survives within a single
+// container's warm lifespan; a request landing on a different container
+// starts a fresh bucket. This is FAST burst control — it stops a single
+// IP from hammering one warm instance with hundreds of requests in a
+// minute. It does NOT bound the total bill from one client over a day.
+//
+// Layer 2 (the real ceiling) is the Firestore-backed per-session daily
+// quota in ./concierge/rateLimit.ts — that's what stops a single client
+// (mobile install or website visitor) from accidentally OR maliciously
+// burning the OpenAI budget.
+//
+// Layer 3 is App Check, which the function options below enforce when
+// CONCIERGE_ENFORCE_APP_CHECK=true is set on the deployed environment.
+// That blocks traffic that isn't coming from our registered iOS / web
+// clients in the first place.
 const RATE_WINDOW_MS = 60_000;
 const RATE_LIMIT = 30; // requests per IP per minute
 const rateBuckets = new Map<string, { count: number; resetAt: number }>();
@@ -275,14 +289,34 @@ function isRateLimited(ip: string): boolean {
   return bucket.count > RATE_LIMIT;
 }
 
+// App Check enforcement is env-controlled so we can ship the code path
+// before the iOS app and web reCAPTCHA site key are registered in the
+// Firebase console. Default OFF — flipping it on without registering
+// would 401 every legitimate request.
+//
+// Deploy with --set-env-vars CONCIERGE_ENFORCE_APP_CHECK=true once:
+//   1. The iOS app is registered for App Check (App Attest provider) in
+//      Firebase console → App Check → Apps tab.
+//   2. The website domain is registered with reCAPTCHA v3 site key
+//      bound to the web app entry under the same App Check tab.
+//   3. The website AND iOS clients are fetching App Check tokens and
+//      attaching them to /concierge requests as `X-Firebase-AppCheck`.
+//
+// During development against the deployed function, generate a debug
+// token via the Firebase JS SDK / iOS SDK init logs and register it in
+// Firebase console → App Check → Apps → ⋮ → Manage debug tokens. That
+// lets your dev build through without owning real attestation creds.
+const ENFORCE_APP_CHECK = process.env.CONCIERGE_ENFORCE_APP_CHECK === "true";
+
 export const concierge = onRequest(
   {
     cors: true,
     invoker: "public",
-    // App Check enforcement gets turned on once the iOS app is registered
-    // in the Firebase console (Phase 4 work). Leaving off for now so we can
-    // hit this endpoint from a laptop with curl during testing.
-    // enforceAppCheck: true,
+    // App Check enforcement is handled MANUALLY inside the handler
+    // below — Gen 2 `onRequest`'s HttpsOptions does NOT support the
+    // `enforceAppCheck` flag (that's a `onCall`-only option). For raw
+    // HTTPS functions we verify the X-Firebase-AppCheck header via
+    // the Admin SDK. Gated on CONCIERGE_ENFORCE_APP_CHECK env var.
 
     // Bind every secret the orchestrator's lazy clients read.
     // LANGFUSE_* are optional — if not bound, the orchestrator just skips
@@ -291,6 +325,19 @@ export const concierge = onRequest(
     // without Langfuse keys) and still have the concierge work.
     secrets: [
       "OPENAI_API_KEY",
+      // Response-leg LLM key. The orchestrator picks between Gemini and
+      // OpenAI via LLM_PROVIDER (default "gemini") — see
+      // functions/src/concierge/orchestrator.ts. Even when the default
+      // is Gemini, OPENAI_API_KEY stays bound because the router and
+      // resolver still run on OpenAI. To roll back the response leg to
+      // OpenAI without code changes, set LLM_PROVIDER=openai in the
+      // function's env and redeploy; GEMINI_API_KEY can remain bound
+      // (an unused bound secret has no cost or effect).
+      //
+      // Populate with: `firebase functions:secrets:set GEMINI_API_KEY`
+      // and paste the AI Studio key (same value as scripts/.env's
+      // GEMINI_API_KEY entry).
+      "GEMINI_API_KEY",
       "VOYAGE_API_KEY",
       "UPSTASH_VECTOR_URL",
       "UPSTASH_VECTOR_TOKEN",
@@ -333,8 +380,45 @@ export const concierge = onRequest(
       return;
     }
 
+    // ── Layer 3 — App Check (env-gated) ────────────────────────────────
+    // Manual verification because HttpsOptions on Gen 2 onRequest
+    // doesn't expose `enforceAppCheck` (that's a onCall-only option).
+    // When ENFORCE_APP_CHECK is on, every request must carry a valid
+    // X-Firebase-AppCheck token issued by App Attest (iOS),
+    // Play Integrity (Android), or reCAPTCHA v3 (web). Without one,
+    // the request is rejected with 401 before touching OpenAI.
+    //
+    // Verification is ~5–20ms on a warm container (one signed-token
+    // check against the App Check public keys, which the SDK caches).
+    if (ENFORCE_APP_CHECK) {
+      const appCheckToken = req.header("X-Firebase-AppCheck");
+      if (!appCheckToken) {
+        res.status(401).json({
+          error:
+            "Missing App Check token. This endpoint requires a valid " +
+            "X-Firebase-AppCheck header.",
+        });
+        return;
+      }
+      try {
+        await getAppCheck().verifyToken(appCheckToken);
+      } catch (err) {
+        // Don't echo the verifier's error to the client — the message
+        // sometimes includes "token signature invalid" / "expired" /
+        // etc. which is fine to surface internally but could help an
+        // attacker triangulate the verifier's behaviour. Log it for
+        // ops; give the client a generic 401.
+        logger.warn("App Check verification failed", err);
+        res.status(401).json({ error: "Invalid App Check token." });
+        return;
+      }
+    }
+
+    // ── Layer 1 — Per-IP burst limit (in-memory) ──────────────────────
     // Rate-limit by remote IP. Cloud Run / Functions sets the real client
-    // IP on `req.ip` via the trust-proxy chain.
+    // IP on `req.ip` via the trust-proxy chain. This is the cheap, fast
+    // burst control — the durable per-session-day cap is enforced via
+    // checkAndIncrementDailyQuota further down.
     const clientIp = req.ip || (req.headers["x-forwarded-for"] as string) || "unknown";
     if (isRateLimited(clientIp)) {
       res.status(429).json({ error: "Rate limit exceeded. Try again in a moment." });
@@ -344,6 +428,38 @@ export const concierge = onRequest(
     const validation = validateRequest(req.body as ConciergeRequest);
     if (!validation.ok) {
       res.status(400).json({ error: validation.error });
+      return;
+    }
+
+    // Layer 2 — durable per-session daily quota. Caps a single client
+    // (mobile install OR website visitor) at N turns per UTC day. The
+    // count survives container recycle and applies across instances.
+    // When the client didn't send a sessionId, falls back to a per-IP
+    // shared bucket (same limit) so older clients and curl users still
+    // get bill protection, just with worse isolation than sessionId
+    // clients. Fails open on Firestore errors — see rateLimit.ts.
+    const quotaIdentity = validation.sessionId
+      ? { sessionId: validation.sessionId }
+      : { fallbackIp: clientIp };
+    const quota = await checkAndIncrementDailyQuota(quotaIdentity);
+    if (!quota.allowed) {
+      // Standard Retry-After header (in seconds) lets a well-behaved
+      // client back off until tomorrow's reset. Payload includes the
+      // numbers so the chat UI can show "You've used 100/100 today,
+      // resets in 4h".
+      const retryAfterSec = Math.max(
+        1,
+        Math.ceil((quota.resetsAt - Date.now()) / 1000)
+      );
+      res.set("Retry-After", String(retryAfterSec));
+      res.status(429).json({
+        error:
+          "Daily concierge limit reached. Resets at midnight UTC. " +
+          `(${quota.used}/${quota.limit} today.)`,
+        used: quota.used,
+        limit: quota.limit,
+        resetsAt: quota.resetsAt,
+      });
       return;
     }
 
@@ -379,11 +495,37 @@ export const concierge = onRequest(
     // Lazy-import the orchestrator so a syntax error in the concierge
     // modules can't break the simpler ping / testEmbed endpoints. (At
     // steady state this import is free — Node caches the resolved module.)
-    let orchestrateTurn: typeof import("./concierge/orchestrator").orchestrateTurn;
+    //
+    // V1 / V2 SELECTION. CONCIERGE_USE_V2 picks between the live v1
+    // orchestrator and the v2 rewrite (see docs/concierge-rewrite-spec.md).
+    // Default OFF — v1 keeps serving production traffic. Set
+    // `CONCIERGE_USE_V2=true` in the function's runtime env to flip
+    // a single instance over for soak testing, or all instances over
+    // for the cutover. Rollback is one env var change — both
+    // implementations stay compiled into the bundle.
+    //
+    // Both orchestrators expose `orchestrateTurn(message, history,
+    // userLocation, regionId, onDelta, identity, opts) → AskResult`
+    // with identical AskResult shape (reply, proposal, wineryCards,
+    // history, cost, etc.) so the SSE event payload is byte-stable
+    // across the cutover. The client doesn't notice the switch.
+    const USE_V2 = process.env.CONCIERGE_USE_V2 === "true";
+    let orchestrateTurn:
+      | typeof import("./concierge/orchestrator").orchestrateTurn
+      | typeof import("./concierge/v2/orchestrator").orchestrateTurnV2;
     try {
-      ({ orchestrateTurn } = await import("./concierge/orchestrator"));
+      if (USE_V2) {
+        const v2 = await import("./concierge/v2/orchestrator");
+        orchestrateTurn = v2.orchestrateTurnV2;
+        if (IS_DEV) {
+          logger.info("Concierge turn handled by v2 orchestrator");
+        }
+      } else {
+        const v1 = await import("./concierge/orchestrator");
+        orchestrateTurn = v1.orchestrateTurn;
+      }
     } catch (err) {
-      logger.error("Failed to load orchestrator", err);
+      logger.error("Failed to load orchestrator", { useV2: USE_V2, err });
       send("error", {
         message: "Concierge module failed to load. Please try again.",
       });

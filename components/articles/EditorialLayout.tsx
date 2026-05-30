@@ -22,6 +22,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, fonts, spacing, type, weights } from "../../constants/theme";
+import {
+  bodyParagraphs,
+  galleryImages,
+  sectionText,
+} from "./types";
 import type { Article, ArticleSection } from "./types";
 
 const { width } = Dimensions.get("window");
@@ -49,9 +54,7 @@ export default function EditorialLayout({ article }: Props) {
   const renderSection = (section: ArticleSection, index: number) => {
     switch (section.type) {
       case "body": {
-        const paragraphs = Array.isArray(section.content)
-          ? section.content
-          : [section.content];
+        const paragraphs = bodyParagraphs(section);
 
         return (
           <View key={index}>
@@ -79,16 +82,16 @@ export default function EditorialLayout({ article }: Props) {
       }
 
       case "pullQuote": {
-        const text = Array.isArray(section.content)
-          ? section.content.join(" ")
-          : section.content;
+        const text = sectionText(section);
+        const attribution =
+          section.attribution ?? (article.author != null ? `— ${article.author}` : null);
         return (
           <View key={index} style={styles.pullQuote}>
             <View style={styles.pullQuoteBar} />
             <View style={{ flex: 1 }}>
               <Text style={styles.pullQuoteText}>{text}</Text>
-              {article.author != null && (
-                <Text style={styles.pullQuoteAttr}>— {article.author}</Text>
+              {attribution && (
+                <Text style={styles.pullQuoteAttr}>{attribution}</Text>
               )}
             </View>
           </View>
@@ -96,18 +99,20 @@ export default function EditorialLayout({ article }: Props) {
       }
 
       case "imageGallery": {
-        const urls = Array.isArray(section.content)
-          ? section.content
-          : [section.content];
+        const images = galleryImages(section);
         return (
           <View key={index} style={styles.galleryWrap}>
-            {urls.map((url, i) => (
+            {images.map((img, i) => (
               <View key={i} style={styles.inlineImgWrap}>
                 <Image
-                  source={{ uri: url }}
+                  source={{ uri: img.url }}
                   style={styles.inlineImg}
                   resizeMode="cover"
+                  accessibilityLabel={img.alt ?? img.caption}
                 />
+                {img.caption ? (
+                  <Text style={styles.imgCaption}>{img.caption}</Text>
+                ) : null}
               </View>
             ))}
           </View>
@@ -115,12 +120,10 @@ export default function EditorialLayout({ article }: Props) {
       }
 
       case "callout": {
-        const text = Array.isArray(section.content)
-          ? section.content.join(" ")
-          : section.content;
+        const text = sectionText(section);
         return (
           <View key={index} style={styles.callout}>
-            <Text style={styles.calloutKicker}>NOTE</Text>
+            <Text style={styles.calloutKicker}>{section.kicker ?? "NOTE"}</Text>
             <Text style={styles.calloutText}>{text}</Text>
           </View>
         );
@@ -423,6 +426,13 @@ const styles = StyleSheet.create({
   inlineImg: {
     width,
     height: 240,
+  },
+  imgCaption: {
+    ...type.caption,
+    color: colors.textMuted,
+    fontStyle: "italic",
+    paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.sm,
   },
 
   // Callout

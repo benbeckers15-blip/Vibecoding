@@ -14,6 +14,7 @@ import { withScreenErrorBoundary } from "../../../components/ScreenErrorBoundary
 // computed at start-time so we don't hit the Directions API on every view.
 
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import * as Location from "expo-location";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
@@ -540,8 +541,19 @@ function TripDetailScreen() {
                       longitude: s.longitude,
                     }}
                     title={`${idx + 1}. ${s.name}`}
-                    pinColor={colors.accent}
-                  />
+                    // The lime logo-pin's tip is at bottom-center.
+                    anchor={{ x: 0.5, y: 1 }}
+                    // Static preview — no per-frame view updates needed,
+                    // and disabling tracking avoids Marker render churn on
+                    // Android when the parent re-renders.
+                    tracksViewChanges={false}
+                  >
+                    <Image
+                      source={require("../../../assets/images/logo-pin.png")}
+                      style={styles.markerPin}
+                      contentFit="contain"
+                    />
+                  </Marker>
                 );
               })}
             </MapView>
@@ -700,6 +712,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   map: { width: "100%", height: "100%" },
+  // Lime logo pin — same dimensions as the wineries list and the active
+  // trip map for visual consistency across the app's three map surfaces.
+  markerPin: { width: 36, height: 48 },
   mapLoadingOverlay: {
     position: "absolute",
     bottom: 8,

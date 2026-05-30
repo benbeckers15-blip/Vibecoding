@@ -313,7 +313,7 @@ Flow per turn:
 
 Drive-time ordering for trip routing uses Google Distance Matrix (`services/concierge/driveTimes.ts`) — replaces naive haversine sort with actual road duration.
 
-The knowledge base itself lives in `scripts/rag/content/*.md` (regional prose, etiquette, history, food culture, seasons, general directions, plus a `tasting-notes/` folder for individual bottles). `scripts/rag/ingest.js` chunks, tags, embeds (Voyage `voyage-3-lite`, 1024-dim), and writes to **both** Upstash (vector index, namespace `knowledge`) and Firestore (`knowledge_chunks` collection). Tasting notes use a separate `wines` namespace via `scripts/rag/ingest-tasting-notes.js`.
+The knowledge base itself lives in `scripts/rag/content/*.md` (regional prose, etiquette, history, food culture, seasons, general directions, plus a `tasting-notes/` folder for individual bottles). `scripts/rag/ingest.js` chunks, tags, embeds (Voyage `voyage-3-lite`, 512-dim — matches the Upstash index dimension), and writes to **both** Upstash (vector index, namespace `knowledge`) and Firestore (`knowledge_chunks` collection). Tasting notes use a separate `wines` namespace via `scripts/rag/ingest-tasting-notes.js`.
 
 ---
 

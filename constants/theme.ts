@@ -59,6 +59,9 @@ export const palette = {
   // Input / search surface — a touch lighter than `paperTint` so an input
   // feels visually pressable on dark surfaces (key UX cue: "this is editable").
   inputGray:    "#262C27",
+  // Pure white — used for a solid light input surface (e.g. the hero concierge
+  // search bar) so it reads as a crisp, tappable field over photography.
+  white:        "#FFFFFF",
 
   // Photo chrome — semi-transparent neutrals that sit over imagery.
   // Always dark, regardless of theme, since imagery is its own surface.
@@ -82,6 +85,11 @@ const inkInverseAlpha = (a: number) => `rgba(245,240,230,${a})`;
 // dark in dark mode (using `inkAlpha` here would lighten the photo, washing
 // out captions). Tinted slightly warm to harmonise with the slate palette.
 const photoInkAlpha   = (a: number) => `rgba(8,12,10,${a})`;
+// Dark-on-light text alpha — for text/icons placed on a solid LIGHT surface
+// (e.g. the white concierge search bar), where the usual light `ink` tokens
+// would be invisible. Uses the slate `paper` hue so it harmonises with the
+// palette rather than reading as flat grey.
+const slateAlpha      = (a: number) => `rgba(15,20,17,${a})`;
 
 // ─── 2. Semantic color tokens ────────────────────────────────────────────────
 // USE THESE IN SCREENS. The values point at `palette` above.
@@ -118,6 +126,10 @@ export const colors = {
 
   // ── Input / search surface ──────────────────────────────────────────
   inputSurface:       palette.inputGray,     // search bars + filter chips
+  inputSurfaceLight:  palette.white,         // solid white input (hero concierge bar)
+  // Dark-on-light text for placeholders / icons sitting on a light input
+  // surface (where `textMuted` would vanish).
+  textOnLightMuted:   slateAlpha(0.55),
 
   // ── Borders / dividers ──────────────────────────────────────────────────
   // In the dark theme these are light-on-dark hairlines (inkAlpha returns

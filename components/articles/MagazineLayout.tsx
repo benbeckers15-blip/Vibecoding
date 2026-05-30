@@ -23,6 +23,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, fonts, spacing, type, weights } from "../../constants/theme";
+import {
+  bodyParagraphs,
+  galleryImages,
+  sectionText,
+} from "./types";
 import type { Article, ArticleSection } from "./types";
 
 const { width } = Dimensions.get("window");
@@ -46,9 +51,7 @@ export default function MagazineLayout({ article }: Props) {
   const renderSection = (section: ArticleSection, index: number) => {
     switch (section.type) {
       case "body": {
-        const paragraphs = Array.isArray(section.content)
-          ? section.content
-          : [section.content];
+        const paragraphs = bodyParagraphs(section);
         return (
           <View key={index} style={styles.bodyBlock}>
             {paragraphs.map((para, i) => (
@@ -61,15 +64,38 @@ export default function MagazineLayout({ article }: Props) {
       }
 
       case "pullQuote": {
-        const text = Array.isArray(section.content)
-          ? section.content.join(" ")
-          : section.content;
+        const text = sectionText(section);
+        const attribution = section.attribution ?? article.author ?? null;
+        // Either render against a per-section backdrop photo, or fall back to
+        // the article-wide pullQuoteBackgroundImage if either is set.
+        const backdrop = section.backgroundImage ?? article.pullQuoteBackgroundImage;
+        if (backdrop) {
+          return (
+            <View key={index} style={styles.pullQuoteWithImg}>
+              <ImageBackground
+                source={{ uri: backdrop }}
+                style={styles.pullQuoteImg}
+              >
+                <LinearGradient
+                  colors={[colors.photoOverlayMedium, colors.photoOverlayDeep]}
+                  style={StyleSheet.absoluteFill}
+                />
+                <View style={styles.pullQuoteImgInner}>
+                  <Text style={styles.pullQuoteTextOnImg}>{text}</Text>
+                  {attribution && (
+                    <Text style={styles.pullQuoteAttrOnImg}>{attribution}</Text>
+                  )}
+                </View>
+              </ImageBackground>
+            </View>
+          );
+        }
         return (
           <View key={index} style={styles.pullQuote}>
             <View style={styles.pullRule} />
             <Text style={styles.pullQuoteText}>{text}</Text>
-            {article.author != null && (
-              <Text style={styles.pullQuoteAttr}>{article.author}</Text>
+            {attribution && (
+              <Text style={styles.pullQuoteAttr}>{attribution}</Text>
             )}
             <View style={styles.pullRule} />
           </View>
@@ -77,31 +103,36 @@ export default function MagazineLayout({ article }: Props) {
       }
 
       case "imageGallery": {
-        const urls = Array.isArray(section.content)
-          ? section.content
-          : [section.content];
+        const images = galleryImages(section);
 
         // 1 image → full-bleed; 2 → 2-up; 3+ → first big, rest in 2-up grid below
-        if (urls.length === 1) {
+        if (images.length === 1) {
           return (
-            <View key={index} style={styles.fullBleed}>
-              <Image
-                source={{ uri: urls[0] }}
-                style={styles.fullBleedImg}
-                resizeMode="cover"
-              />
+            <View key={index} style={styles.galleryStack}>
+              <View style={styles.fullBleed}>
+                <Image
+                  source={{ uri: images[0].url }}
+                  style={styles.fullBleedImg}
+                  resizeMode="cover"
+                  accessibilityLabel={images[0].alt ?? images[0].caption}
+                />
+              </View>
+              {images[0].caption ? (
+                <Text style={styles.imgCaption}>{images[0].caption}</Text>
+              ) : null}
             </View>
           );
         }
-        if (urls.length === 2) {
+        if (images.length === 2) {
           return (
             <View key={index} style={styles.twoUp}>
-              {urls.map((url, i) => (
+              {images.map((img, i) => (
                 <Image
                   key={i}
-                  source={{ uri: url }}
+                  source={{ uri: img.url }}
                   style={styles.twoUpImg}
                   resizeMode="cover"
+                  accessibilityLabel={img.alt ?? img.caption}
                 />
               ))}
             </View>
@@ -111,18 +142,23 @@ export default function MagazineLayout({ article }: Props) {
           <View key={index} style={styles.galleryStack}>
             <View style={styles.fullBleed}>
               <Image
-                source={{ uri: urls[0] }}
+                source={{ uri: images[0].url }}
                 style={styles.fullBleedImg}
                 resizeMode="cover"
+                accessibilityLabel={images[0].alt ?? images[0].caption}
               />
             </View>
+            {images[0].caption ? (
+              <Text style={styles.imgCaption}>{images[0].caption}</Text>
+            ) : null}
             <View style={styles.twoUp}>
-              {urls.slice(1).map((url, i) => (
+              {images.slice(1).map((img, i) => (
                 <Image
                   key={i}
-                  source={{ uri: url }}
+                  source={{ uri: img.url }}
                   style={styles.twoUpImg}
                   resizeMode="cover"
+                  accessibilityLabel={img.alt ?? img.caption}
                 />
               ))}
             </View>
@@ -131,12 +167,12 @@ export default function MagazineLayout({ article }: Props) {
       }
 
       case "callout": {
-        const text = Array.isArray(section.content)
-          ? section.content.join(" ")
-          : section.content;
+        const text = sectionText(section);
         return (
           <View key={index} style={styles.callout}>
-            <Text style={styles.calloutKicker}>FROM THE FIELD</Text>
+            <Text style={styles.calloutKicker}>
+              {section.kicker ?? "FROM THE FIELD"}
+            </Text>
             <Text style={styles.calloutText}>{text}</Text>
           </View>
         );
@@ -381,6 +417,39 @@ const styles = StyleSheet.create({
     marginTop: -spacing.md,
   },
 
+  // Pull quote on top of a backdrop photo
+  pullQuoteWithImg: {
+    marginVertical: spacing.xl,
+    width,
+    height: 360,
+  },
+  pullQuoteImg: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  pullQuoteImgInner: {
+    paddingHorizontal: COLUMN,
+    paddingVertical: spacing.xxxl,
+    alignItems: "center",
+  },
+  pullQuoteTextOnImg: {
+    fontFamily: fonts.serif,
+    fontStyle: "italic",
+    fontWeight: weights.body,
+    fontSize: 26,
+    lineHeight: 36,
+    color: colors.textOnDark,
+    letterSpacing: -0.4,
+    textAlign: "center",
+    marginBottom: spacing.lg,
+  },
+  pullQuoteAttrOnImg: {
+    ...type.kicker,
+    color: colors.accentSoft,
+    letterSpacing: 1.8,
+    textAlign: "center",
+  },
+
   // Galleries
   fullBleed: {
     width,
@@ -390,6 +459,13 @@ const styles = StyleSheet.create({
   fullBleedImg: {
     width: "100%",
     height: "100%",
+  },
+  imgCaption: {
+    ...type.caption,
+    color: colors.textMuted,
+    fontStyle: "italic",
+    paddingHorizontal: COLUMN,
+    paddingTop: spacing.sm,
   },
   twoUp: {
     flexDirection: "row",

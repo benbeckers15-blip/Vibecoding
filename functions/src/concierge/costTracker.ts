@@ -55,6 +55,34 @@ const PRICING: Record<string, ModelPricing> = {
     output: 40.00,
     longContextSurcharge: true,
   },
+  // ── Gemini family (Google AI Studio paid-tier pricing) ──────────────
+  // Used by the response leg when LLM_PROVIDER=gemini (default after the
+  // May 2026 migration). Router and resolver remain on OpenAI, so OpenAI
+  // entries above stay live too. No long-context surcharge — Gemini's
+  // 1M-token window is flat-priced up to the cap.
+  //
+  // Source: https://ai.google.dev/pricing (last reviewed 2026-05). The
+  // thinking-mode tier (input $0.30 / output $2.50) is NOT priced here
+  // because the orchestrator explicitly disables thinking via
+  // thinkingConfig.thinkingBudget = 0 — we'd misprice every turn if we
+  // used the thinking rates.
+  "gemini-2.5-flash": {
+    input: 0.075,
+    cachedInput: 0.01875,
+    cacheWrite: 0,
+    output: 0.30,
+    longContextSurcharge: false,
+  },
+  // Smaller / cheaper variant. Priced here so a future env-var flip can
+  // A/B it without code changes. Slightly worse prose quality than full
+  // Flash but ~half the cost.
+  "gemini-2.5-flash-lite": {
+    input: 0.04,
+    cachedInput: 0.01,
+    cacheWrite: 0,
+    output: 0.15,
+    longContextSurcharge: false,
+  },
 };
 
 const FALLBACK_MODEL = "gpt-5.4-mini";

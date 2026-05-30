@@ -21,6 +21,12 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, fonts, spacing, type, weights } from "../../constants/theme";
+import {
+  bodyParagraphs,
+  galleryImages,
+  qaHeading,
+  sectionText,
+} from "./types";
 import type { Article, ArticleSection } from "./types";
 
 interface Props {
@@ -44,9 +50,7 @@ export default function InterviewLayout({ article }: Props) {
   const renderSection = (section: ArticleSection, index: number) => {
     switch (section.type) {
       case "body": {
-        const paragraphs = Array.isArray(section.content)
-          ? section.content
-          : [section.content];
+        const paragraphs = bodyParagraphs(section);
         return (
           <View key={index} style={styles.preambleBlock}>
             {paragraphs.map((para, i) => (
@@ -59,31 +63,29 @@ export default function InterviewLayout({ article }: Props) {
       }
 
       case "pullQuote": {
-        const text = Array.isArray(section.content)
-          ? section.content.join(" ")
-          : section.content;
+        const text = sectionText(section);
+        const attribution = section.attribution ?? article.subject ?? null;
         return (
           <View key={index} style={styles.pullQuote}>
             <Text style={styles.pullQuoteText}>&ldquo;{text}&rdquo;</Text>
-            {article.subject != null && (
-              <Text style={styles.pullQuoteAttr}>{article.subject}</Text>
+            {attribution && (
+              <Text style={styles.pullQuoteAttr}>{attribution}</Text>
             )}
           </View>
         );
       }
 
       case "imageGallery": {
-        const urls = Array.isArray(section.content)
-          ? section.content
-          : [section.content];
+        const images = galleryImages(section);
         return (
           <View key={index} style={styles.imageRow}>
-            {urls.map((url, i) => (
+            {images.map((img, i) => (
               <Image
                 key={i}
-                source={{ uri: url }}
+                source={{ uri: img.url }}
                 style={styles.imageRowImg}
                 resizeMode="cover"
+                accessibilityLabel={img.alt ?? img.caption}
               />
             ))}
           </View>
@@ -91,12 +93,10 @@ export default function InterviewLayout({ article }: Props) {
       }
 
       case "callout": {
-        const text = Array.isArray(section.content)
-          ? section.content.join(" ")
-          : section.content;
+        const text = sectionText(section);
         return (
           <View key={index} style={styles.callout}>
-            <Text style={styles.calloutKicker}>BIO</Text>
+            <Text style={styles.calloutKicker}>{section.kicker ?? "BIO"}</Text>
             <Text style={styles.calloutText}>{text}</Text>
           </View>
         );
@@ -104,9 +104,7 @@ export default function InterviewLayout({ article }: Props) {
 
       case "qa": {
         // The qa section type is an intro/heading for the transcript itself.
-        const heading = Array.isArray(section.content)
-          ? section.content.join(" ")
-          : section.content;
+        const heading = qaHeading(section);
         return (
           <View key={index} style={styles.transcriptIntro}>
             <View style={styles.transcriptRule} />

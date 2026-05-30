@@ -1,0 +1,2059 @@
+{
+  "url": "http://127.0.0.1:5001/winery-tourism-tasmania/us-central1/concierge",
+  "regionId": "tasmania",
+  "runAt": "2026-05-28T12:11:10.741Z",
+  "results": [
+    {
+      "id": 1,
+      "expectedBranch": "WINERY_FOCUS",
+      "expectations": [
+        "intent should be WINERY_FOCUS",
+        "anchorWinerySlug should be bangor-vineyard-shed",
+        "reply should only mention Bangor wines — NO neighbour winery",
+        "should emit a winery_card for bangor-vineyard-shed only"
+      ],
+      "multiTurn": false,
+      "transcript": [
+        {
+          "query": "Wines from Bangor Vineyard Shed",
+          "elapsedMs": 8205,
+          "streamedText": "Bangor Vineyard Shed, on the East Coast about an hour from Hobart, is a working farm that happens to make wine. It's run by the Dunbabin family, who are seventh-generation farmers on the property, and their approach to winemaking reflects that deep connection to the land.\n\nThey focus on cool-climate varietals, and the 2023 1830 Chardonnay offers bright citrus and white peach, with a touch of vanilla and cashew, making it lovely with seafood or creamy pasta. Their 2024 Abel Tasman Pinot Noir is vibrant with strawberry and raspberry, underpinned by savoury fig and olive notes, and is built to age beautifully.\n\nThe cellar door is open every day until 5pm, and they offer various tasting experiences, including wine and food pairings, as well as vineyard tours. It's a five-star Halliday-rated winery and has won multiple Tasmanian Tourism Awards.\n\n",
+          "done": {
+            "reply": "Bangor Vineyard Shed, on the East Coast about an hour from Hobart, is a working farm that happens to make wine. It's run by the Dunbabin family, who are seventh-generation farmers on the property, and their approach to winemaking reflects that deep connection to the land.\n\nThey focus on cool-climate varietals, and the 2023 1830 Chardonnay offers bright citrus and white peach, with a touch of vanilla and cashew, making it lovely with seafood or creamy pasta. Their 2024 Abel Tasman Pinot Noir is vibrant with strawberry and raspberry, underpinned by savoury fig and olive notes, and is built to age beautifully.\n\nThe cellar door is open every day until 5pm, and they offer various tasting experiences, including wine and food pairings, as well as vineyard tours. It's a five-star Halliday-rated winery and has won multiple Tasmanian Tourism Awards.",
+            "usage": {
+              "prompt_tokens": 10540,
+              "completion_tokens": 221,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              }
+            },
+            "stopReason": "stop",
+            "routerDecision": {
+              "selfContainedQuery": "Wines from Bangor Vineyard Shed",
+              "intent": "WINERY_FOCUS",
+              "anchorWinerySlug": "bangor-vineyard-shed",
+              "anchorWineId": null,
+              "regions": [],
+              "tags": [],
+              "wineWords": [],
+              "dayOfWeek": null,
+              "clarifyingQuestion": null
+            },
+            "candidateCount": 1,
+            "cost": {
+              "total": {
+                "inputTokens": 13221,
+                "outputTokens": 274,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 0,
+                "totalTokens": 13495,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.00280125,
+                  "output": 0.0003048,
+                  "cacheWrite": 0,
+                  "cacheRead": 0,
+                  "total": 0.00310605
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 2681,
+                    "outputTokens": 53,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 0,
+                    "totalTokens": 2734,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.00201075,
+                      "output": 0.0002385,
+                      "cacheWrite": 0,
+                      "cacheRead": 0,
+                      "total": 0.00224925
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 10540,
+                    "outputTokens": 221,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 0,
+                    "totalTokens": 10761,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.0007905000000000001,
+                      "output": 0.0000663,
+                      "cacheWrite": 0,
+                      "cacheRead": 0,
+                      "total": 0.0008568000000000001
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": null,
+            "wineryCards": {
+              "slugs": [
+                "bangor-vineyard-shed"
+              ]
+            },
+            "history": [
+              {
+                "role": "user",
+                "content": "Wines from Bangor Vineyard Shed"
+              },
+              {
+                "role": "assistant",
+                "content": "Bangor Vineyard Shed, on the East Coast about an hour from Hobart, is a working farm that happens to make wine. It's run by the Dunbabin family, who are seventh-generation farmers on the property, and their approach to winemaking reflects that deep connection to the land.\n\nThey focus on cool-climate varietals, and the 2023 1830 Chardonnay offers bright citrus and white peach, with a touch of vanilla and cashew, making it lovely with seafood or creamy pasta. Their 2024 Abel Tasman Pinot Noir is vibrant with strawberry and raspberry, underpinned by savoury fig and olive notes, and is built to age beautifully.\n\nThe cellar door is open every day until 5pm, and they offer various tasting experiences, including wine and food pairings, as well as vineyard tours. It's a five-star Halliday-rated winery and has won multiple Tasmanian Tourism Awards."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "expectedBranch": "WINERY_FOCUS",
+      "expectations": [
+        "intent should be WINERY_FOCUS (wine name implicitly anchors)",
+        "anchorWinerySlug should be bangor-vineyard-shed",
+        "anchorWineId should match the Abel Tasman wine doc",
+        "reply should describe Abel Tasman Pinot Noir using the actual tasting notes"
+      ],
+      "multiTurn": false,
+      "transcript": [
+        {
+          "query": "abel tasman pinot noir",
+          "elapsedMs": 4705,
+          "streamedText": "The Abel Tasman Pinot Noir from Bangor Vineyard Shed is a vibrant red, displaying notes of strawberry, raspberry, and cherry, with deeper undertones of fig and olive. It's a structured wine with a savoury edge that suggests it will evolve beautifully over the next 8–10 years. James Halliday awarded the 2024 vintage 95 points, and it also earned a Gold Medal at the Australian Pinot Noir Challenge.\n\nBangor Vineyard Shed is an award-winning cellar door on the East Coast, open today until 5pm, and they offer tours if you'd like to explore the property.\n\n",
+          "done": {
+            "reply": "The Abel Tasman Pinot Noir from Bangor Vineyard Shed is a vibrant red, displaying notes of strawberry, raspberry, and cherry, with deeper undertones of fig and olive. It's a structured wine with a savoury edge that suggests it will evolve beautifully over the next 8–10 years. James Halliday awarded the 2024 vintage 95 points, and it also earned a Gold Medal at the Australian Pinot Noir Challenge.\n\nBangor Vineyard Shed is an award-winning cellar door on the East Coast, open today until 5pm, and they offer tours if you'd like to explore the property.",
+            "usage": {
+              "prompt_tokens": 10691,
+              "completion_tokens": 155,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              }
+            },
+            "stopReason": "stop",
+            "routerDecision": {
+              "selfContainedQuery": "abel tasman pinot noir",
+              "intent": "WINERY_FOCUS",
+              "anchorWinerySlug": "bangor-vineyard-shed",
+              "anchorWineId": "bangor-vineyard-shed__abel-tasman-pinot-noir-2024",
+              "regions": [],
+              "tags": [],
+              "wineWords": [
+                "pinot",
+                "noir"
+              ],
+              "dayOfWeek": null,
+              "clarifyingQuestion": null
+            },
+            "candidateCount": 1,
+            "cost": {
+              "total": {
+                "inputTokens": 11836,
+                "outputTokens": 214,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 1536,
+                "totalTokens": 13586,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.001660575,
+                  "output": 0.000312,
+                  "cacheWrite": 0,
+                  "cacheRead": 0.0001152,
+                  "total": 0.002087775
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 1145,
+                    "outputTokens": 59,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 1536,
+                    "totalTokens": 2740,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.0008587499999999999,
+                      "output": 0.0002655,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.0001152,
+                      "total": 0.0012394499999999998
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 10691,
+                    "outputTokens": 155,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 0,
+                    "totalTokens": 10846,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.000801825,
+                      "output": 0.0000465,
+                      "cacheWrite": 0,
+                      "cacheRead": 0,
+                      "total": 0.000848325
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": null,
+            "wineryCards": {
+              "slugs": [
+                "bangor-vineyard-shed"
+              ]
+            },
+            "history": [
+              {
+                "role": "user",
+                "content": "abel tasman pinot noir"
+              },
+              {
+                "role": "assistant",
+                "content": "The Abel Tasman Pinot Noir from Bangor Vineyard Shed is a vibrant red, displaying notes of strawberry, raspberry, and cherry, with deeper undertones of fig and olive. It's a structured wine with a savoury edge that suggests it will evolve beautifully over the next 8–10 years. James Halliday awarded the 2024 vintage 95 points, and it also earned a Gold Medal at the Australian Pinot Noir Challenge.\n\nBangor Vineyard Shed is an award-winning cellar door on the East Coast, open today until 5pm, and they offer tours if you'd like to explore the property."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "expectedBranch": "WINERY_FOCUS",
+      "expectations": [
+        "intent should be WINERY_FOCUS",
+        "anchorWinerySlug should be bangor-vineyard-shed (winery wins over wine)",
+        "anchorWineId should be null (winery-name hit populated the anchor, not the wine)",
+        "same answer as #2 in substance"
+      ],
+      "multiTurn": false,
+      "transcript": [
+        {
+          "query": "abel tasman pinot noir bangor vineyard shed",
+          "elapsedMs": 4519,
+          "streamedText": "The Abel Tasman Pinot Noir from Bangor Vineyard Shed is a vibrant expression of the East Coast's cool maritime climate. The 2024 vintage, a gold medalist and 95-point Halliday wine, opens with bright red fruit notes of strawberry, raspberry, and cherry, layered with fig, olive, and subtle savoury undertones that hint at its aging potential. It's a wine crafted for longevity, expected to develop more depth and complexity over the next eight to ten years.\n\nBangor Vineyard Shed itself is an award-winning cellar door on an historic farming estate, open today until 5pm. They also produce an excellent 1830 Chardonnay, a refined wine with citrus, white peach, and vanilla notes that pairs beautifully with seafood or creamy pasta.\n\n",
+          "done": {
+            "reply": "The Abel Tasman Pinot Noir from Bangor Vineyard Shed is a vibrant expression of the East Coast's cool maritime climate. The 2024 vintage, a gold medalist and 95-point Halliday wine, opens with bright red fruit notes of strawberry, raspberry, and cherry, layered with fig, olive, and subtle savoury undertones that hint at its aging potential. It's a wine crafted for longevity, expected to develop more depth and complexity over the next eight to ten years.\n\nBangor Vineyard Shed itself is an award-winning cellar door on an historic farming estate, open today until 5pm. They also produce an excellent 1830 Chardonnay, a refined wine with citrus, white peach, and vanilla notes that pairs beautifully with seafood or creamy pasta.",
+            "usage": {
+              "prompt_tokens": 10695,
+              "completion_tokens": 187,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              }
+            },
+            "stopReason": "stop",
+            "routerDecision": {
+              "selfContainedQuery": "abel tasman pinot noir bangor vineyard shed",
+              "intent": "WINERY_FOCUS",
+              "anchorWinerySlug": "bangor-vineyard-shed",
+              "anchorWineId": null,
+              "regions": [],
+              "tags": [],
+              "wineWords": [
+                "pinot",
+                "noir"
+              ],
+              "dayOfWeek": null,
+              "clarifyingQuestion": null
+            },
+            "candidateCount": 1,
+            "cost": {
+              "total": {
+                "inputTokens": 11844,
+                "outputTokens": 250,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 1536,
+                "totalTokens": 13630,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.001663875,
+                  "output": 0.0003396,
+                  "cacheWrite": 0,
+                  "cacheRead": 0.0001152,
+                  "total": 0.002118675
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 1149,
+                    "outputTokens": 63,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 1536,
+                    "totalTokens": 2748,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.0008617500000000001,
+                      "output": 0.0002835,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.0001152,
+                      "total": 0.00126045
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 10695,
+                    "outputTokens": 187,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 0,
+                    "totalTokens": 10882,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.000802125,
+                      "output": 0.000056099999999999995,
+                      "cacheWrite": 0,
+                      "cacheRead": 0,
+                      "total": 0.000858225
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": null,
+            "wineryCards": {
+              "slugs": [
+                "bangor-vineyard-shed"
+              ]
+            },
+            "history": [
+              {
+                "role": "user",
+                "content": "abel tasman pinot noir bangor vineyard shed"
+              },
+              {
+                "role": "assistant",
+                "content": "The Abel Tasman Pinot Noir from Bangor Vineyard Shed is a vibrant expression of the East Coast's cool maritime climate. The 2024 vintage, a gold medalist and 95-point Halliday wine, opens with bright red fruit notes of strawberry, raspberry, and cherry, layered with fig, olive, and subtle savoury undertones that hint at its aging potential. It's a wine crafted for longevity, expected to develop more depth and complexity over the next eight to ten years.\n\nBangor Vineyard Shed itself is an award-winning cellar door on an historic farming estate, open today until 5pm. They also produce an excellent 1830 Chardonnay, a refined wine with citrus, white peach, and vanilla notes that pairs beautifully with seafood or creamy pasta."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "expectedBranch": "WINERY_FOCUS",
+      "expectations": [
+        "intent should be WINERY_FOCUS",
+        "anchorWinerySlug should be tolpuddle-vineyard",
+        "reply should answer from hours data — no fabrication",
+        "winery_card for Tolpuddle"
+      ],
+      "multiTurn": false,
+      "transcript": [
+        {
+          "query": "Is Tolpuddle open Sunday?",
+          "elapsedMs": 6174,
+          "streamedText": "Yes, Tolpuddle is open on Sunday from 11am to 5pm. Do remember that tastings are by appointment only, so it's best to book in advance.\n\n",
+          "done": {
+            "reply": "Yes, Tolpuddle is open on Sunday from 11am to 5pm. Do remember that tastings are by appointment only, so it's best to book in advance.",
+            "usage": {
+              "prompt_tokens": 9839,
+              "completion_tokens": 64,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              }
+            },
+            "stopReason": "stop",
+            "routerDecision": {
+              "selfContainedQuery": "Is Tolpuddle open Sunday?",
+              "intent": "WINERY_FOCUS",
+              "anchorWinerySlug": "tolpuddle-vineyard",
+              "anchorWineId": null,
+              "regions": [],
+              "tags": [],
+              "wineWords": [],
+              "dayOfWeek": "Sun",
+              "clarifyingQuestion": null
+            },
+            "candidateCount": 1,
+            "cost": {
+              "total": {
+                "inputTokens": 10985,
+                "outputTokens": 118,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 1536,
+                "totalTokens": 12639,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.001597425,
+                  "output": 0.0002622,
+                  "cacheWrite": 0,
+                  "cacheRead": 0.0001152,
+                  "total": 0.001974825
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 1146,
+                    "outputTokens": 54,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 1536,
+                    "totalTokens": 2736,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.0008595,
+                      "output": 0.000243,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.0001152,
+                      "total": 0.0012177
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 9839,
+                    "outputTokens": 64,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 0,
+                    "totalTokens": 9903,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.0007379250000000001,
+                      "output": 0.0000192,
+                      "cacheWrite": 0,
+                      "cacheRead": 0,
+                      "total": 0.0007571250000000001
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": null,
+            "wineryCards": {
+              "slugs": [
+                "tolpuddle-vineyard"
+              ]
+            },
+            "history": [
+              {
+                "role": "user",
+                "content": "Is Tolpuddle open Sunday?"
+              },
+              {
+                "role": "assistant",
+                "content": "Yes, Tolpuddle is open on Sunday from 11am to 5pm. Do remember that tastings are by appointment only, so it's best to book in advance."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "expectedBranch": "WINERY_FOCUS",
+      "expectations": [
+        "intent should be WINERY_FOCUS",
+        "anchorWinerySlug should be null (off-corpus)",
+        "diagnostics.offCorpusWineryNamed should be true",
+        "reply should be encyclopedic about House of Arras",
+        "reply should include one short \"not a SipLocal cellar door\" line",
+        "no winery_card (House of Arras not in corpus)"
+      ],
+      "multiTurn": false,
+      "transcript": [
+        {
+          "query": "Tell me about House of Arras",
+          "elapsedMs": 6653,
+          "streamedText": "House of Arras is truly a benchmark for Australian sparkling wine, and a visit to their cellar door in Pipers River offers a deep dive into what makes them so acclaimed. They focus entirely on traditional-method sparkling wines crafted from Chardonnay and Pinot Noir, drawing fruit from Tasmania's coolest sites.\n\nWinemaker Ed Carr, often called Australia's most awarded sparkling winemaker, has been the driving force since the winery's founding in 1995. His vision centers on extended lees aging, with some of their prestige cuvées spending a decade or more on lees, which builds incredible depth and textural complexity. This approach has earned them a remarkable collection of accolades, including numerous international trophies and even a 100-point rating from Robert Parker Wine Advocate for their E.J. Carr Late Disgorged 1998 Magnum.\n\nThe cellar door, nestled amidst woodlands along the Pipers River, is open today until 5pm. They offer a range of luxurious and informative tasting experiences, from seated tastings exploring their regional terroir to masterclasses. It’s important to remember that tastings are by appointment, so do ring ahead to book your visit.\n\n",
+          "done": {
+            "reply": "House of Arras is truly a benchmark for Australian sparkling wine, and a visit to their cellar door in Pipers River offers a deep dive into what makes them so acclaimed. They focus entirely on traditional-method sparkling wines crafted from Chardonnay and Pinot Noir, drawing fruit from Tasmania's coolest sites.\n\nWinemaker Ed Carr, often called Australia's most awarded sparkling winemaker, has been the driving force since the winery's founding in 1995. His vision centers on extended lees aging, with some of their prestige cuvées spending a decade or more on lees, which builds incredible depth and textural complexity. This approach has earned them a remarkable collection of accolades, including numerous international trophies and even a 100-point rating from Robert Parker Wine Advocate for their E.J. Carr Late Disgorged 1998 Magnum.\n\nThe cellar door, nestled amidst woodlands along the Pipers River, is open today until 5pm. They offer a range of luxurious and informative tasting experiences, from seated tastings exploring their regional terroir to masterclasses. It’s important to remember that tastings are by appointment, so do ring ahead to book your visit.",
+            "usage": {
+              "prompt_tokens": 10232,
+              "completion_tokens": 266,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              }
+            },
+            "stopReason": "stop",
+            "routerDecision": {
+              "selfContainedQuery": "Tell me about House of Arras",
+              "intent": "WINERY_FOCUS",
+              "anchorWinerySlug": "house-of-arras",
+              "anchorWineId": null,
+              "regions": [],
+              "tags": [],
+              "wineWords": [],
+              "dayOfWeek": null,
+              "clarifyingQuestion": null
+            },
+            "candidateCount": 1,
+            "cost": {
+              "total": {
+                "inputTokens": 11378,
+                "outputTokens": 320,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 1536,
+                "totalTokens": 13234,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.0016269000000000001,
+                  "output": 0.0003228,
+                  "cacheWrite": 0,
+                  "cacheRead": 0.0001152,
+                  "total": 0.0020648999999999997
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 1146,
+                    "outputTokens": 54,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 1536,
+                    "totalTokens": 2736,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.0008595,
+                      "output": 0.000243,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.0001152,
+                      "total": 0.0012177
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 10232,
+                    "outputTokens": 266,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 0,
+                    "totalTokens": 10498,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.0007674,
+                      "output": 0.0000798,
+                      "cacheWrite": 0,
+                      "cacheRead": 0,
+                      "total": 0.0008472
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": null,
+            "wineryCards": {
+              "slugs": [
+                "house-of-arras"
+              ]
+            },
+            "history": [
+              {
+                "role": "user",
+                "content": "Tell me about House of Arras"
+              },
+              {
+                "role": "assistant",
+                "content": "House of Arras is truly a benchmark for Australian sparkling wine, and a visit to their cellar door in Pipers River offers a deep dive into what makes them so acclaimed. They focus entirely on traditional-method sparkling wines crafted from Chardonnay and Pinot Noir, drawing fruit from Tasmania's coolest sites.\n\nWinemaker Ed Carr, often called Australia's most awarded sparkling winemaker, has been the driving force since the winery's founding in 1995. His vision centers on extended lees aging, with some of their prestige cuvées spending a decade or more on lees, which builds incredible depth and textural complexity. This approach has earned them a remarkable collection of accolades, including numerous international trophies and even a 100-point rating from Robert Parker Wine Advocate for their E.J. Carr Late Disgorged 1998 Magnum.\n\nThe cellar door, nestled amidst woodlands along the Pipers River, is open today until 5pm. They offer a range of luxurious and informative tasting experiences, from seated tastings exploring their regional terroir to masterclasses. It’s important to remember that tastings are by appointment, so do ring ahead to book your visit."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "expectedBranch": "WINERY_FOCUS",
+      "expectations": [
+        "intent should be WINERY_FOCUS",
+        "anchorWinerySlug should be null",
+        "reply should speak about Tasmanian Riesling style generically",
+        "reply should NOT invent a fake winery card or tasting notes"
+      ],
+      "multiTurn": false,
+      "transcript": [
+        {
+          "query": "Tell me about Velvet & Willow Riesling",
+          "elapsedMs": 3057,
+          "streamedText": "I don't have a record of a Tasmanian producer called Velvet & Willow. It might be a smaller, newer label I haven't come across yet, or perhaps from another region.\n\nTasmanian Riesling, generally speaking, is known for its elegant, often dry style, with vibrant citrus notes and a crisp minerality. It's a varietal that truly expresses our cool climate, offering wines with excellent aging potential that develop complex toasty notes over time.\n\nIf you're looking to explore some excellent Tasmanian Riesling, I could certainly point you to a few acclaimed producers.",
+          "done": {
+            "reply": "I don't have a record of a Tasmanian producer called Velvet & Willow. It might be a smaller, newer label I haven't come across yet, or perhaps from another region.\n\nTasmanian Riesling, generally speaking, is known for its elegant, often dry style, with vibrant citrus notes and a crisp minerality. It's a varietal that truly expresses our cool climate, offering wines with excellent aging potential that develop complex toasty notes over time.\n\nIf you're looking to explore some excellent Tasmanian Riesling, I could certainly point you to a few acclaimed producers.",
+            "usage": {
+              "prompt_tokens": 8381,
+              "completion_tokens": 121,
+              "prompt_tokens_details": {
+                "cached_tokens": 8180
+              }
+            },
+            "stopReason": "stop",
+            "routerDecision": {
+              "selfContainedQuery": "Tell me about Velvet & Willow Riesling",
+              "intent": "WINERY_FOCUS",
+              "anchorWinerySlug": null,
+              "anchorWineId": null,
+              "regions": [],
+              "tags": [],
+              "wineWords": [
+                "riesling"
+              ],
+              "dayOfWeek": null,
+              "clarifyingQuestion": null
+            },
+            "candidateCount": 0,
+            "cost": {
+              "total": {
+                "inputTokens": 1348,
+                "outputTokens": 179,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 9716,
+                "totalTokens": 11243,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.000875325,
+                  "output": 0.0002973,
+                  "cacheWrite": 0,
+                  "cacheRead": 0.000268575,
+                  "total": 0.0014412000000000001
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 1147,
+                    "outputTokens": 58,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 1536,
+                    "totalTokens": 2741,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.00086025,
+                      "output": 0.000261,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.0001152,
+                      "total": 0.00123645
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 201,
+                    "outputTokens": 121,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 8180,
+                    "totalTokens": 8502,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.000015075,
+                      "output": 0.0000363,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.000153375,
+                      "total": 0.00020475000000000002
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": null,
+            "wineryCards": null,
+            "history": [
+              {
+                "role": "user",
+                "content": "Tell me about Velvet & Willow Riesling"
+              },
+              {
+                "role": "assistant",
+                "content": "I don't have a record of a Tasmanian producer called Velvet & Willow. It might be a smaller, newer label I haven't come across yet, or perhaps from another region.\n\nTasmanian Riesling, generally speaking, is known for its elegant, often dry style, with vibrant citrus notes and a crisp minerality. It's a varietal that truly expresses our cool climate, offering wines with excellent aging potential that develop complex toasty notes over time.\n\nIf you're looking to explore some excellent Tasmanian Riesling, I could certainly point you to a few acclaimed producers."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "expectedBranch": "DISCOVERY",
+      "expectations": [
+        "intent should be DISCOVERY",
+        "tags should include dog-friendly and restaurant",
+        "wineWords should be empty",
+        "no tasting_notes block in envelope",
+        "reply should name multiple wineries that match both filters",
+        "winery_card should include every named corpus winery"
+      ],
+      "multiTurn": false,
+      "transcript": [
+        {
+          "query": "Dog-friendly cellar doors with a restaurant",
+          "elapsedMs": 5962,
+          "streamedText": "For dog-friendly cellar doors with a restaurant, I'd suggest two excellent options, both open today until 5pm.\n\nMayfield Estate on the East Coast offers stunning views of Great Oyster Bay, and their cellar door and restaurant are designed to make the most of the maritime setting. They focus on Pinot Noir and Chardonnay, with some newer plantings of Pinot Gris and Shiraz. The Dunbabin family has a long history on this land, and their winemaking venture, though relatively young, is already producing compelling wines.\n\nEvery Man & His Dog Vineyard in the Coal River Valley takes a slightly different approach, pairing their wines with handcrafted chocolates made on-site. They're known for their distinctive Siegerrebe and Ehrenfelser, two rare German white varieties that thrive in Tasmania's cool climate, alongside their well-regarded Cabernet Sauvignon. It's a unique experience that goes beyond a standard wine tasting.\n\nDevil's Corner Cellar Door, also on the East Coast, is another strong contender. It's built right on the water with expansive views over Moulting Lagoon. They offer a full kitchen that runs until 4pm, making it a great spot for lunch. Their focus is on cool-climate varieties like Pinot Noir, Syrah, Riesling, Pinot Gris, and Chardonnay, all reflecting the fresh, fruit-driven style of the East Coast.\n\n",
+          "done": {
+            "reply": "For dog-friendly cellar doors with a restaurant, I'd suggest two excellent options, both open today until 5pm.\n\nMayfield Estate on the East Coast offers stunning views of Great Oyster Bay, and their cellar door and restaurant are designed to make the most of the maritime setting. They focus on Pinot Noir and Chardonnay, with some newer plantings of Pinot Gris and Shiraz. The Dunbabin family has a long history on this land, and their winemaking venture, though relatively young, is already producing compelling wines.\n\nEvery Man & His Dog Vineyard in the Coal River Valley takes a slightly different approach, pairing their wines with handcrafted chocolates made on-site. They're known for their distinctive Siegerrebe and Ehrenfelser, two rare German white varieties that thrive in Tasmania's cool climate, alongside their well-regarded Cabernet Sauvignon. It's a unique experience that goes beyond a standard wine tasting.\n\nDevil's Corner Cellar Door, also on the East Coast, is another strong contender. It's built right on the water with expansive views over Moulting Lagoon. They offer a full kitchen that runs until 4pm, making it a great spot for lunch. Their focus is on cool-climate varieties like Pinot Noir, Syrah, Riesling, Pinot Gris, and Chardonnay, all reflecting the fresh, fruit-driven style of the East Coast.",
+            "usage": {
+              "prompt_tokens": 10496,
+              "completion_tokens": 327,
+              "prompt_tokens_details": {
+                "cached_tokens": 8182
+              }
+            },
+            "stopReason": "stop",
+            "routerDecision": {
+              "selfContainedQuery": "Dog-friendly cellar doors with a restaurant",
+              "intent": "DISCOVERY",
+              "anchorWinerySlug": null,
+              "anchorWineId": null,
+              "regions": [],
+              "tags": [
+                "dog-friendly",
+                "restaurant"
+              ],
+              "wineWords": [],
+              "dayOfWeek": null,
+              "clarifyingQuestion": null
+            },
+            "candidateCount": 3,
+            "cost": {
+              "total": {
+                "inputTokens": 3460,
+                "outputTokens": 384,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 9718,
+                "totalTokens": 13562,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.00103305,
+                  "output": 0.0003546,
+                  "cacheWrite": 0,
+                  "cacheRead": 0.0002686125,
+                  "total": 0.0016562625
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 1146,
+                    "outputTokens": 57,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 1536,
+                    "totalTokens": 2739,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.0008595,
+                      "output": 0.0002565,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.0001152,
+                      "total": 0.0012312
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 2314,
+                    "outputTokens": 327,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 8182,
+                    "totalTokens": 10823,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.00017355,
+                      "output": 0.00009809999999999999,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.0001534125,
+                      "total": 0.0004250625
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": null,
+            "wineryCards": {
+              "slugs": [
+                "mayfield-estate",
+                "every-man--his-dog-vineyard",
+                "devils-corner-cellar-door"
+              ]
+            },
+            "history": [
+              {
+                "role": "user",
+                "content": "Dog-friendly cellar doors with a restaurant"
+              },
+              {
+                "role": "assistant",
+                "content": "For dog-friendly cellar doors with a restaurant, I'd suggest two excellent options, both open today until 5pm.\n\nMayfield Estate on the East Coast offers stunning views of Great Oyster Bay, and their cellar door and restaurant are designed to make the most of the maritime setting. They focus on Pinot Noir and Chardonnay, with some newer plantings of Pinot Gris and Shiraz. The Dunbabin family has a long history on this land, and their winemaking venture, though relatively young, is already producing compelling wines.\n\nEvery Man & His Dog Vineyard in the Coal River Valley takes a slightly different approach, pairing their wines with handcrafted chocolates made on-site. They're known for their distinctive Siegerrebe and Ehrenfelser, two rare German white varieties that thrive in Tasmania's cool climate, alongside their well-regarded Cabernet Sauvignon. It's a unique experience that goes beyond a standard wine tasting.\n\nDevil's Corner Cellar Door, also on the East Coast, is another strong contender. It's built right on the water with expansive views over Moulting Lagoon. They offer a full kitchen that runs until 4pm, making it a great spot for lunch. Their focus is on cool-climate varieties like Pinot Noir, Syrah, Riesling, Pinot Gris, and Chardonnay, all reflecting the fresh, fruit-driven style of the East Coast."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "expectedBranch": "DISCOVERY",
+      "expectations": [
+        "intent should be DISCOVERY",
+        "wineWords should include skin-contact and riesling",
+        "tasting_notes retrieval runs against the WHOLE wines namespace",
+        "returned wines anchor to specific wineries which get cards"
+      ],
+      "multiTurn": false,
+      "transcript": [
+        {
+          "query": "Skin-contact riesling producers in Tasmania",
+          "elapsedMs": 6557,
+          "streamedText": "I don't have any specific skin-contact rieslings in my notes right now, but I can certainly speak to some excellent Tasmanian producers known for their dry, aromatic rieslings that often show lovely texture and complexity.\n\nBream Creek Vineyard on the East Coast makes a highly-regarded Riesling. Their 2025 vintage, for example, offers lifted aromas of lime blossom and green apple, with a crisp, vibrant palate and a saline streak. It's a precise and focused wine with bright acidity. Just remember to ring ahead, as Bream Creek is by appointment.\n\nIn the Derwent Valley, Derwent Estate Vineyard produces a 2022 Riesling that presents mandarin, lime, and honeysuckle on the nose, with a palate of citrus, sherbet, and bright acid. They operate out of the historic Rathbone Cottage and are open until 5pm today.\n\nBroad Acres Vineyard in the North West also has a 2023 Riesling with delicate flavours; you'll find notes of white flowers, apricot, and lemon zest, with a lively palate and zippy acidity. Their on-site cafe, Windows on Westella, is open until 3:30pm today.\n\nWhile these aren't explicitly skin-contact, they represent the quality and style of dry Tasmanian riesling that might appeal to you.\n\n",
+          "done": {
+            "reply": "I don't have any specific skin-contact rieslings in my notes right now, but I can certainly speak to some excellent Tasmanian producers known for their dry, aromatic rieslings that often show lovely texture and complexity.\n\nBream Creek Vineyard on the East Coast makes a highly-regarded Riesling. Their 2025 vintage, for example, offers lifted aromas of lime blossom and green apple, with a crisp, vibrant palate and a saline streak. It's a precise and focused wine with bright acidity. Just remember to ring ahead, as Bream Creek is by appointment.\n\nIn the Derwent Valley, Derwent Estate Vineyard produces a 2022 Riesling that presents mandarin, lime, and honeysuckle on the nose, with a palate of citrus, sherbet, and bright acid. They operate out of the historic Rathbone Cottage and are open until 5pm today.\n\nBroad Acres Vineyard in the North West also has a 2023 Riesling with delicate flavours; you'll find notes of white flowers, apricot, and lemon zest, with a lively palate and zippy acidity. Their on-site cafe, Windows on Westella, is open until 3:30pm today.\n\nWhile these aren't explicitly skin-contact, they represent the quality and style of dry Tasmanian riesling that might appeal to you.",
+            "usage": {
+              "prompt_tokens": 10783,
+              "completion_tokens": 322,
+              "prompt_tokens_details": {
+                "cached_tokens": 8182
+              }
+            },
+            "stopReason": "stop",
+            "routerDecision": {
+              "selfContainedQuery": "Skin-contact riesling producers in Tasmania",
+              "intent": "DISCOVERY",
+              "anchorWinerySlug": null,
+              "anchorWineId": null,
+              "regions": [],
+              "tags": [],
+              "wineWords": [
+                "skin-contact",
+                "riesling"
+              ],
+              "dayOfWeek": null,
+              "clarifyingQuestion": null
+            },
+            "candidateCount": 11,
+            "cost": {
+              "total": {
+                "inputTokens": 3747,
+                "outputTokens": 380,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 9718,
+                "totalTokens": 13845,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.001054575,
+                  "output": 0.0003576,
+                  "cacheWrite": 0,
+                  "cacheRead": 0.0002686125,
+                  "total": 0.0016807875
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 1146,
+                    "outputTokens": 58,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 1536,
+                    "totalTokens": 2740,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.0008595,
+                      "output": 0.000261,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.0001152,
+                      "total": 0.0012357
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 2601,
+                    "outputTokens": 322,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 8182,
+                    "totalTokens": 11105,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.00019507499999999998,
+                      "output": 0.0000966,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.0001534125,
+                      "total": 0.0004450875
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": null,
+            "wineryCards": {
+              "slugs": [
+                "bream-creek-vineyard",
+                "derwent-estate-vineyard",
+                "broad-acres-vineyard"
+              ]
+            },
+            "history": [
+              {
+                "role": "user",
+                "content": "Skin-contact riesling producers in Tasmania"
+              },
+              {
+                "role": "assistant",
+                "content": "I don't have any specific skin-contact rieslings in my notes right now, but I can certainly speak to some excellent Tasmanian producers known for their dry, aromatic rieslings that often show lovely texture and complexity.\n\nBream Creek Vineyard on the East Coast makes a highly-regarded Riesling. Their 2025 vintage, for example, offers lifted aromas of lime blossom and green apple, with a crisp, vibrant palate and a saline streak. It's a precise and focused wine with bright acidity. Just remember to ring ahead, as Bream Creek is by appointment.\n\nIn the Derwent Valley, Derwent Estate Vineyard produces a 2022 Riesling that presents mandarin, lime, and honeysuckle on the nose, with a palate of citrus, sherbet, and bright acid. They operate out of the historic Rathbone Cottage and are open until 5pm today.\n\nBroad Acres Vineyard in the North West also has a 2023 Riesling with delicate flavours; you'll find notes of white flowers, apricot, and lemon zest, with a lively palate and zippy acidity. Their on-site cafe, Windows on Westella, is open until 3:30pm today.\n\nWhile these aren't explicitly skin-contact, they represent the quality and style of dry Tasmanian riesling that might appeal to you."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "expectedBranch": "DISCOVERY",
+      "expectations": [
+        "intent should be DISCOVERY",
+        "wineWords should include chardonnay",
+        "top chardonnays from notes; their wineries get cards"
+      ],
+      "multiTurn": false,
+      "transcript": [
+        {
+          "query": "Who makes the best Tasmanian chardonnay?",
+          "elapsedMs": 6235,
+          "streamedText": "Tasmania offers some excellent cool-climate chardonnays, and a few producers stand out.\n\nIn the North West, Broad Acres Vineyard crafts a 2022 Chardonnay that's a fine expression of the region, showing floral, citrus, and stone fruit notes with integrated toasted oak.\n\nFrom the East Coast, Bangor Vineyard Shed's 1830 Chardonnay, the 2023 vintage, presents brilliant acidity and a refined structure with notes of citrus and white peach, while Darlington Vineyard's 2024 Chardonnay offers elegance with stone fruit and a subtle touch of oak.\n\nCloser to Hobart in the Coal River Valley, Charles Reuben Estate's 2022 Chardonnay provides a crisp, elegant palate with classic buttery notes, citrus, and tropical fruit.\n\nAll of these are highly regarded, and each offers a slightly different take on Tasmanian chardonnay. It often comes down to personal preference for oak influence and fruit profile.\n\n",
+          "done": {
+            "reply": "Tasmania offers some excellent cool-climate chardonnays, and a few producers stand out.\n\nIn the North West, Broad Acres Vineyard crafts a 2022 Chardonnay that's a fine expression of the region, showing floral, citrus, and stone fruit notes with integrated toasted oak.\n\nFrom the East Coast, Bangor Vineyard Shed's 1830 Chardonnay, the 2023 vintage, presents brilliant acidity and a refined structure with notes of citrus and white peach, while Darlington Vineyard's 2024 Chardonnay offers elegance with stone fruit and a subtle touch of oak.\n\nCloser to Hobart in the Coal River Valley, Charles Reuben Estate's 2022 Chardonnay provides a crisp, elegant palate with classic buttery notes, citrus, and tropical fruit.\n\nAll of these are highly regarded, and each offers a slightly different take on Tasmanian chardonnay. It often comes down to personal preference for oak influence and fruit profile.",
+            "usage": {
+              "prompt_tokens": 10891,
+              "completion_tokens": 247,
+              "prompt_tokens_details": {
+                "cached_tokens": 9205
+              }
+            },
+            "stopReason": "stop",
+            "routerDecision": {
+              "selfContainedQuery": "Who makes the best Tasmanian chardonnay?",
+              "intent": "DISCOVERY",
+              "anchorWinerySlug": null,
+              "anchorWineId": null,
+              "regions": [],
+              "tags": [],
+              "wineWords": [
+                "chardonnay"
+              ],
+              "dayOfWeek": null,
+              "clarifyingQuestion": null
+            },
+            "candidateCount": 12,
+            "cost": {
+              "total": {
+                "inputTokens": 2835,
+                "outputTokens": 305,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 10741,
+                "totalTokens": 13881,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.0009882,
+                  "output": 0.0003351,
+                  "cacheWrite": 0,
+                  "cacheRead": 0.00028779375,
+                  "total": 0.0016110937500000001
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 1149,
+                    "outputTokens": 58,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 1536,
+                    "totalTokens": 2743,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.0008617500000000001,
+                      "output": 0.000261,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.0001152,
+                      "total": 0.00123795
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 1686,
+                    "outputTokens": 247,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 9205,
+                    "totalTokens": 11138,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.00012644999999999998,
+                      "output": 0.0000741,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.00017259374999999998,
+                      "total": 0.00037314374999999997
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": null,
+            "wineryCards": {
+              "slugs": [
+                "broad-acres-vineyard",
+                "bangor-vineyard-shed",
+                "darlington-vineyard",
+                "charles-reuben-estate"
+              ]
+            },
+            "history": [
+              {
+                "role": "user",
+                "content": "Who makes the best Tasmanian chardonnay?"
+              },
+              {
+                "role": "assistant",
+                "content": "Tasmania offers some excellent cool-climate chardonnays, and a few producers stand out.\n\nIn the North West, Broad Acres Vineyard crafts a 2022 Chardonnay that's a fine expression of the region, showing floral, citrus, and stone fruit notes with integrated toasted oak.\n\nFrom the East Coast, Bangor Vineyard Shed's 1830 Chardonnay, the 2023 vintage, presents brilliant acidity and a refined structure with notes of citrus and white peach, while Darlington Vineyard's 2024 Chardonnay offers elegance with stone fruit and a subtle touch of oak.\n\nCloser to Hobart in the Coal River Valley, Charles Reuben Estate's 2022 Chardonnay provides a crisp, elegant palate with classic buttery notes, citrus, and tropical fruit.\n\nAll of these are highly regarded, and each offers a slightly different take on Tasmanian chardonnay. It often comes down to personal preference for oak influence and fruit profile."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "expectedBranch": "KNOWLEDGE",
+      "expectations": [
+        "intent should be KNOWLEDGE",
+        "knowledge_base block populated",
+        "reply should explain the climate/region answer in prose",
+        "no winery cards UNLESS the model names a specific corpus winery"
+      ],
+      "multiTurn": false,
+      "transcript": [
+        {
+          "query": "Why is Tasmania so good for sparkling?",
+          "elapsedMs": 5955,
+          "streamedText": "Tasmania's climate is ideal for sparkling wine production, particularly for traditional method wines made from Chardonnay and Pinot Noir. The island's cool temperatures, long daylight hours during the growing season, and significant diurnal temperature shifts allow the grapes to ripen slowly and fully, developing complex flavours while retaining the high acidity crucial for sparkling wines.\n\nThe Pipers River region in the north is particularly renowned for its sparkling wines, with producers like House of Arras crafting world-class examples. Their EJ Carr Late Disgorged 2004, for instance, showcases the remarkable autolytic complexity that comes from extended lees aging — notes of toasted brioche, browned butter, and hazelnut, all lifted by a bright citrus core. This kind of depth and structure is a direct result of Tasmania's unique cool-climate conditions. Many of the island's most acclaimed sparkling wines come from this region, benefiting from the maritime influence and well-drained soils.\n\n",
+          "done": {
+            "reply": "Tasmania's climate is ideal for sparkling wine production, particularly for traditional method wines made from Chardonnay and Pinot Noir. The island's cool temperatures, long daylight hours during the growing season, and significant diurnal temperature shifts allow the grapes to ripen slowly and fully, developing complex flavours while retaining the high acidity crucial for sparkling wines.\n\nThe Pipers River region in the north is particularly renowned for its sparkling wines, with producers like House of Arras crafting world-class examples. Their EJ Carr Late Disgorged 2004, for instance, showcases the remarkable autolytic complexity that comes from extended lees aging — notes of toasted brioche, browned butter, and hazelnut, all lifted by a bright citrus core. This kind of depth and structure is a direct result of Tasmania's unique cool-climate conditions. Many of the island's most acclaimed sparkling wines come from this region, benefiting from the maritime influence and well-drained soils.",
+            "usage": {
+              "prompt_tokens": 9346,
+              "completion_tokens": 219,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              }
+            },
+            "stopReason": "stop",
+            "routerDecision": {
+              "selfContainedQuery": "Why is Tasmania so good for sparkling?",
+              "intent": "KNOWLEDGE",
+              "anchorWinerySlug": null,
+              "anchorWineId": null,
+              "regions": [],
+              "tags": [],
+              "wineWords": [
+                "sparkling"
+              ],
+              "dayOfWeek": null,
+              "clarifyingQuestion": null
+            },
+            "candidateCount": 0,
+            "cost": {
+              "total": {
+                "inputTokens": 12029,
+                "outputTokens": 277,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 0,
+                "totalTokens": 12306,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.0027132000000000002,
+                  "output": 0.00032669999999999997,
+                  "cacheWrite": 0,
+                  "cacheRead": 0,
+                  "total": 0.0030399
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 2683,
+                    "outputTokens": 58,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 0,
+                    "totalTokens": 2741,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.00201225,
+                      "output": 0.000261,
+                      "cacheWrite": 0,
+                      "cacheRead": 0,
+                      "total": 0.00227325
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 9346,
+                    "outputTokens": 219,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 0,
+                    "totalTokens": 9565,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.00070095,
+                      "output": 0.0000657,
+                      "cacheWrite": 0,
+                      "cacheRead": 0,
+                      "total": 0.00076665
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": null,
+            "wineryCards": {
+              "slugs": [
+                "house-of-arras"
+              ]
+            },
+            "history": [
+              {
+                "role": "user",
+                "content": "Why is Tasmania so good for sparkling?"
+              },
+              {
+                "role": "assistant",
+                "content": "Tasmania's climate is ideal for sparkling wine production, particularly for traditional method wines made from Chardonnay and Pinot Noir. The island's cool temperatures, long daylight hours during the growing season, and significant diurnal temperature shifts allow the grapes to ripen slowly and fully, developing complex flavours while retaining the high acidity crucial for sparkling wines.\n\nThe Pipers River region in the north is particularly renowned for its sparkling wines, with producers like House of Arras crafting world-class examples. Their EJ Carr Late Disgorged 2004, for instance, showcases the remarkable autolytic complexity that comes from extended lees aging — notes of toasted brioche, browned butter, and hazelnut, all lifted by a bright citrus core. This kind of depth and structure is a direct result of Tasmania's unique cool-climate conditions. Many of the island's most acclaimed sparkling wines come from this region, benefiting from the maritime influence and well-drained soils."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "expectedBranch": "TRIP",
+      "expectations": [
+        "intent should be TRIP",
+        "regions should include Coal River Valley, Derwent Valley, or Huon Valley",
+        "wineWords should include pinot",
+        "dayOfWeek should be Sat",
+        "reply should sketch a 3-4 stop itinerary",
+        "should emit <<TRIP_PLAN>> with valid slugs and 2-4 stops"
+      ],
+      "multiTurn": false,
+      "transcript": [
+        {
+          "query": "Plan a Saturday from Hobart, partner and I, love pinot",
+          "elapsedMs": 5641,
+          "streamedText": "For a Saturday tasting from Hobart with a focus on Pinot Noir, the Coal River Valley is an ideal choice, offering a blend of acclaimed vineyards and a relaxed atmosphere.\n\nI'd suggest starting at Pooley Wines, which opens at 10am. They're known for their elegant Pinot Noirs, and the cellar door offers a warm welcome. From there, you could head to Pressing Matters Cellar Door, open until 5pm today, where you can taste their wines, including Pinot, right within the vineyard itself. For lunch, Caledon Estate offers a beautiful setting with impressive views and their Reserve Pinot Noir is a fine example of the region's style, with notes of dark cherry and raspberry.\n\nIf you'd like another stop, Charles Reuben Estate is open until 4pm on Saturdays and offers tours, which can be a nice way to learn more about the winemaking process.\n\n",
+          "done": {
+            "reply": "For a Saturday tasting from Hobart with a focus on Pinot Noir, the Coal River Valley is an ideal choice, offering a blend of acclaimed vineyards and a relaxed atmosphere.\n\nI'd suggest starting at Pooley Wines, which opens at 10am. They're known for their elegant Pinot Noirs, and the cellar door offers a warm welcome. From there, you could head to Pressing Matters Cellar Door, open until 5pm today, where you can taste their wines, including Pinot, right within the vineyard itself. For lunch, Caledon Estate offers a beautiful setting with impressive views and their Reserve Pinot Noir is a fine example of the region's style, with notes of dark cherry and raspberry.\n\nIf you'd like another stop, Charles Reuben Estate is open until 4pm on Saturdays and offers tours, which can be a nice way to learn more about the winemaking process.",
+            "usage": {
+              "prompt_tokens": 10754,
+              "completion_tokens": 290,
+              "prompt_tokens_details": {
+                "cached_tokens": 8182
+              }
+            },
+            "stopReason": "stop",
+            "routerDecision": {
+              "selfContainedQuery": "Plan a Saturday from Hobart, partner and I, love pinot",
+              "intent": "TRIP",
+              "anchorWinerySlug": null,
+              "anchorWineId": null,
+              "regions": [
+                "Coal River Valley",
+                "Derwent Valley",
+                "Huon Valley"
+              ],
+              "tags": [],
+              "wineWords": [
+                "pinot"
+              ],
+              "dayOfWeek": "Sat",
+              "clarifyingQuestion": null
+            },
+            "candidateCount": 12,
+            "cost": {
+              "total": {
+                "inputTokens": 3725,
+                "outputTokens": 364,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 9718,
+                "totalTokens": 13807,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.00105765,
+                  "output": 0.00041999999999999996,
+                  "cacheWrite": 0,
+                  "cacheRead": 0.0002686125,
+                  "total": 0.0017462625
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 1153,
+                    "outputTokens": 74,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 1536,
+                    "totalTokens": 2763,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.00086475,
+                      "output": 0.00033299999999999996,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.0001152,
+                      "total": 0.00131295
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 2572,
+                    "outputTokens": 290,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 8182,
+                    "totalTokens": 11044,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.0001929,
+                      "output": 0.000087,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.0001534125,
+                      "total": 0.0004333125
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": {
+              "name": "Coal River Pinot Saturday",
+              "slugs": [
+                "pooley-wines",
+                "pressing-matters-cellar-door",
+                "caledon-estate",
+                "charles-reuben-estate"
+              ]
+            },
+            "wineryCards": {
+              "slugs": [
+                "pooley-wines",
+                "pressing-matters-cellar-door",
+                "caledon-estate",
+                "charles-reuben-estate"
+              ]
+            },
+            "history": [
+              {
+                "role": "user",
+                "content": "Plan a Saturday from Hobart, partner and I, love pinot"
+              },
+              {
+                "role": "assistant",
+                "content": "For a Saturday tasting from Hobart with a focus on Pinot Noir, the Coal River Valley is an ideal choice, offering a blend of acclaimed vineyards and a relaxed atmosphere.\n\nI'd suggest starting at Pooley Wines, which opens at 10am. They're known for their elegant Pinot Noirs, and the cellar door offers a warm welcome. From there, you could head to Pressing Matters Cellar Door, open until 5pm today, where you can taste their wines, including Pinot, right within the vineyard itself. For lunch, Caledon Estate offers a beautiful setting with impressive views and their Reserve Pinot Noir is a fine example of the region's style, with notes of dark cherry and raspberry.\n\nIf you'd like another stop, Charles Reuben Estate is open until 4pm on Saturdays and offers tours, which can be a nice way to learn more about the winemaking process."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "expectedBranch": "TRIP",
+      "expectations": [
+        "intent should be TRIP",
+        "reply should propose 5-6 stops across multiple regions",
+        "reply should include a prose note about splitting across days",
+        "single <<TRIP_PLAN>> block (multi-day handled in prose, not the marker)"
+      ],
+      "multiTurn": false,
+      "transcript": [
+        {
+          "query": "Plan a 3-day Tasmania wine trip",
+          "elapsedMs": 5753,
+          "streamedText": "A three-day trip through Tasmania's wine regions offers a wonderful immersion into the island's diverse terroirs. Here’s a possible itinerary, focusing on different regions each day to give you a broad experience.\n\nDay One: The Coal River Valley\nStart your journey in the Coal River Valley, just a short drive from Hobart. This region is known for its elegant cool-climate wines. Begin your day at Pressing Matters Cellar Door, open until 5pm today, where you can taste their acclaimed Riesling and Pinot Noir right within the vineyard rows. Afterward, head to Highclare Estate Wine Room, open until 6:30pm, for a tasting at a property lovingly developed by its owners. For a more intimate experience, consider booking a tasting at Brinktop Vineyard, which offers hands-on winemaking experiences, or Stargazer Wine, which focuses on small-batch, artisanal wines (Stargazer is closed today, but open Friday through Monday).\n\nDay Two: Tamar Valley and Pipers River\nHead north towards Launceston for your second day, exploring the Tamar Valley and the sparkling wine heartland of Pipers River. Begin in Pipers River at Bellebonne, open until 4pm, for a dedicated sparkling wine tasting experience. Then, make your way to the Tamar Valley. Utzinger Wines, open until 4pm today, offers tours and tastings by appointment, showcasing high-density plantings. Also in the Tamar Valley, Bundaleera Vineyard is an appointment-only cellar door, and while their cellar door typically opens on Sundays, it's worth ringing ahead to see if they can accommodate a tasting.\n\nDay Three: East Coast or Huon Valley\nFor your final day, you have a choice depending on your preference. If you enjoy dramatic coastal scenery and a slightly warmer climate, head to the East Coast. Bream Creek Vineyard, open until 5pm today, is an award-winning by-appointment cellar door with stunning views over Marion Bay. If you prefer the cooler, more secluded charm of the south, the Huon Valley is an excellent choice. Sailor Seeks Horse is a beautiful, by-appointment vineyard that produces elegant wines from a site they painstakingly restored.\n\nThis itinerary covers diverse regions, but remember to call ahead, especially for the by-appointment cellar doors, to ensure they can welcome you.\n\n",
+          "done": {
+            "reply": "A three-day trip through Tasmania's wine regions offers a wonderful immersion into the island's diverse terroirs. Here’s a possible itinerary, focusing on different regions each day to give you a broad experience.\n\nDay One: The Coal River Valley\nStart your journey in the Coal River Valley, just a short drive from Hobart. This region is known for its elegant cool-climate wines. Begin your day at Pressing Matters Cellar Door, open until 5pm today, where you can taste their acclaimed Riesling and Pinot Noir right within the vineyard rows. Afterward, head to Highclare Estate Wine Room, open until 6:30pm, for a tasting at a property lovingly developed by its owners. For a more intimate experience, consider booking a tasting at Brinktop Vineyard, which offers hands-on winemaking experiences, or Stargazer Wine, which focuses on small-batch, artisanal wines (Stargazer is closed today, but open Friday through Monday).\n\nDay Two: Tamar Valley and Pipers River\nHead north towards Launceston for your second day, exploring the Tamar Valley and the sparkling wine heartland of Pipers River. Begin in Pipers River at Bellebonne, open until 4pm, for a dedicated sparkling wine tasting experience. Then, make your way to the Tamar Valley. Utzinger Wines, open until 4pm today, offers tours and tastings by appointment, showcasing high-density plantings. Also in the Tamar Valley, Bundaleera Vineyard is an appointment-only cellar door, and while their cellar door typically opens on Sundays, it's worth ringing ahead to see if they can accommodate a tasting.\n\nDay Three: East Coast or Huon Valley\nFor your final day, you have a choice depending on your preference. If you enjoy dramatic coastal scenery and a slightly warmer climate, head to the East Coast. Bream Creek Vineyard, open until 5pm today, is an award-winning by-appointment cellar door with stunning views over Marion Bay. If you prefer the cooler, more secluded charm of the south, the Huon Valley is an excellent choice. Sailor Seeks Horse is a beautiful, by-appointment vineyard that produces elegant wines from a site they painstakingly restored.\n\nThis itinerary covers diverse regions, but remember to call ahead, especially for the by-appointment cellar doors, to ensure they can welcome you.",
+            "usage": {
+              "prompt_tokens": 10122,
+              "completion_tokens": 632,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              }
+            },
+            "stopReason": "stop",
+            "routerDecision": {
+              "selfContainedQuery": "Plan a 3-day Tasmania wine trip",
+              "intent": "TRIP",
+              "anchorWinerySlug": null,
+              "anchorWineId": null,
+              "regions": [],
+              "tags": [],
+              "wineWords": [],
+              "dayOfWeek": null,
+              "clarifyingQuestion": null
+            },
+            "candidateCount": 12,
+            "cost": {
+              "total": {
+                "inputTokens": 11269,
+                "outputTokens": 685,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 1536,
+                "totalTokens": 13490,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.0016194,
+                  "output": 0.00042809999999999994,
+                  "cacheWrite": 0,
+                  "cacheRead": 0.0001152,
+                  "total": 0.0021627
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 1147,
+                    "outputTokens": 53,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 1536,
+                    "totalTokens": 2736,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.00086025,
+                      "output": 0.0002385,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.0001152,
+                      "total": 0.0012139499999999999
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 10122,
+                    "outputTokens": 632,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 0,
+                    "totalTokens": 10754,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.00075915,
+                      "output": 0.00018959999999999997,
+                      "cacheWrite": 0,
+                      "cacheRead": 0,
+                      "total": 0.0009487499999999999
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": {
+              "name": "Three-day wine trip",
+              "slugs": [
+                "pressing-matters-cellar-door",
+                "highclare-estate-wine-room",
+                "bellebonne",
+                "utzinger-wines",
+                "bream-creek-vineyard"
+              ]
+            },
+            "wineryCards": {
+              "slugs": [
+                "pressing-matters-cellar-door",
+                "highclare-estate-wine-room",
+                "brinktop-vineyard",
+                "stargazer-wine",
+                "bellebonne",
+                "utzinger-wines",
+                "bundaleera-vineyard",
+                "bream-creek-vineyard",
+                "sailor-seeks-horse"
+              ]
+            },
+            "history": [
+              {
+                "role": "user",
+                "content": "Plan a 3-day Tasmania wine trip"
+              },
+              {
+                "role": "assistant",
+                "content": "A three-day trip through Tasmania's wine regions offers a wonderful immersion into the island's diverse terroirs. Here’s a possible itinerary, focusing on different regions each day to give you a broad experience.\n\nDay One: The Coal River Valley\nStart your journey in the Coal River Valley, just a short drive from Hobart. This region is known for its elegant cool-climate wines. Begin your day at Pressing Matters Cellar Door, open until 5pm today, where you can taste their acclaimed Riesling and Pinot Noir right within the vineyard rows. Afterward, head to Highclare Estate Wine Room, open until 6:30pm, for a tasting at a property lovingly developed by its owners. For a more intimate experience, consider booking a tasting at Brinktop Vineyard, which offers hands-on winemaking experiences, or Stargazer Wine, which focuses on small-batch, artisanal wines (Stargazer is closed today, but open Friday through Monday).\n\nDay Two: Tamar Valley and Pipers River\nHead north towards Launceston for your second day, exploring the Tamar Valley and the sparkling wine heartland of Pipers River. Begin in Pipers River at Bellebonne, open until 4pm, for a dedicated sparkling wine tasting experience. Then, make your way to the Tamar Valley. Utzinger Wines, open until 4pm today, offers tours and tastings by appointment, showcasing high-density plantings. Also in the Tamar Valley, Bundaleera Vineyard is an appointment-only cellar door, and while their cellar door typically opens on Sundays, it's worth ringing ahead to see if they can accommodate a tasting.\n\nDay Three: East Coast or Huon Valley\nFor your final day, you have a choice depending on your preference. If you enjoy dramatic coastal scenery and a slightly warmer climate, head to the East Coast. Bream Creek Vineyard, open until 5pm today, is an award-winning by-appointment cellar door with stunning views over Marion Bay. If you prefer the cooler, more secluded charm of the south, the Huon Valley is an excellent choice. Sailor Seeks Horse is a beautiful, by-appointment vineyard that produces elegant wines from a site they painstakingly restored.\n\nThis itinerary covers diverse regions, but remember to call ahead, especially for the by-appointment cellar doors, to ensure they can welcome you."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "expectedBranch": "TRIP",
+      "expectations": [
+        "intent should be TRIP",
+        "clarifyingQuestion should be populated (no day, no preferences, region is broad)",
+        "reply should ask one focused follow-up before recommending",
+        "no winery_card, no trip_plan"
+      ],
+      "multiTurn": false,
+      "transcript": [
+        {
+          "query": "Plan a day from Hobart",
+          "elapsedMs": 4189,
+          "streamedText": "For a day trip from Hobart, the Coal River Valley is your best bet; it's just a short drive east of the city, making it easy to fit in a few cellar doors. Today, Thursday, offers some excellent choices.\n\nI'd suggest starting at Pooley Wines, where you can enjoy their award-winning single-vineyard wines in a beautiful setting. They're open until 5pm today. For lunch, Riversdale Estate Winery, Cellar Door & French",
+          "done": {
+            "reply": "For a day trip from Hobart, the Coal River Valley is your best bet; it's just a short drive east of the city, making it easy to fit in a few cellar doors. Today, Thursday, offers some excellent choices.\n\nI'd suggest starting at Pooley Wines, where you can enjoy their award-winning single-vineyard wines in a beautiful setting. They're open until 5pm today.",
+            "usage": {
+              "prompt_tokens": 8379,
+              "completion_tokens": 100,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              }
+            },
+            "stopReason": "length",
+            "routerDecision": {
+              "selfContainedQuery": "Plan a day from Hobart",
+              "intent": "TRIP",
+              "anchorWinerySlug": null,
+              "anchorWineId": null,
+              "regions": [],
+              "tags": [],
+              "wineWords": [],
+              "dayOfWeek": null,
+              "clarifyingQuestion": "When are you thinking, and what kind of day do you want from Hobart?"
+            },
+            "candidateCount": 0,
+            "cost": {
+              "total": {
+                "inputTokens": 9524,
+                "outputTokens": 167,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 1536,
+                "totalTokens": 11227,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.0014871749999999999,
+                  "output": 0.00033150000000000003,
+                  "cacheWrite": 0,
+                  "cacheRead": 0.0001152,
+                  "total": 0.0019338749999999998
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 1145,
+                    "outputTokens": 67,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 1536,
+                    "totalTokens": 2748,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.0008587499999999999,
+                      "output": 0.0003015,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.0001152,
+                      "total": 0.0012754499999999998
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 8379,
+                    "outputTokens": 100,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 0,
+                    "totalTokens": 8479,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.000628425,
+                      "output": 0.00003,
+                      "cacheWrite": 0,
+                      "cacheRead": 0,
+                      "total": 0.0006584249999999999
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": null,
+            "wineryCards": null,
+            "history": [
+              {
+                "role": "user",
+                "content": "Plan a day from Hobart"
+              },
+              {
+                "role": "assistant",
+                "content": "For a day trip from Hobart, the Coal River Valley is your best bet; it's just a short drive east of the city, making it easy to fit in a few cellar doors. Today, Thursday, offers some excellent choices.\n\nI'd suggest starting at Pooley Wines, where you can enjoy their award-winning single-vineyard wines in a beautiful setting. They're open until 5pm today."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "expectedBranch": "DISCOVERY",
+      "expectations": [
+        "intent should be DISCOVERY",
+        "clarifyingQuestion should be null (NARROWED rule per stipulation #12)",
+        "reply should give a confident default recommendation"
+      ],
+      "multiTurn": false,
+      "transcript": [
+        {
+          "query": "What's good?",
+          "elapsedMs": 2524,
+          "streamedText": "Tasmania offers such a range, it truly depends on what you're in the mood for. Are you hoping for a focused tasting experience, perhaps a lovely lunch with a view, or something specific like a cellar door known for its pinot noir? Knowing a little more about what you're looking for will help me guide you to the perfect spot.",
+          "done": {
+            "reply": "Tasmania offers such a range, it truly depends on what you're in the mood for. Are you hoping for a focused tasting experience, perhaps a lovely lunch with a view, or something specific like a cellar door known for its pinot noir? Knowing a little more about what you're looking for will help me guide you to the perfect spot.",
+            "usage": {
+              "prompt_tokens": 8381,
+              "completion_tokens": 72,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              }
+            },
+            "stopReason": "stop",
+            "routerDecision": {
+              "selfContainedQuery": "What's good?",
+              "intent": "DISCOVERY",
+              "anchorWinerySlug": null,
+              "anchorWineId": null,
+              "regions": [],
+              "tags": [],
+              "wineWords": [],
+              "dayOfWeek": null,
+              "clarifyingQuestion": "Anything you're looking for — pinot focus, lunch, somewhere with a view?"
+            },
+            "candidateCount": 0,
+            "cost": {
+              "total": {
+                "inputTokens": 9523,
+                "outputTokens": 135,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 1536,
+                "totalTokens": 11194,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.001485075,
+                  "output": 0.0003051,
+                  "cacheWrite": 0,
+                  "cacheRead": 0.0001152,
+                  "total": 0.001905375
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 1142,
+                    "outputTokens": 63,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 1536,
+                    "totalTokens": 2741,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.0008565000000000001,
+                      "output": 0.0002835,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.0001152,
+                      "total": 0.0012552
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 8381,
+                    "outputTokens": 72,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 0,
+                    "totalTokens": 8453,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.0006285749999999999,
+                      "output": 0.0000216,
+                      "cacheWrite": 0,
+                      "cacheRead": 0,
+                      "total": 0.0006501749999999999
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": null,
+            "wineryCards": null,
+            "history": [
+              {
+                "role": "user",
+                "content": "What's good?"
+              },
+              {
+                "role": "assistant",
+                "content": "Tasmania offers such a range, it truly depends on what you're in the mood for. Are you hoping for a focused tasting experience, perhaps a lovely lunch with a view, or something specific like a cellar door known for its pinot noir? Knowing a little more about what you're looking for will help me guide you to the perfect spot."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "expectedBranch": "OUT_OF_SCOPE",
+      "expectations": [
+        "intent should be OUT_OF_SCOPE",
+        "reply should be a warm deflection",
+        "no cards, no trip plan"
+      ],
+      "multiTurn": false,
+      "transcript": [
+        {
+          "query": "Help me write an email",
+          "elapsedMs": 2604,
+          "streamedText": "I can certainly help you with questions about Tasmanian wine and cellar doors, but I'm not able to write emails or perform other general-purpose tasks. How can I help you with wine today?",
+          "done": {
+            "reply": "I can certainly help you with questions about Tasmanian wine and cellar doors, but I'm not able to write emails or perform other general-purpose tasks. How can I help you with wine today?",
+            "usage": {
+              "prompt_tokens": 8351,
+              "completion_tokens": 41,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              }
+            },
+            "stopReason": "stop",
+            "routerDecision": {
+              "selfContainedQuery": "Help me write an email",
+              "intent": "OUT_OF_SCOPE",
+              "anchorWinerySlug": null,
+              "anchorWineId": null,
+              "regions": [],
+              "tags": [],
+              "wineWords": [],
+              "dayOfWeek": null,
+              "clarifyingQuestion": null
+            },
+            "candidateCount": 0,
+            "cost": {
+              "total": {
+                "inputTokens": 9495,
+                "outputTokens": 92,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 1536,
+                "totalTokens": 11123,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.001484325,
+                  "output": 0.0002418,
+                  "cacheWrite": 0,
+                  "cacheRead": 0.0001152,
+                  "total": 0.001841325
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 1144,
+                    "outputTokens": 51,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 1536,
+                    "totalTokens": 2731,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.000858,
+                      "output": 0.0002295,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.0001152,
+                      "total": 0.0012027
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 8351,
+                    "outputTokens": 41,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 0,
+                    "totalTokens": 8392,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.0006263250000000001,
+                      "output": 0.000012299999999999999,
+                      "cacheWrite": 0,
+                      "cacheRead": 0,
+                      "total": 0.0006386250000000001
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": null,
+            "wineryCards": null,
+            "history": [
+              {
+                "role": "user",
+                "content": "Help me write an email"
+              },
+              {
+                "role": "assistant",
+                "content": "I can certainly help you with questions about Tasmanian wine and cellar doors, but I'm not able to write emails or perform other general-purpose tasks. How can I help you with wine today?"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "expectedBranch": "TRIP",
+      "expectations": [
+        "turn 2 selfContainedQuery should be a coref rewrite (e.g. \"Plan a sparkling-focused Coal River day instead of pinot\")",
+        "turn 2 should emit a fresh trip plan with sparkling producers"
+      ],
+      "multiTurn": true,
+      "transcript": [
+        {
+          "query": "Suggest a Coal River pinot day",
+          "elapsedMs": 6450,
+          "streamedText": "The Coal River Valley is an excellent choice for a pinot-focused day, offering a range of styles and cellar door experiences, and it's conveniently close to Hobart. Today, Thursday, you have several wonderful options.\n\nYou could begin at Pressing Matters Cellar Door, open until 5pm, where the tasting room is uniquely situated right within the vineyard, offering a direct connection to the wines you're enjoying. Their pinot noir is known for its clarity and expression of the site.\n\nJust a short drive away is Caledon Estate, also open until 5pm. Their Reserve Pinot Noir from 2022 is a beautiful example of the region, with deep ruby colour, concentrated red fruits, and subtle spice from oak. The cellar door itself is architecturally striking, with expansive views.\n\nFor a more intimate experience, consider Craigow Vineyard. They are an award-winning producer, and while their cellar door is by appointment, a call ahead can often secure you a tasting of their classic pinot noir, which showcases black cherry and spice notes. Similarly, Uplands Vineyard is an older property with a rich history, offering tastings by appointment.\n\nCharles Reuben Estate is open until 3pm today and offers tours, which could add another dimension to your visit. Their self-contained cottage among the vines speaks to the peaceful setting. Sisu Wines, open until 4:30pm, is another good option, known for its thoughtful approach to farming and winemaking on a larger estate.\n\nRemember to ring ahead for any by-appointment cellar doors to ensure they can accommodate you.\n\n",
+          "done": {
+            "reply": "The Coal River Valley is an excellent choice for a pinot-focused day, offering a range of styles and cellar door experiences, and it's conveniently close to Hobart. Today, Thursday, you have several wonderful options.\n\nYou could begin at Pressing Matters Cellar Door, open until 5pm, where the tasting room is uniquely situated right within the vineyard, offering a direct connection to the wines you're enjoying. Their pinot noir is known for its clarity and expression of the site.\n\nJust a short drive away is Caledon Estate, also open until 5pm. Their Reserve Pinot Noir from 2022 is a beautiful example of the region, with deep ruby colour, concentrated red fruits, and subtle spice from oak. The cellar door itself is architecturally striking, with expansive views.\n\nFor a more intimate experience, consider Craigow Vineyard. They are an award-winning producer, and while their cellar door is by appointment, a call ahead can often secure you a tasting of their classic pinot noir, which showcases black cherry and spice notes. Similarly, Uplands Vineyard is an older property with a rich history, offering tastings by appointment.\n\nCharles Reuben Estate is open until 3pm today and offers tours, which could add another dimension to your visit. Their self-contained cottage among the vines speaks to the peaceful setting. Sisu Wines, open until 4:30pm, is another good option, known for its thoughtful approach to farming and winemaking on a larger estate.\n\nRemember to ring ahead for any by-appointment cellar doors to ensure they can accommodate you.",
+            "usage": {
+              "prompt_tokens": 10822,
+              "completion_tokens": 391,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              }
+            },
+            "stopReason": "stop",
+            "routerDecision": {
+              "selfContainedQuery": "Suggest a Coal River pinot day",
+              "intent": "TRIP",
+              "anchorWinerySlug": "coal-valley-vineyard",
+              "anchorWineId": null,
+              "regions": [
+                "Coal River Valley"
+              ],
+              "tags": [],
+              "wineWords": [
+                "pinot"
+              ],
+              "dayOfWeek": null,
+              "clarifyingQuestion": null
+            },
+            "candidateCount": 12,
+            "cost": {
+              "total": {
+                "inputTokens": 11968,
+                "outputTokens": 450,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 1536,
+                "totalTokens": 13954,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.0016711500000000002,
+                  "output": 0.0003828,
+                  "cacheWrite": 0,
+                  "cacheRead": 0.0001152,
+                  "total": 0.00216915
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 1146,
+                    "outputTokens": 59,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 1536,
+                    "totalTokens": 2741,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.0008595,
+                      "output": 0.0002655,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.0001152,
+                      "total": 0.0012402000000000001
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 10822,
+                    "outputTokens": 391,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 0,
+                    "totalTokens": 11213,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.00081165,
+                      "output": 0.0001173,
+                      "cacheWrite": 0,
+                      "cacheRead": 0,
+                      "total": 0.00092895
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": null,
+            "wineryCards": {
+              "slugs": [
+                "pressing-matters-cellar-door",
+                "caledon-estate",
+                "craigow-vineyard",
+                "uplands-vineyard",
+                "charles-reuben-estate",
+                "sisu-wines"
+              ]
+            },
+            "history": [
+              {
+                "role": "user",
+                "content": "Suggest a Coal River pinot day"
+              },
+              {
+                "role": "assistant",
+                "content": "The Coal River Valley is an excellent choice for a pinot-focused day, offering a range of styles and cellar door experiences, and it's conveniently close to Hobart. Today, Thursday, you have several wonderful options.\n\nYou could begin at Pressing Matters Cellar Door, open until 5pm, where the tasting room is uniquely situated right within the vineyard, offering a direct connection to the wines you're enjoying. Their pinot noir is known for its clarity and expression of the site.\n\nJust a short drive away is Caledon Estate, also open until 5pm. Their Reserve Pinot Noir from 2022 is a beautiful example of the region, with deep ruby colour, concentrated red fruits, and subtle spice from oak. The cellar door itself is architecturally striking, with expansive views.\n\nFor a more intimate experience, consider Craigow Vineyard. They are an award-winning producer, and while their cellar door is by appointment, a call ahead can often secure you a tasting of their classic pinot noir, which showcases black cherry and spice notes. Similarly, Uplands Vineyard is an older property with a rich history, offering tastings by appointment.\n\nCharles Reuben Estate is open until 3pm today and offers tours, which could add another dimension to your visit. Their self-contained cottage among the vines speaks to the peaceful setting. Sisu Wines, open until 4:30pm, is another good option, known for its thoughtful approach to farming and winemaking on a larger estate.\n\nRemember to ring ahead for any by-appointment cellar doors to ensure they can accommodate you."
+              }
+            ]
+          }
+        },
+        {
+          "query": "actually let's do sparkling",
+          "elapsedMs": 7624,
+          "streamedText": "Certainly, let's shift to sparkling wine. Tasmania, particularly the northern regions, is renowned for its traditional method sparkling, drawing comparisons to Champagne.\n\nFor today, Thursday, Pipers River is your best bet for a focused sparkling experience. Bellebonne, open until 4pm, is dedicated entirely to sparkling wine, and they craft some truly exquisite examples. Their Bis Non Vintage Rose, made from Pinot Noir, offers a melody of strawberry, Turkish delight, and rose petal, with a long, elegant finish.\n\nClover Hill Wines, also in Pipers River and open until 4:30pm, is another excellent choice. Their cellar door is quite impressive, and they are award-winning producers. I'd particularly recommend their Blanc de Blancs MV, a Chardonnay-driven sparkling with notes of citrus, white peach, and green apple, layered with hints of sea spray and toasted bread. Do keep in mind that Clover Hill operates by appointment, so it's best to call ahead.\n\nDelamere Vineyard, open until 4:30pm today, is another Pipers River gem. Their NV Rose, crafted from 100% Pinot Noir, is a benchmark Tasmanian sparkling. It displays a pale salmon colour with fresh strawberry and musk aromas, complexed by hints of lanolin and toast.\n\nIf you find yourself in the Tamar Valley, Highclare Estate Wine Room is open until 6:30pm. While they offer a range of wines, it's a welcoming spot if you're exploring that region.\n\nKeep in mind that Brinktop Vineyard in the Coal River Valley and Loira Vines in the Tamar Valley are not open today, Thursday. Bundaleera Vineyard, also in the Tamar Valley, is by appointment, but their Sparkling shows notes of citrus and red apple with a toasted biscuit aroma and fine creamy texture.\n\nEnjoy your sparkling day!\n\n",
+          "done": {
+            "reply": "Certainly, let's shift to sparkling wine. Tasmania, particularly the northern regions, is renowned for its traditional method sparkling, drawing comparisons to Champagne.\n\nFor today, Thursday, Pipers River is your best bet for a focused sparkling experience. Bellebonne, open until 4pm, is dedicated entirely to sparkling wine, and they craft some truly exquisite examples. Their Bis Non Vintage Rose, made from Pinot Noir, offers a melody of strawberry, Turkish delight, and rose petal, with a long, elegant finish.\n\nClover Hill Wines, also in Pipers River and open until 4:30pm, is another excellent choice. Their cellar door is quite impressive, and they are award-winning producers. I'd particularly recommend their Blanc de Blancs MV, a Chardonnay-driven sparkling with notes of citrus, white peach, and green apple, layered with hints of sea spray and toasted bread. Do keep in mind that Clover Hill operates by appointment, so it's best to call ahead.\n\nDelamere Vineyard, open until 4:30pm today, is another Pipers River gem. Their NV Rose, crafted from 100% Pinot Noir, is a benchmark Tasmanian sparkling. It displays a pale salmon colour with fresh strawberry and musk aromas, complexed by hints of lanolin and toast.\n\nIf you find yourself in the Tamar Valley, Highclare Estate Wine Room is open until 6:30pm. While they offer a range of wines, it's a welcoming spot if you're exploring that region.\n\nKeep in mind that Brinktop Vineyard in the Coal River Valley and Loira Vines in the Tamar Valley are not open today, Thursday. Bundaleera Vineyard, also in the Tamar Valley, is by appointment, but their Sparkling shows notes of citrus and red apple with a toasted biscuit aroma and fine creamy texture.\n\nEnjoy your sparkling day!",
+            "usage": {
+              "prompt_tokens": 11039,
+              "completion_tokens": 401,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              }
+            },
+            "stopReason": "length",
+            "routerDecision": {
+              "selfContainedQuery": "actually let's do sparkling",
+              "intent": "DISCOVERY",
+              "anchorWinerySlug": null,
+              "anchorWineId": null,
+              "regions": [],
+              "tags": [],
+              "wineWords": [
+                "sparkling"
+              ],
+              "dayOfWeek": null,
+              "clarifyingQuestion": null
+            },
+            "candidateCount": 10,
+            "cost": {
+              "total": {
+                "inputTokens": 12519,
+                "outputTokens": 453,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 1536,
+                "totalTokens": 14508,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.0019379249999999998,
+                  "output": 0.0003543,
+                  "cacheWrite": 0,
+                  "cacheRead": 0.0001152,
+                  "total": 0.002407425
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 1480,
+                    "outputTokens": 52,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 1536,
+                    "totalTokens": 3068,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.0011099999999999999,
+                      "output": 0.000234,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.0001152,
+                      "total": 0.0014592
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 11039,
+                    "outputTokens": 401,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 0,
+                    "totalTokens": 11440,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.000827925,
+                      "output": 0.0001203,
+                      "cacheWrite": 0,
+                      "cacheRead": 0,
+                      "total": 0.000948225
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": null,
+            "wineryCards": null,
+            "history": [
+              {
+                "role": "user",
+                "content": "Suggest a Coal River pinot day"
+              },
+              {
+                "role": "assistant",
+                "content": "The Coal River Valley is an excellent choice for a pinot-focused day, offering a range of styles and cellar door experiences, and it's conveniently close to Hobart. Today, Thursday, you have several wonderful options.\n\nYou could begin at Pressing Matters Cellar Door, open until 5pm, where the tasting room is uniquely situated right within the vineyard, offering a direct connection to the wines you're enjoying. Their pinot noir is known for its clarity and expression of the site.\n\nJust a short drive away is Caledon Estate, also open until 5pm. Their Reserve Pinot Noir from 2022 is a beautiful example of the region, with deep ruby colour, concentrated red fruits, and subtle spice from oak. The cellar door itself is architecturally striking, with expansive views.\n\nFor a more intimate experience, consider Craigow Vineyard. They are an award-winning producer, and while their cellar door is by appointment, a call ahead can often secure you a tasting of their classic pinot noir, which showcases black cherry and spice notes. Similarly, Uplands Vineyard is an older property with a rich history, offering tastings by appointment.\n\nCharles Reuben Estate is open until 3pm today and offers tours, which could add another dimension to your visit. Their self-contained cottage among the vines speaks to the peaceful setting. Sisu Wines, open until 4:30pm, is another good option, known for its thoughtful approach to farming and winemaking on a larger estate.\n\nRemember to ring ahead for any by-appointment cellar doors to ensure they can accommodate you."
+              },
+              {
+                "role": "user",
+                "content": "actually let's do sparkling"
+              },
+              {
+                "role": "assistant",
+                "content": "Certainly, let's shift to sparkling wine. Tasmania, particularly the northern regions, is renowned for its traditional method sparkling, drawing comparisons to Champagne.\n\nFor today, Thursday, Pipers River is your best bet for a focused sparkling experience. Bellebonne, open until 4pm, is dedicated entirely to sparkling wine, and they craft some truly exquisite examples. Their Bis Non Vintage Rose, made from Pinot Noir, offers a melody of strawberry, Turkish delight, and rose petal, with a long, elegant finish.\n\nClover Hill Wines, also in Pipers River and open until 4:30pm, is another excellent choice. Their cellar door is quite impressive, and they are award-winning producers. I'd particularly recommend their Blanc de Blancs MV, a Chardonnay-driven sparkling with notes of citrus, white peach, and green apple, layered with hints of sea spray and toasted bread. Do keep in mind that Clover Hill operates by appointment, so it's best to call ahead.\n\nDelamere Vineyard, open until 4:30pm today, is another Pipers River gem. Their NV Rose, crafted from 100% Pinot Noir, is a benchmark Tasmanian sparkling. It displays a pale salmon colour with fresh strawberry and musk aromas, complexed by hints of lanolin and toast.\n\nIf you find yourself in the Tamar Valley, Highclare Estate Wine Room is open until 6:30pm. While they offer a range of wines, it's a welcoming spot if you're exploring that region.\n\nKeep in mind that Brinktop Vineyard in the Coal River Valley and Loira Vines in the Tamar Valley are not open today, Thursday. Bundaleera Vineyard, also in the Tamar Valley, is by appointment, but their Sparkling shows notes of citrus and red apple with a toasted biscuit aroma and fine creamy texture.\n\nEnjoy your sparkling day!"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,497 @@
+{
+  "url": "http://127.0.0.1:5001/winery-tourism-tasmania/us-central1/concierge",
+  "regionId": "tasmania",
+  "runAt": "2026-05-28T12:34:29.365Z",
+  "results": [
+    {
+      "id": 13,
+      "expectedBranch": "TRIP",
+      "expectations": [
+        "intent should be TRIP",
+        "clarifyingQuestion should be populated (no day, no preferences, region is broad)",
+        "reply should ask one focused follow-up before recommending",
+        "no winery_card, no trip_plan"
+      ],
+      "multiTurn": false,
+      "transcript": [
+        {
+          "query": "Plan a day from Hobart",
+          "elapsedMs": 7060,
+          "streamedText": "For a day trip from Hobart, the Coal River Valley is a wonderful choice with a range of excellent cellar doors. Today, Thursday, you could begin your day at Charles Reuben Estate, open until 3pm, where you can enjoy their wines and perhaps even take a tour. Just a short drive away is Sisu Wines, open until 4:30pm, known for their thoughtful approach to farming and winemaking.\n\nFor lunch and further tasting, Caledon Estate is open until 5pm and offers stunning views of the valley from their architecturally designed cellar door and restaurant. Afterwards, Pressing Matters Cellar Door, open until 5pm, provides a unique experience with its tasting room set right within the vineyard.\n\nIf you prefer a more intimate, by-appointment experience, Uplands Vineyard is also in the Coal River Valley, though you'd need to ring ahead to book a tasting. Another excellent option, also by appointment, is Craigow Vineyard, an award-winning estate with deep roots in the valley.\n\nThis itinerary focuses on the Coal River Valley, which is easily accessible from Hobart. It allows for a relaxed pace with a mix of walk-in and by-appointment options, though for the latter, do remember to call ahead.\n\n",
+          "done": {
+            "reply": "For a day trip from Hobart, the Coal River Valley is a wonderful choice with a range of excellent cellar doors. Today, Thursday, you could begin your day at Charles Reuben Estate, open until 3pm, where you can enjoy their wines and perhaps even take a tour. Just a short drive away is Sisu Wines, open until 4:30pm, known for their thoughtful approach to farming and winemaking.\n\nFor lunch and further tasting, Caledon Estate is open until 5pm and offers stunning views of the valley from their architecturally designed cellar door and restaurant. Afterwards, Pressing Matters Cellar Door, open until 5pm, provides a unique experience with its tasting room set right within the vineyard.\n\nIf you prefer a more intimate, by-appointment experience, Uplands Vineyard is also in the Coal River Valley, though you'd need to ring ahead to book a tasting. Another excellent option, also by appointment, is Craigow Vineyard, an award-winning estate with deep roots in the valley.\n\nThis itinerary focuses on the Coal River Valley, which is easily accessible from Hobart. It allows for a relaxed pace with a mix of walk-in and by-appointment options, though for the latter, do remember to call ahead.",
+            "usage": {
+              "prompt_tokens": 10663,
+              "completion_tokens": 376,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              }
+            },
+            "stopReason": "stop",
+            "routerDecision": {
+              "selfContainedQuery": "Plan a day from Hobart",
+              "intent": "TRIP",
+              "anchorWinerySlug": null,
+              "anchorWineId": null,
+              "regions": [
+                "Coal River Valley",
+                "Derwent Valley",
+                "Huon Valley"
+              ],
+              "tags": [],
+              "wineWords": [],
+              "dayOfWeek": null,
+              "clarifyingQuestion": null
+            },
+            "candidateCount": 12,
+            "cost": {
+              "total": {
+                "inputTokens": 13876,
+                "outputTokens": 439,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 0,
+                "totalTokens": 14315,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.003209475,
+                  "output": 0.0003963,
+                  "cacheWrite": 0,
+                  "cacheRead": 0,
+                  "total": 0.003605775
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 3213,
+                    "outputTokens": 63,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 0,
+                    "totalTokens": 3276,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.00240975,
+                      "output": 0.0002835,
+                      "cacheWrite": 0,
+                      "cacheRead": 0,
+                      "total": 0.00269325
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 10663,
+                    "outputTokens": 376,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 0,
+                    "totalTokens": 11039,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.000799725,
+                      "output": 0.00011279999999999999,
+                      "cacheWrite": 0,
+                      "cacheRead": 0,
+                      "total": 0.0009125250000000001
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": {
+              "name": "Coal River Valley day trip",
+              "slugs": [
+                "charles-reuben-estate",
+                "sisu-wines",
+                "caledon-estate",
+                "pressing-matters-cellar-door"
+              ]
+            },
+            "wineryCards": {
+              "slugs": [
+                "charles-reuben-estate",
+                "sisu-wines",
+                "caledon-estate",
+                "pressing-matters-cellar-door",
+                "uplands-vineyard",
+                "craigow-vineyard"
+              ]
+            },
+            "history": [
+              {
+                "role": "user",
+                "content": "Plan a day from Hobart"
+              },
+              {
+                "role": "assistant",
+                "content": "For a day trip from Hobart, the Coal River Valley is a wonderful choice with a range of excellent cellar doors. Today, Thursday, you could begin your day at Charles Reuben Estate, open until 3pm, where you can enjoy their wines and perhaps even take a tour. Just a short drive away is Sisu Wines, open until 4:30pm, known for their thoughtful approach to farming and winemaking.\n\nFor lunch and further tasting, Caledon Estate is open until 5pm and offers stunning views of the valley from their architecturally designed cellar door and restaurant. Afterwards, Pressing Matters Cellar Door, open until 5pm, provides a unique experience with its tasting room set right within the vineyard.\n\nIf you prefer a more intimate, by-appointment experience, Uplands Vineyard is also in the Coal River Valley, though you'd need to ring ahead to book a tasting. Another excellent option, also by appointment, is Craigow Vineyard, an award-winning estate with deep roots in the valley.\n\nThis itinerary focuses on the Coal River Valley, which is easily accessible from Hobart. It allows for a relaxed pace with a mix of walk-in and by-appointment options, though for the latter, do remember to call ahead."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "expectedBranch": "DISCOVERY",
+      "expectations": [
+        "intent should be DISCOVERY",
+        "clarifyingQuestion should be null (NARROWED rule per stipulation #12)",
+        "reply should give a confident default recommendation"
+      ],
+      "multiTurn": false,
+      "transcript": [
+        {
+          "query": "What's good?",
+          "elapsedMs": 6042,
+          "streamedText": "To give you the best recommendations, could you tell me where in Tasmania you're based or starting from?",
+          "done": {
+            "reply": "To give you the best recommendations, could you tell me where in Tasmania you're based or starting from?",
+            "usage": {
+              "prompt_tokens": 8810,
+              "completion_tokens": 22,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              }
+            },
+            "stopReason": "stop",
+            "routerDecision": {
+              "selfContainedQuery": "What's good?",
+              "intent": "DISCOVERY",
+              "anchorWinerySlug": null,
+              "anchorWineId": null,
+              "regions": [],
+              "tags": [],
+              "wineWords": [],
+              "dayOfWeek": null,
+              "clarifyingQuestion": "Where in Tasmania are you based or starting from?"
+            },
+            "candidateCount": 0,
+            "cost": {
+              "total": {
+                "inputTokens": 9460,
+                "outputTokens": 79,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 2560,
+                "totalTokens": 12099,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.00114825,
+                  "output": 0.0002631,
+                  "cacheWrite": 0,
+                  "cacheRead": 0.000192,
+                  "total": 0.00160335
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 650,
+                    "outputTokens": 57,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 2560,
+                    "totalTokens": 3267,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.0004875,
+                      "output": 0.0002565,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.000192,
+                      "total": 0.000936
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 8810,
+                    "outputTokens": 22,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 0,
+                    "totalTokens": 8832,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.00066075,
+                      "output": 0.0000065999999999999995,
+                      "cacheWrite": 0,
+                      "cacheRead": 0,
+                      "total": 0.00066735
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": null,
+            "wineryCards": null,
+            "history": [
+              {
+                "role": "user",
+                "content": "What's good?"
+              },
+              {
+                "role": "assistant",
+                "content": "To give you the best recommendations, could you tell me where in Tasmania you're based or starting from?"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "expectedBranch": "TRIP",
+      "expectations": [
+        "turn 2 selfContainedQuery should be a coref rewrite (e.g. \"Plan a sparkling-focused Coal River day instead of pinot\")",
+        "turn 2 should emit a fresh trip plan with sparkling producers"
+      ],
+      "multiTurn": true,
+      "transcript": [
+        {
+          "query": "Suggest a Coal River pinot day",
+          "elapsedMs": 6152,
+          "streamedText": "The Coal River Valley is an excellent choice for a pinot day, offering a range of styles and cellar door experiences.\n\nI would suggest beginning your day at Pressing Matters Cellar Door, which is open until 5pm today. Their tasting room is uniquely situated right within the vineyard, offering a direct connection to the wines you're enjoying. From there, you could move on to Caledon Estate, also open until 5pm, where you'll find a striking sandstone entrance and architecturally designed space with beautiful views. Their Reserve Pinot Noir from 2022 is a powerful expression of dark cherry and raspberry with subtle spice and toasty oak.\n\nIf you are keen to try another award-winning pinot, you might consider Craigow Vineyard. Their pinot noir offers classic spice and black cherry notes, with French oak tannins enhancing a full-flavoured palate. Just remember to ring ahead, as Craigow is by appointment.\n\n",
+          "done": {
+            "reply": "The Coal River Valley is an excellent choice for a pinot day, offering a range of styles and cellar door experiences.\n\nI would suggest beginning your day at Pressing Matters Cellar Door, which is open until 5pm today. Their tasting room is uniquely situated right within the vineyard, offering a direct connection to the wines you're enjoying. From there, you could move on to Caledon Estate, also open until 5pm, where you'll find a striking sandstone entrance and architecturally designed space with beautiful views. Their Reserve Pinot Noir from 2022 is a powerful expression of dark cherry and raspberry with subtle spice and toasty oak.\n\nIf you are keen to try another award-winning pinot, you might consider Craigow Vineyard. Their pinot noir offers classic spice and black cherry notes, with French oak tannins enhancing a full-flavoured palate. Just remember to ring ahead, as Craigow is by appointment.",
+            "usage": {
+              "prompt_tokens": 11259,
+              "completion_tokens": 284,
+              "prompt_tokens_details": {
+                "cached_tokens": 9206
+              }
+            },
+            "stopReason": "stop",
+            "routerDecision": {
+              "selfContainedQuery": "Suggest a Coal River pinot day",
+              "intent": "TRIP",
+              "anchorWinerySlug": "coal-valley-vineyard",
+              "anchorWineId": null,
+              "regions": [
+                "Coal River Valley"
+              ],
+              "tags": [],
+              "wineWords": [
+                "pinot"
+              ],
+              "dayOfWeek": null,
+              "clarifyingQuestion": null
+            },
+            "candidateCount": 12,
+            "cost": {
+              "total": {
+                "inputTokens": 5267,
+                "outputTokens": 343,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 9206,
+                "totalTokens": 14816,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.002564475,
+                  "output": 0.0003507,
+                  "cacheWrite": 0,
+                  "cacheRead": 0.0001726125,
+                  "total": 0.0030877875
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 3214,
+                    "outputTokens": 59,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 0,
+                    "totalTokens": 3273,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.0024105,
+                      "output": 0.0002655,
+                      "cacheWrite": 0,
+                      "cacheRead": 0,
+                      "total": 0.002676
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 2053,
+                    "outputTokens": 284,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 9206,
+                    "totalTokens": 11543,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.00015397500000000002,
+                      "output": 0.0000852,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.0001726125,
+                      "total": 0.0004117875
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": {
+              "name": "Coal River Pinot Day",
+              "slugs": [
+                "pressing-matters-cellar-door",
+                "caledon-estate",
+                "craigow-vineyard"
+              ]
+            },
+            "wineryCards": {
+              "slugs": [
+                "pressing-matters-cellar-door",
+                "caledon-estate",
+                "craigow-vineyard"
+              ]
+            },
+            "history": [
+              {
+                "role": "user",
+                "content": "Suggest a Coal River pinot day"
+              },
+              {
+                "role": "assistant",
+                "content": "The Coal River Valley is an excellent choice for a pinot day, offering a range of styles and cellar door experiences.\n\nI would suggest beginning your day at Pressing Matters Cellar Door, which is open until 5pm today. Their tasting room is uniquely situated right within the vineyard, offering a direct connection to the wines you're enjoying. From there, you could move on to Caledon Estate, also open until 5pm, where you'll find a striking sandstone entrance and architecturally designed space with beautiful views. Their Reserve Pinot Noir from 2022 is a powerful expression of dark cherry and raspberry with subtle spice and toasty oak.\n\nIf you are keen to try another award-winning pinot, you might consider Craigow Vineyard. Their pinot noir offers classic spice and black cherry notes, with French oak tannins enhancing a full-flavoured palate. Just remember to ring ahead, as Craigow is by appointment."
+              }
+            ]
+          }
+        },
+        {
+          "query": "actually let's do sparkling",
+          "elapsedMs": 7213,
+          "streamedText": "Certainly, if it's sparkling you're after, the Coal River Valley still has some lovely options, though it's less known for it than, say, Pipers River.\n\nYou could visit Frogmore Creek Cellar Door & Restaurant, which is open until 5pm today. They're an acclaimed producer in the valley and often have a sparkling wine among their offerings. Their cellar door and restaurant provide a beautiful setting with views over the vineyard.\n\nAnother option, though you'd need to arrange an appointment, is Uplands Vineyard. Their homestead, dating back to 1823, carries a sense of history that makes for a unique visit. They produce a range of wines, and while I don't have specific notes on a sparkling from them right now, it's worth inquiring directly if you're looking for something off the beaten path and enjoy a more intimate, by-appointment experience.",
+          "done": {
+            "reply": "Certainly, if it's sparkling you're after, the Coal River Valley still has some lovely options, though it's less known for it than, say, Pipers River.\n\nYou could visit Frogmore Creek Cellar Door & Restaurant, which is open until 5pm today. They're an acclaimed producer in the valley and often have a sparkling wine among their offerings. Their cellar door and restaurant provide a beautiful setting with views over the vineyard.\n\nAnother option, though you'd need to arrange an appointment, is Uplands Vineyard. Their homestead, dating back to 1823, carries a sense of history that makes for a unique visit. They produce a range of wines, and while I don't have specific notes on a sparkling from them right now, it's worth inquiring directly if you're looking for something off the beaten path and enjoy a more intimate, by-appointment experience.",
+            "usage": {
+              "prompt_tokens": 11519,
+              "completion_tokens": 189,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              }
+            },
+            "stopReason": "stop",
+            "routerDecision": {
+              "selfContainedQuery": "Plan a sparkling-focused day in the Coal River Valley instead of pinot.",
+              "intent": "TRIP",
+              "anchorWinerySlug": "coal-valley-vineyard",
+              "anchorWineId": null,
+              "regions": [
+                "Coal River Valley"
+              ],
+              "tags": [],
+              "wineWords": [
+                "sparkling"
+              ],
+              "dayOfWeek": null,
+              "clarifyingQuestion": null
+            },
+            "candidateCount": 12,
+            "cost": {
+              "total": {
+                "inputTokens": 12375,
+                "outputTokens": 255,
+                "reasoningTokens": 0,
+                "cacheWriteTokens": 0,
+                "cacheReadTokens": 2560,
+                "totalTokens": 15190,
+                "longContextSurchargeApplied": false,
+                "usd": {
+                  "input": 0.001505925,
+                  "output": 0.00035370000000000003,
+                  "cacheWrite": 0,
+                  "cacheRead": 0.000192,
+                  "total": 0.002051625
+                },
+                "model": "combined"
+              },
+              "parts": [
+                {
+                  "label": "Router (classify + resolve)",
+                  "breakdown": {
+                    "inputTokens": 856,
+                    "outputTokens": 66,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 2560,
+                    "totalTokens": 3482,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.000642,
+                      "output": 0.000297,
+                      "cacheWrite": 0,
+                      "cacheRead": 0.000192,
+                      "total": 0.001131
+                    },
+                    "model": "gpt-5.4-mini"
+                  }
+                },
+                {
+                  "label": "Response (reply)",
+                  "breakdown": {
+                    "inputTokens": 11519,
+                    "outputTokens": 189,
+                    "reasoningTokens": 0,
+                    "cacheWriteTokens": 0,
+                    "cacheReadTokens": 0,
+                    "totalTokens": 11708,
+                    "longContextSurchargeApplied": false,
+                    "usd": {
+                      "input": 0.000863925,
+                      "output": 0.0000567,
+                      "cacheWrite": 0,
+                      "cacheRead": 0,
+                      "total": 0.000920625
+                    },
+                    "model": "gemini-2.5-flash"
+                  }
+                }
+              ]
+            },
+            "proposal": null,
+            "wineryCards": null,
+            "history": [
+              {
+                "role": "user",
+                "content": "Suggest a Coal River pinot day"
+              },
+              {
+                "role": "assistant",
+                "content": "The Coal River Valley is an excellent choice for a pinot day, offering a range of styles and cellar door experiences.\n\nI would suggest beginning your day at Pressing Matters Cellar Door, which is open until 5pm today. Their tasting room is uniquely situated right within the vineyard, offering a direct connection to the wines you're enjoying. From there, you could move on to Caledon Estate, also open until 5pm, where you'll find a striking sandstone entrance and architecturally designed space with beautiful views. Their Reserve Pinot Noir from 2022 is a powerful expression of dark cherry and raspberry with subtle spice and toasty oak.\n\nIf you are keen to try another award-winning pinot, you might consider Craigow Vineyard. Their pinot noir offers classic spice and black cherry notes, with French oak tannins enhancing a full-flavoured palate. Just remember to ring ahead, as Craigow is by appointment."
+              },
+              {
+                "role": "user",
+                "content": "actually let's do sparkling"
+              },
+              {
+                "role": "assistant",
+                "content": "Certainly, if it's sparkling you're after, the Coal River Valley still has some lovely options, though it's less known for it than, say, Pipers River.\n\nYou could visit Frogmore Creek Cellar Door & Restaurant, which is open until 5pm today. They're an acclaimed producer in the valley and often have a sparkling wine among their offerings. Their cellar door and restaurant provide a beautiful setting with views over the vineyard.\n\nAnother option, though you'd need to arrange an appointment, is Uplands Vineyard. Their homestead, dating back to 1823, carries a sense of history that makes for a unique visit. They produce a range of wines, and while I don't have specific notes on a sparkling from them right now, it's worth inquiring directly if you're looking for something off the beaten path and enjoy a more intimate, by-appointment experience."
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

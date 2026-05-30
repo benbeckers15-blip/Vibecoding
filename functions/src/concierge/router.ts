@@ -10,6 +10,15 @@
 //   passed in by the caller. The router gracefully handles flat regions
 //   by dropping the `regions` field from the tool schema entirely when
 //   `subRegions` is empty.
+//
+// WHY THE WORLD INDEX IS NOT IN THE ROUTER PROMPT:
+//   The router is a structured-output classifier. Everything it actually
+//   needs to populate the tool call (sub-region enum, tag enum, day
+//   enum) is already in the tool schema. The full corpus listing was
+//   previously concatenated onto the system prompt (~3.5K tokens/turn,
+//   cached after turn 1) and bought us nothing in classification
+//   accuracy — the router never references individual wineries in its
+//   output. Drop saves ~50% of router input cost with no accuracy hit.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import OpenAI from "openai";
@@ -513,7 +522,6 @@ call with the structured fields filled in per the rules above.`;
 export interface RouteOptions {
   client: OpenAI;
   model?: string;
-  worldIndex: string;
   /** Active region's config. The router's tool schema is built per-region
    *  (sub-region enum, description text) and the output is validated
    *  against this region's sub-region names. */
@@ -537,7 +545,7 @@ export async function routeQuery(
       messages: [
         {
           role: "system",
-          content: `${ROUTER_SYSTEM_PROMPT}\n\n${opts.worldIndex}`,
+          content: ROUTER_SYSTEM_PROMPT,
         },
         { role: "user", content: userMessage },
       ],
