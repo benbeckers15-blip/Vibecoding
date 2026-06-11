@@ -15,12 +15,16 @@ module.exports = {
     ios: {
       ...base.expo.ios,
       config: {
+        // Preserve static config from app.json (e.g. usesNonExemptEncryption)
+        // — a bare object literal here would silently drop it.
+        ...base.expo.ios.config,
         googleMapsApiKey,
       },
     },
     android: {
       ...base.expo.android,
       config: {
+        ...base.expo.android.config,
         googleMaps: {
           apiKey: googleMapsApiKey,
         },

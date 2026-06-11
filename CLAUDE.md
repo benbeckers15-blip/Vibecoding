@@ -269,7 +269,7 @@ Run with `node scripts/<name>.js` against `winery-tourism-tasmania` using `servi
 - **No test framework** (no Jest / Testing Library) — the concierge eval scripts are the closest thing.
 - `reportError()` is console-only — Crashlytics not yet wired (`docs/setup-crashlytics.md` has the steps).
 - No push notifications.
-- **No `eas.json`** — store submission pipeline not set up yet.
+- **Store submission in progress** — `eas.json` + encryption flag exist; remaining steps (Apple Developer enrollment, EAS env vars, screenshots, listing) in `docs/app-store-submission.md`.
 - No server-side search or pagination (client-side only; fine at current volume).
 - Lightly-used `expo-*` packages (`expo-haptics`, `expo-constants`, `expo-symbols`, `expo-system-ui`) — review and prune.
 
@@ -285,7 +285,7 @@ Run with `node scripts/<name>.js` against `winery-tourism-tasmania` using `servi
 - [ ] Wire Crashlytics into `reportError()`.
 - [ ] App Check enforcement on the concierge endpoint (`CONCIERGE_ENFORCE_APP_CHECK`).
 - [ ] Push notifications for trip reminders + new "Pour" issues.
-- [ ] EAS build config + App Store / Google Play submission.
+- [ ] App Store submission — config + listing copy done (`eas.json`, `docs/app-store-submission.md`); owner actions remain (enrollment, builds, screenshots, review).
 - [ ] Decide fate of `homepage_carousel` (unused) and a standalone Events surface (events currently live only on the winery detail tab).
 
 ---
