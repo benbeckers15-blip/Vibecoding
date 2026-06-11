@@ -125,6 +125,32 @@ export default function InterviewLayout({ article }: Props) {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
+      {/* ── Black header bar — back button + label, above the hero photo ── */}
+      <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
+        <View style={styles.topBarSide}>
+          <Pressable
+            style={styles.backBtn}
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Back to home"
+          >
+            <Ionicons name="chevron-back" size={18} color={colors.textOnDark} />
+            <Text style={styles.backBtnText}>Home</Text>
+          </Pressable>
+        </View>
+        <Text style={styles.headerKicker}>INTERVIEW</Text>
+        <View style={[styles.topBarSide, styles.topBarSideRight]}>
+          <Pressable
+            style={styles.iconBtn}
+            onPress={handleShare}
+            accessibilityRole="button"
+            accessibilityLabel="Share this interview"
+          >
+            <Ionicons name="share-outline" size={16} color={colors.textOnDark} />
+          </Pressable>
+        </View>
+      </View>
+
       {/* ── Hero ────────────────────────────────────────────────────────── */}
       <View style={styles.hero}>
         <ImageBackground
@@ -140,31 +166,6 @@ export default function InterviewLayout({ article }: Props) {
             locations={[0, 0.4, 1]}
             style={StyleSheet.absoluteFill}
           />
-
-          <View style={[styles.headerRow, { paddingTop: insets.top + 10 }]}>
-            <Pressable
-              style={styles.backBtn}
-              onPress={() => router.back()}
-              accessibilityRole="button"
-              accessibilityLabel="Back to home"
-            >
-              <Ionicons name="chevron-back" size={16} color={colors.textOnDark} />
-              <Text style={styles.backBtnText}>Home</Text>
-            </Pressable>
-            <Text style={styles.headerKicker}>INTERVIEW</Text>
-            <Pressable
-              style={styles.iconBtn}
-              onPress={handleShare}
-              accessibilityRole="button"
-              accessibilityLabel="Share this interview"
-            >
-              <Ionicons
-                name="share-outline"
-                size={15}
-                color={colors.textOnDark}
-              />
-            </Pressable>
-          </View>
 
           <View style={styles.heroCopy}>
             <Text style={styles.heroKicker}>IN CONVERSATION WITH</Text>
@@ -240,23 +241,29 @@ const styles = StyleSheet.create({
 
   // Hero
   hero: { height: 460 },
-  heroImg: { flex: 1, justifyContent: "space-between" },
-  headerRow: {
+  heroImg: { flex: 1, justifyContent: "flex-end" },
+  // Black header bar that sits above the hero photo.
+  topBar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    backgroundColor: colors.surfaceDeep,
     paddingHorizontal: spacing.xxl,
+    paddingBottom: spacing.md,
+  },
+  // Equal-width side columns so the centered label is dead-center on screen
+  // regardless of the back-button / share-button widths.
+  topBarSide: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  topBarSideRight: {
+    justifyContent: "flex-end",
   },
   backBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
-    backgroundColor: colors.photoChrome,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.borderOnDark,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
     minHeight: spacing.hitTarget,
   },
   backBtnText: {
@@ -268,17 +275,15 @@ const styles = StyleSheet.create({
   iconBtn: {
     width: spacing.hitTarget,
     height: spacing.hitTarget,
-    borderRadius: spacing.hitTarget / 2,
-    backgroundColor: colors.photoChrome,
-    borderWidth: 1,
-    borderColor: colors.borderOnDark,
     alignItems: "center",
     justifyContent: "center",
   },
   headerKicker: {
     ...type.kicker,
+    fontSize: 12,
     letterSpacing: 2,
     color: colors.accentSoft,
+    textAlign: "center",
   },
   heroCopy: {
     paddingHorizontal: spacing.xxl,

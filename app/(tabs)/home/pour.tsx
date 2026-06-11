@@ -160,12 +160,12 @@ function PourScreen() {
         <Ionicons name="alert-circle-outline" size={32} color={colors.textMuted} />
         <Text style={styles.loadingText}>Issue unavailable</Text>
         <Pressable
-          style={styles.backBtn}
+          style={styles.errorBackBtn}
           onPress={() => router.back()}
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >
-          <Text style={styles.backBtnText}>Go back</Text>
+          <Text style={styles.errorBackBtnText}>Go back</Text>
         </Pressable>
       </View>
     );
@@ -224,6 +224,32 @@ function PourScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
+      {/* ── Black header bar — back button + label, above the hero photo ── */}
+      <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
+        <View style={styles.topBarSide}>
+          <Pressable
+            style={styles.backBtn}
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Back to home"
+          >
+            <Ionicons name="chevron-back" size={18} color={colors.textOnDark} />
+            <Text style={styles.backBtnText}>Home</Text>
+          </Pressable>
+        </View>
+        <Text style={styles.headerKicker}>{article.issueLabel}</Text>
+        <View style={[styles.topBarSide, styles.topBarSideRight]}>
+          <Pressable
+            style={styles.iconBtn}
+            onPress={handleShare}
+            accessibilityRole="button"
+            accessibilityLabel="Share this article"
+          >
+            <Ionicons name="share-outline" size={16} color={colors.textOnDark} />
+          </Pressable>
+        </View>
+      </View>
+
       {/* ── Cinematic hero ─────────────────────────────────────────────── */}
       <View style={styles.hero}>
         <View style={styles.heroImg}>
@@ -243,30 +269,6 @@ function PourScreen() {
             locations={[0, 0.25, 0.72, 1]}
             style={StyleSheet.absoluteFill}
           />
-
-          {/* Header: back · issue label · share */}
-          <View style={[styles.headerRow, { paddingTop: insets.top + 10 }]}>
-            <Pressable
-              style={styles.heroBackBtn}
-              onPress={() => router.back()}
-              accessibilityRole="button"
-              accessibilityLabel="Back to home"
-            >
-              <Ionicons name="chevron-back" size={16} color={colors.textOnDark} />
-              <Text style={styles.heroBackBtnText}>Home</Text>
-            </Pressable>
-
-            <Text style={styles.headerKicker}>{article.issueLabel}</Text>
-
-            <Pressable
-              style={styles.iconBtn}
-              onPress={handleShare}
-              accessibilityRole="button"
-              accessibilityLabel="Share this article"
-            >
-              <Ionicons name="share-outline" size={15} color={colors.textOnDark} />
-            </Pressable>
-          </View>
 
           {/* Article title overlaid at bottom of hero */}
           <View style={styles.heroCopy}>
@@ -386,7 +388,10 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     color: colors.textMuted,
   },
-  backBtn: {
+  // Bordered "Go back" button on the error / empty state. Named distinctly
+  // from the top-bar `backBtn` below — they previously shared a key, which
+  // failed typecheck (TS1117) and let the top-bar style shadow this one.
+  errorBackBtn: {
     marginTop: 8,
     paddingHorizontal: 20,
     paddingVertical: 10,
@@ -394,7 +399,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 4,
   },
-  backBtnText: {
+  errorBackBtnText: {
     fontFamily: fonts.mono,
     fontSize: 11,
     letterSpacing: 1.5,
@@ -407,27 +412,33 @@ const styles = StyleSheet.create({
   },
   heroImg: {
     flex: 1,
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
   },
-  headerRow: {
+  // Black header bar that sits above the hero photo.
+  topBar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.xxl,           // standardised 20 → 24
+    backgroundColor: colors.surfaceDeep,
+    paddingHorizontal: spacing.xxl,
+    paddingBottom: spacing.md,
   },
-  heroBackBtn: {
+  // Equal-width side columns so the centered label is dead-center on screen
+  // regardless of the back-button / share-button widths.
+  topBarSide: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  topBarSideRight: {
+    justifyContent: "flex-end",
+  },
+  backBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
-    backgroundColor: colors.photoChrome,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.borderOnDark,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
     minHeight: spacing.hitTarget,
   },
-  heroBackBtnText: {
+  backBtnText: {
     color: colors.textOnDark,
     fontSize: type.body.fontSize,
     fontWeight: weights.body,
@@ -436,17 +447,15 @@ const styles = StyleSheet.create({
   iconBtn: {
     width: spacing.hitTarget,                 // 44pt — Apple HIG
     height: spacing.hitTarget,
-    borderRadius: spacing.hitTarget / 2,
-    backgroundColor: colors.photoChrome,
-    borderWidth: 1,
-    borderColor: colors.borderOnDark,
     alignItems: "center",
     justifyContent: "center",
   },
   headerKicker: {
-    ...type.kicker,                           // bumped 9.5 → 10 (kicker minimum)
+    ...type.kicker,
+    fontSize: 12,
     letterSpacing: 2,
     color: colors.accentSoft,
+    textAlign: "center",
   },
   heroCopy: {
     paddingHorizontal: spacing.xxl,           // standardised 22 → 24

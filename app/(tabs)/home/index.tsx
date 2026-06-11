@@ -23,6 +23,7 @@ import {
   Animated,
   Dimensions,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -30,6 +31,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ConciergeChat from "../../../components/ConciergeChat";
+import SectionHeader from "../../../components/SectionHeader";
 import { withScreenErrorBoundary } from "../../../components/ScreenErrorBoundary";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
 import { db } from "../../../firebaseConfig";
@@ -49,14 +51,14 @@ const SCREEN_H = Dimensions.get("window").height;
 
 // Rounded top corners on the content card that overlaps the hero image
 const CARD_OVERLAP = 24;
-const CARD_RADIUS  = 8;   // unified home-screen card radius
+const CARD_RADIUS  = 20;  // rounded top corners on the content card that lips over the hero
 
 // Hero is sized so its *visible* portion (the part above the overlapping
 // content card) is a dominant 75% of the screen. We add CARD_OVERLAP because
 // the bottom CARD_OVERLAP points of the hero container sit underneath the
 // rounded-corner card, so HERO_HEIGHT must be a bit taller than the target
 // visible height.
-const HERO_VISIBLE_RATIO = 0.62;
+const HERO_VISIBLE_RATIO = 1.0;
 const HERO_HEIGHT = Math.round(SCREEN_H * HERO_VISIBLE_RATIO) + CARD_OVERLAP;
 const PARALLAX_EXTRA = 100;       // extra px the image extends beyond the container
 const PARALLAX_TRANSLATE = 10;    // max px the image translates as the hero scrolls away (very subtle)
@@ -146,9 +148,53 @@ function HomeScreen() {
 
   // Parallax scroll driver
   const scrollY = useRef(new Animated.Value(0)).current;
+  // Ref to the scroll view so the scroll cue can drive a programmatic scroll.
+  const scrollRef = useRef<ScrollView | null>(null);
+
+  // Slide the editorial card section into view. Target = the top of the
+  // rounded card overlay (hero height minus the lip it tucks under), so the
+  // "This Month" / field-notes content lands at the top of the viewport.
+  const handleScrollCuePress = () => {
+    scrollRef.current?.scrollTo({
+      y: HERO_HEIGHT - CARD_OVERLAP,
+      animated: true,
+    });
+  };
   const heroImageTranslate = scrollY.interpolate({
     inputRange: [0, HERO_HEIGHT],
     outputRange: [0, -PARALLAX_TRANSLATE],
+    extrapolate: "clamp",
+  });
+
+  // Scroll cue — a gently bouncing down-chevron near the bottom of the hero
+  // that signals there's an editorial section below the fold. It fades out as
+  // soon as the reader starts scrolling so it never lingers over content.
+  const cueBounce = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(cueBounce, {
+          toValue: 1,
+          duration: 950,
+          useNativeDriver: true,
+        }),
+        Animated.timing(cueBounce, {
+          toValue: 0,
+          duration: 950,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [cueBounce]);
+  const cueTranslate = cueBounce.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 8],
+  });
+  const cueOpacity = scrollY.interpolate({
+    inputRange: [0, 80],
+    outputRange: [1, 0],
     extrapolate: "clamp",
   });
 
@@ -296,6 +342,7 @@ function HomeScreen() {
   return (
     <View style={styles.screen}>
     <Animated.ScrollView
+      ref={scrollRef}
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
@@ -339,7 +386,7 @@ function HomeScreen() {
         {/* Dark gradient on the top edge of the hero — anchors the logo against
             light/bright photography. Sits above the image but below the UI. */}
         <LinearGradient
-          colors={["rgba(0,0,0,0.55)", "rgba(0,0,0,0)"]}
+          colors={["rgba(0,0,0,0.68)", "rgba(0,0,0,0)"]}
           style={styles.heroTopGradient}
           pointerEvents="none"
         />
@@ -348,18 +395,18 @@ function HomeScreen() {
             the editorial copy section below and adds contrast under the search
             bar when it sits near the bottom of bright imagery. */}
         <LinearGradient
-          colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.6)"]}
+          colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.78)"]}
           style={styles.heroBottomGradient}
           pointerEvents="none"
         />
 
         {/* Region title overlaid on the photo, top-left — the local-focus
             anchor in Bebas Neue (replaces the old SipLocal wordmark). */}
-        <View style={[styles.heroHeader, { paddingTop: insets.top + 10 }]}>
+        <View style={[styles.heroHeader, { paddingTop: insets.top + spacing.xxxl * 2 }]} pointerEvents="none">
           <View style={styles.heroTitleWrap}>
             <Text style={styles.heroTitle}>{region.displayNameUpper}</Text>
             <View style={styles.heroTitleDivider} />
-            <Text style={styles.heroSubtitle}>WINE COUNTRY</Text>
+            <Text style={styles.heroSubtitle}>WELCOME TO WINE COUNTRY</Text>
           </View>
         </View>
 
@@ -390,6 +437,31 @@ function HomeScreen() {
             </View>
           </Pressable>
         </View>
+
+        {/* ── Scroll cue — bouncing chevron hinting at the editorial section
+              below the fold. Fades out as soon as the reader scrolls.
+              Tapping it slides the editorial card section into view. */}
+        <Animated.View
+          style={[styles.scrollCue, { opacity: cueOpacity }]}
+          pointerEvents="box-none"
+        >
+          <Pressable
+            style={styles.scrollCuePress}
+            onPress={handleScrollCuePress}
+            accessibilityRole="button"
+            accessibilityLabel="Scroll down to this month's editorial section"
+          >
+            <Text style={styles.scrollCueLabel}>Discover</Text>
+            <Animated.View
+              style={[
+                styles.scrollCueChevron,
+                { transform: [{ translateY: cueTranslate }] },
+              ]}
+            >
+              <Ionicons name="chevron-down" size={20} color={colors.textOnDark} />
+            </Animated.View>
+          </Pressable>
+        </Animated.View>
       </View>
 
       {/* ── Rounded card overlay — softens the bottom of the hero photo
@@ -399,12 +471,7 @@ function HomeScreen() {
       {/* ── Featured winery card ─────────────────────────────────────────────── */}
       {featuredWinery && (
         <View style={styles.section}>
-          <View style={styles.sectionHead}>
-            <View style={styles.goldLine} />
-            <Text style={styles.sectionKicker}>
-              {(featuredWinery.featuredLabel ?? "FEATURED").toUpperCase()} · PARTNER
-            </Text>
-          </View>
+          <SectionHeader eyebrow="Partner" title="Featured" />
 
           <Pressable
             onPress={() =>
@@ -455,10 +522,11 @@ function HomeScreen() {
       {/* ── Featured: The Pour (live from Firestore) ──────────────────────────
           Relocated from the former Explore tab. Same layout & data source. */}
       <View style={styles.featuredSection}>
-        <View style={styles.sectionHead}>
-          <View style={styles.goldLine} />
-          <Text style={styles.sectionKicker}>THIS WEEK</Text>
-        </View>
+        <SectionHeader
+          eyebrow="This month"
+          title="June Field Notes"
+          style={styles.sectionHeaderInset}
+        />
 
         {loadingPour ? (
           <View style={styles.featuredLoading}>
@@ -549,10 +617,16 @@ function HomeScreen() {
       {/* ── Article directory ──────────────────────────────────────────────
           Relocated from the former Explore tab. Same cards, same routes. */}
       <View style={styles.directorySection}>
-        <View style={styles.sectionHead}>
-          <View style={styles.goldLine} />
-          <Text style={styles.sectionKicker}>THE LIBRARY</Text>
-        </View>
+        <SectionHeader
+          eyebrow="Editorial"
+          title="The Library"
+          meta={
+            articles.length > 0
+              ? `${articles.length} ${articles.length === 1 ? "Story" : "Stories"}`
+              : undefined
+          }
+          style={styles.sectionHeaderInset}
+        />
 
         {articles.map((item) => (
           <Pressable
@@ -584,30 +658,20 @@ function HomeScreen() {
               transition={150}
             />
             <View style={styles.articleCardBody}>
-              <Text style={styles.articleTitle} numberOfLines={2}>
-                {item.thumbnailTitle}
-              </Text>
               <View style={styles.articleKickerRow}>
                 <Text style={styles.articleKicker}>{item.thumbnailKicker}</Text>
                 <Text style={styles.articleCadence}>· {item.thumbnailCadence}</Text>
               </View>
-              <Text style={styles.articleBlurb} numberOfLines={2}>
-                {item.thumbnailBlurb}
+              <Text style={styles.articleTitle} numberOfLines={2}>
+                {item.thumbnailTitle}
               </Text>
-              <View style={styles.articleFooter}>
-                {item.href ? (
-                  <View style={styles.readBtn}>
-                    <Text style={styles.readBtnText}>READ</Text>
-                    <Ionicons
-                      name="arrow-forward"
-                      size={12}
-                      color={colors.onAccent}
-                    />
-                  </View>
-                ) : (
-                  <Text style={styles.comingSoon}>COMING SOON</Text>
-                )}
-              </View>
+              {item.href ? (
+                <Text style={styles.articleBlurb} numberOfLines={1}>
+                  {item.thumbnailBlurb}
+                </Text>
+              ) : (
+                <Text style={styles.comingSoon}>COMING SOON</Text>
+              )}
             </View>
           </Pressable>
         ))}
@@ -665,10 +729,20 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: Math.round(HERO_HEIGHT * 0.32),
   },
+  // Title block is absolutely centered over the full hero so "TASMANIA /
+  // WINE COUNTRY" sits dead-center of the photo. pointerEvents="none" on the
+  // wrapper lets taps fall through to the search bar beneath it.
   heroHeader: {
-    flexDirection: "row",
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: "center",
-    justifyContent: "space-between",
+    // Anchored to the top of the hero photo (paddingTop set inline from the
+    // safe-area inset so the title clears the notch/status bar), horizontally
+    // centered.
+    justifyContent: "flex-start",
     paddingHorizontal: spacing.xxl,
   },
   // Card overlay that floats over the bottom of the hero photo with rounded
@@ -696,15 +770,14 @@ const styles = StyleSheet.create({
     right: 0,
     // Anchored a touch below the vertical center of the visible hero image
     // (~34% of the hero height from the bottom).
-    bottom: Math.round(HERO_HEIGHT * 0.22),
+    bottom: Math.round(HERO_HEIGHT * 0.33),
     paddingHorizontal: spacing.xxl,           // standardised to 24
   },
   // Region name overlaid on the hero in Bebas Neue — the local-focus anchor.
   // A subtle text shadow keeps it legible over bright/light photography where
   // the hero gradients don't reach.
   heroTitleWrap: {
-    marginTop: spacing.md,
-    marginBottom: spacing.xl,
+    alignItems: "center",
   },
   // Thin white rule between the region name and "WINE COUNTRY".
   heroTitleDivider: {
@@ -720,19 +793,22 @@ const styles = StyleSheet.create({
     lineHeight: 76,
     color: colors.textOnDark,
     letterSpacing: 2,
+    textAlign: "center",
     textShadowColor: "rgba(0,0,0,0.45)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 12,
   },
   heroSubtitle: {
-    fontFamily: fonts.sansMedium,
+    fontFamily: fonts.sansBold,                // medium → bold for photo legibility
     fontSize: type.body.fontSize,
     letterSpacing: 5,
-    color: colors.textOnDark,
+    color: colors.textOnDark,                  // ivory — matches the title above
+    textAlign: "center",
     marginTop: spacing.xs,
-    textShadowColor: "rgba(0,0,0,0.45)",
+    // Tight halo reads crisper on bright imagery than a wide blur.
+    textShadowColor: "rgba(0,0,0,0.7)",
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 8,
+    textShadowRadius: 4,
   },
   searchBar: {
     flexDirection: "row",
@@ -758,25 +834,56 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
+  // ── Scroll cue ──────────────────────────────────────────────────────────
+  // Centered at the bottom of the hero, just above the rounded card lip.
+  scrollCue: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 125,
+    alignItems: "center",
+  },
+  // Tappable inner wrapper — padded out to a comfortable hit target.
+  scrollCuePress: {
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.sm,
+    minHeight: spacing.hitTarget,
+    justifyContent: "center",
+  },
+  scrollCueLabel: {
+    ...type.kicker,
+    fontSize: 13,                              // 12 → 13 for legibility on photo
+    fontWeight: weights.emphasis,
+    letterSpacing: 3,
+    color: colors.textOnDark,
+    // Bare text on the photo — a tight, near-opaque shadow halo does the
+    // legibility work without any chrome behind the word.
+    textShadowColor: "rgba(0,0,0,0.9)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  scrollCueChevron: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: colors.textOnDark,
+    backgroundColor: colors.photoChrome,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   // ── Section header ────────────────────────────────────────────────────────
   section: {
     marginTop: spacing.hero,                  // 40 — new section rhythm (Fix 5)
     paddingHorizontal: spacing.xxl,           // standardised 20 → 24 (Fix 2)
   },
-  sectionHead: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  goldLine: {
-    width: 32,
-    height: 2,
-    backgroundColor: colors.accent,
-  },
-  sectionKicker: {
-    ...type.kicker,
-    color: colors.accentSoft,
+  // Inset for section headers in sections that aren't themselves padded
+  // (The Pour, The Library) so the header aligns with their cards.
+  sectionHeaderInset: {
+    paddingHorizontal: spacing.xxl,
   },
 
   // ── Featured winery ───────────────────────────────────────────────────────
@@ -893,8 +1000,11 @@ const styles = StyleSheet.create({
     marginTop: spacing.hero,                  // 40
   },
   articleCard: {
+    flexDirection: "row",                     // thumbnail left · text right
+    alignItems: "stretch",
+    height: 112,
     marginHorizontal: spacing.xxl,            // 24 — matches featured card
-    marginBottom: spacing.md,
+    marginBottom: spacing.xl,
     borderRadius: 8,
     overflow: "hidden",
     backgroundColor: colors.surfaceElevated,
@@ -908,21 +1018,25 @@ const styles = StyleSheet.create({
     opacity: 0.92,
   },
   articleCardImg: {
-    width: "100%",
-    height: 150,
+    width: 104,                               // compact thumbnail, full card height
+    height: "100%",
     backgroundColor: colors.surfaceDeep,
   },
   articleCardBody: {
-    padding: spacing.xl,                      // 20
+    flex: 1,
+    paddingHorizontal: spacing.lg,            // 16
+    paddingVertical: spacing.md,              // 12
+    justifyContent: "center",
   },
   articleKickerRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
   articleKicker: {
     ...type.kicker,
+    fontSize: 12,
     letterSpacing: 1.8,
     color: colors.accentSoft,
   },
@@ -933,10 +1047,10 @@ const styles = StyleSheet.create({
   },
   articleTitle: {
     fontFamily: fonts.serif,
-    fontSize: type.h3.fontSize,               // 22 — bumped from lede (17) for stronger hierarchy
+    fontSize: type.lede.fontSize,             // 17 — fits the compact row card
     fontWeight: weights.emphasis,
     color: colors.textPrimary,
-    lineHeight: 28,
+    lineHeight: 22,
     letterSpacing: -0.3,
     marginBottom: spacing.xs,
   },

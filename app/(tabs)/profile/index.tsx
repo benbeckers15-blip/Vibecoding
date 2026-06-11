@@ -169,6 +169,9 @@ function ProfileScreen() {
 
   const [tab, setTab] = useState<ProfileTab>("saved");
 
+  // ── Settings dropdown (gear, top-right) ───────────────────────────────────
+  const [menuVisible, setMenuVisible] = useState(false);
+
   // ── Edit-name modal state ─────────────────────────────────────────────────
   const [editNameVisible, setEditNameVisible] = useState(false);
   const [editNameValue, setEditNameValue]     = useState("");
@@ -358,18 +361,15 @@ function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      {/* ── Floating top bar ─────────────────────────────────────────────── */}
+      {/* ── Floating top bar — settings gear (top-right) ─────────────────── */}
       <View style={[styles.topBar, { paddingTop: insets.top + 14 }]}>
         <Pressable
           style={styles.iconBtn}
           accessibilityRole="button"
-          accessibilityLabel="Sign out"
-          onPress={handleSignOut}
+          accessibilityLabel="Open settings menu"
+          onPress={() => setMenuVisible(true)}
         >
-          <Ionicons name="log-out-outline" size={15} color={colors.textPrimary} />
-        </Pressable>
-        <Pressable style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Share profile">
-          <Ionicons name="share-outline" size={15} color={colors.textPrimary} />
+          <Ionicons name="settings-outline" size={16} color={colors.textPrimary} />
         </Pressable>
       </View>
 
@@ -614,65 +614,77 @@ function ProfileScreen() {
           </View>
         )}
 
-        {/* ── Account section (sign out + delete account) ──────────────────
-            Apple App Review guideline 5.1.1(v) requires in-app account
-            deletion that's "easy to find". Keeping it next to Sign out so
-            both lifecycle actions live in the same predictable place, on
-            every tab of the profile screen. */}
-        <View style={styles.accountSection}>
-          <Text style={styles.sectionKickerGold}>ACCOUNT</Text>
+      </ScrollView>
 
-          <Pressable
-            style={styles.accountRow}
-            onPress={handleSignOut}
-            accessibilityRole="button"
-            accessibilityLabel="Sign out"
-          >
-            <Ionicons name="log-out-outline" size={18} color={colors.textPrimary} />
-            <View style={styles.accountRowText}>
-              <Text style={styles.accountRowTitle}>Sign out</Text>
-              <Text style={styles.accountRowSubtitle}>
-                Sign out of this device. Your data stays in your account.
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-          </Pressable>
+      {/* ── Settings dropdown menu ─────────────────────────────────────────
+          Sign out / Privacy policy / Delete account live here (moved from
+          the old "Account" section at the bottom of the page). Apple App
+          Review guideline 5.1.1(v) requires in-app account deletion that's
+          "easy to find" — a top-level settings gear on the profile screen
+          satisfies that. */}
+      <Modal
+        visible={menuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <Pressable
+          style={styles.menuBackdrop}
+          onPress={() => setMenuVisible(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss settings menu"
+        >
+          <View style={[styles.menuCard, { top: insets.top + 64 }]}>
+            <Pressable
+              style={styles.menuRow}
+              onPress={() => {
+                setMenuVisible(false);
+                // Let the modal finish dismissing before the native Alert
+                // appears — presenting both at once can swallow the Alert
+                // on iOS.
+                setTimeout(handleSignOut, 300);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Sign out"
+            >
+              <Ionicons name="log-out-outline" size={18} color={colors.textPrimary} />
+              <Text style={styles.menuRowTitle}>Sign out</Text>
+            </Pressable>
 
-          <Pressable
-            style={styles.accountRow}
-            onPress={handleOpenPrivacy}
-            accessibilityRole="button"
-            accessibilityLabel="Open privacy policy"
-          >
-            <Ionicons name="shield-checkmark-outline" size={18} color={colors.textPrimary} />
-            <View style={styles.accountRowText}>
-              <Text style={styles.accountRowTitle}>Privacy policy</Text>
-              <Text style={styles.accountRowSubtitle}>
-                What we collect, how we use it, and your rights.
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-          </Pressable>
+            <View style={styles.menuDivider} />
 
-          <Pressable
-            style={styles.accountRow}
-            onPress={() => router.push("/profile/delete-account" as any)}
-            accessibilityRole="button"
-            accessibilityLabel="Delete account"
-          >
-            <Ionicons name="trash-outline" size={18} color={colors.error} />
-            <View style={styles.accountRowText}>
-              <Text style={[styles.accountRowTitle, { color: colors.error }]}>
+            <Pressable
+              style={styles.menuRow}
+              onPress={() => {
+                setMenuVisible(false);
+                handleOpenPrivacy();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Open privacy policy"
+            >
+              <Ionicons name="shield-checkmark-outline" size={18} color={colors.textPrimary} />
+              <Text style={styles.menuRowTitle}>Privacy policy</Text>
+            </Pressable>
+
+            <View style={styles.menuDivider} />
+
+            <Pressable
+              style={styles.menuRow}
+              onPress={() => {
+                setMenuVisible(false);
+                router.push("/profile/delete-account" as any);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Delete account"
+            >
+              <Ionicons name="trash-outline" size={18} color={colors.error} />
+              <Text style={[styles.menuRowTitle, { color: colors.error }]}>
                 Delete account
               </Text>
-              <Text style={styles.accountRowSubtitle}>
-                Permanently delete your account and all of your data.
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-          </Pressable>
-        </View>
-      </ScrollView>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
 
       {/* ── Edit Name Modal ──────────────────────────────────────────────────── */}
       <Modal
@@ -777,7 +789,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xxl,           // standardised 22 → 24
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",               // gear sits top-right only
   },
   iconBtn: {
     width: spacing.hitTarget,                 // bumped 38 → 44 (Apple HIG)
@@ -1170,33 +1182,38 @@ const styles = StyleSheet.create({
     fontWeight: weights.emphasis,
   },
 
-  // ── Account section (sign out + delete account) ──────────────────────────
-  accountSection: {
-    paddingTop: spacing.hero,
-    paddingHorizontal: spacing.xxl,
+  // ── Settings dropdown (gear menu) ─────────────────────────────────────────
+  menuBackdrop: {
+    flex: 1,
+    backgroundColor: colors.scrim,
   },
-  accountRow: {
+  menuCard: {
+    position: "absolute",
+    right: spacing.xxl,
+    minWidth: 220,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.cardLg,
+    paddingVertical: spacing.xs,
+    overflow: "hidden",
+  },
+  menuRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.lg,
-    paddingVertical: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
     minHeight: spacing.hitTarget,
   },
-  accountRowText: {
-    flex: 1,
-    minWidth: 0,
-  },
-  accountRowTitle: {
+  menuRowTitle: {
     ...type.body,
     fontWeight: weights.emphasis,
     color: colors.textPrimary,
   },
-  accountRowSubtitle: {
-    ...type.caption,
-    color: colors.textMuted,
-    marginTop: 2,
+  menuDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginHorizontal: spacing.lg,
   },
 
   // ── Palate ────────────────────────────────────────────────────────────────

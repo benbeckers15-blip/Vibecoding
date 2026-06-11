@@ -34,6 +34,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
+import ConciergeChat from "../../../components/ConciergeChat";
 import { withScreenErrorBoundary } from "../../../components/ScreenErrorBoundary";
 import { useAuth } from "../../../context/AuthContext";
 import { useActiveRegionId, useRegionConfig } from "../../../context/RegionContext";
@@ -63,6 +64,15 @@ function TripsIndexScreen() {
 
   const [premadeTrips, setPremadeTrips] = useState<PremadeTrip[]>([]);
   const [premadeLoading, setPremadeLoading] = useState(true);
+
+  // Concierge chat — opened by the "Plan with our trip concierge" card. We
+  // seed the conversation with a trip-planning prompt so the bot opens in
+  // planning mode rather than the generic sommelier empty state.
+  const [chatOpen, setChatOpen] = useState(false);
+  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
+
+  const TRIP_PLANNING_PROMPT =
+    "I'd like to plan a wine trip. Help me build a day visiting cellar doors — ask me about my starting point, how many stops I want, and what styles of wine I'm into.";
 
   // Wait for Firebase Auth to restore the persisted session before querying
   // Firestore. If we fire before the auth token is attached, rules that
@@ -123,7 +133,7 @@ function TripsIndexScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
       >
-        {/* ── Header ─────────────────────────────────────────────────────── */}
+        {/* ── Masthead — "MY TRIPS" eyebrow + "Plan Your Trip" title ──────── */}
         <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
           <Text style={styles.headerKicker}>{region.displayNameUpper}</Text>
           <Text style={styles.headerTitle}>Plan Your Trip</Text>
@@ -157,36 +167,49 @@ function TripsIndexScreen() {
           </Pressable>
         )}
 
-        {/* ── My trips (now at the top) ──────────────────────────────────── */}
-        <View style={styles.sectionHeaderRow}>
-          <View style={styles.goldLine} />
-          <Text style={styles.sectionLabel}>MY TRIPS</Text>
-        </View>
+        {/* ── My trips list ──────────────────────────────────────────────── */}
+        {userTrips.map((t) => (
+          <UserTripCard
+            key={t.id}
+            trip={t}
+            onPress={() =>
+              router.push({
+                pathname: "/(tabs)/trips/[id]",
+                params: { id: t.id, kind: "user" },
+              })
+            }
+          />
+        ))}
 
-        {userTrips.length === 0 ? (
-          <View style={styles.empty}>
-            <Text style={styles.emptyText}>
-              You haven’t built a trip yet.
-            </Text>
-          </View>
-        ) : (
-          userTrips.map((t) => (
-            <UserTripCard
-              key={t.id}
-              trip={t}
-              onPress={() =>
-                router.push({
-                  pathname: "/(tabs)/trips/[id]",
-                  params: { id: t.id, kind: "user" },
-                })
-              }
-            />
-          ))
-        )}
+        {/* Concierge card (left) + Build Your Own pill (right), bottom-aligned
+            on a single row. The card tells the reader the "+ Build Your Own"
+            button opens a chat with the trip-planning assistant; both route to
+            the same destination. */}
+        <View style={styles.buildRow}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.aiCard,
+              pressed && styles.cardPressed,
+            ]}
+            onPress={() => {
+              setPendingPrompt(TRIP_PLANNING_PROMPT);
+              setChatOpen(true);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Plan with our trip concierge — opens a chat with the trip-planning assistant"
+          >
+            <View style={styles.aiCardIcon}>
+              <Ionicons
+                name="chatbubble-ellipses-outline"
+                size={24}
+                color={colors.accent}
+              />
+            </View>
+            <View style={styles.aiCardBody}>
+              <Text style={styles.aiCardTitle}>Plan with our trip concierge</Text>
+            </View>
+          </Pressable>
 
-        {/* Small Build Your Own pill — clearly nested inside the section,
-            below the trips list (or empty state) but above the next divider. */}
-        <View style={styles.buildOwnRow}>
           <Pressable
             style={({ pressed }) => [
               styles.buildOwnPill,
@@ -280,6 +303,13 @@ function TripsIndexScreen() {
         {/* spacer so the floating tab bar never overlaps the last card */}
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      <ConciergeChat
+        visible={chatOpen}
+        onClose={() => setChatOpen(false)}
+        initialPrompt={pendingPrompt}
+        onPromptConsumed={() => setPendingPrompt(null)}
+      />
     </View>
   );
 }
@@ -601,25 +631,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  // ── Plain "MY TRIPS" section header (matches wineries divider style) ───
-  sectionHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    paddingHorizontal: spacing.xxl,
-    marginTop: spacing.xxxl,
-    marginBottom: spacing.lg,
-  },
-  goldLine: {
-    width: spacing.xl,
-    height: 1,
-    backgroundColor: colors.accent,
-  },
-  sectionLabel: {
-    ...type.kicker,
-    color: colors.accentSoft,
-  },
-
   sectionLoading: {
     paddingVertical: spacing.xxl,
     alignItems: "center",
@@ -869,16 +880,48 @@ const styles = StyleSheet.create({
     opacity: 0.92,
   },
 
-  // ── Build Your Own — small pill nested inside the MY TRIPS section ─────
-  buildOwnRow: {
-    paddingHorizontal: spacing.xxl,
-    marginTop: spacing.xs,
+  // ── AI build-your-own prompt card ───────────────────────────────────────
+  // Squarer, centered tile: icon stacked above the copy, constrained width so
+  // the proportions read close to square rather than a wide bar.
+  // Row holding the concierge card (left) and the Build Your Own pill (right),
+  // bottom-aligned so the pill sits on the card's bottom line.
+  buildRow: {
     flexDirection: "row",
-    // Right-aligned so the pill sits on the right edge of the section,
-    // reading as a small action tucked into the corner rather than a full
-    // width CTA.
-    justifyContent: "flex-end",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.xxl,
+    marginBottom: spacing.md,
   },
+  aiCard: {
+    width: 195,
+    backgroundColor: colors.surface,
+    borderRadius: radius.cardLg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing.xxl,
+    paddingHorizontal: spacing.xl,
+    flexDirection: "column",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  aiCardIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceElevated,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  aiCardBody: { alignItems: "center" },
+  aiCardTitle: {
+    ...type.h3,
+    fontSize: 20,
+    lineHeight: 25,
+    color: colors.textPrimary,
+    textAlign: "center",
+  },
+
+  // ── Build Your Own — small pill, bottom-aligned beside the concierge card ─
   buildOwnPill: {
     flexDirection: "row",
     alignItems: "center",
