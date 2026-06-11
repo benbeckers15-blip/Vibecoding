@@ -54,7 +54,7 @@ The old hardcoded-Tasmania setup (`constants/region.ts`, `REGION_NAME` env var) 
 - **`regionId` field on every content document** — all content screens query with `where("regionId", "==", regionId)` (home, pour, wineries list, trips hub/create/detail, explore). Composite indexes in `firestore.indexes.json`.
 - **Concierge requests carry `regionId`** — the Cloud Function loads the region's config per cold start and region-filters retrieval.
 
-**Status (see `docs/multi-region-refactor-plan.md`):** Phases 1–3 are shipped (backfill, server dual-mode, client). **Phase 4–5 remain**: require `regionId` server-side (it still defaults to `"tasmania"`), purge legacy client AI deps/env vars, add a second region, hardening. `docs/adding-a-new-region.md` is the playbook for onboarding a region.
+**Status (see `docs/multi-region-refactor-plan.md`):** Phases 1–3 are shipped (backfill, server dual-mode, client), and `regionId` is now **required** server-side (Phase 4 step 1 — requests without it get a 400). **Rest of Phase 4–5 remains**: purge legacy client AI deps/env vars, add a second region, hardening. `docs/adding-a-new-region.md` is the playbook for onboarding a region.
 
 ---
 
@@ -193,7 +193,7 @@ The old hardcoded-Tasmania setup (`constants/region.ts`, `REGION_NAME` env var) 
 The concierge pipeline moved out of the app. **No AI API keys ship in the JS bundle.**
 
 **Server (`functions/src/`):**
-- `concierge` — public HTTPS Gen2 function, POST `{ message, history (≤40), userLocation?, regionId?, sessionId?, userId? }` → **SSE stream** (`delta` / `done` / `error` events). `regionId` defaults to `"tasmania"` until Phase 4 makes it required.
+- `concierge` — public HTTPS Gen2 function, POST `{ message, history (≤40), userLocation?, regionId, sessionId?, userId? }` → **SSE stream** (`delta` / `done` / `error` events). `regionId` is **required** (400 if missing — no Tasmania fallback).
 - Orchestrator flow: **resolve coreference → route (structured filters) → retrieve → respond**, streaming tokens back. Two implementations: v1 (live) and `v2/` rewrite, selected by `CONCIERGE_USE_V2` env (default off). Both expose the same `AskResult` shape (reply, proposal, wineryCards, history, cost).
 - Retrieval: `retrieve.ts` (winery descriptions), `knowledgeRetrieve.ts` (`knowledge` Upstash namespace), `tastingNotes.ts` (`wines` namespace), `winerySourcesRetrieve.ts` (`winery_sources` namespace, scraped winery-website chunks) — all Voyage-embedded queries against Upstash Vector, with `rerank.ts` reranking. `driveTimes.ts` uses Google Distance Matrix for itinerary ordering. `regionConfig.ts` loads + caches `regions/{regionId}` per cold start; the system prompt is templated from it (`brandVoiceLine`, `regionalPrimer`, sub-regions, timezone-correct "today").
 - Response LLM: Gemini by default (`LLM_PROVIDER`, `geminiResponse.ts`); router/resolver stay on OpenAI. Rollback to OpenAI = one env var.
@@ -278,7 +278,8 @@ Run with `node scripts/<name>.js` against `winery-tourism-tasmania` using `servi
 
 ## Roadmap / Planned Features
 
-- [ ] **Multi-region Phase 4**: require `regionId` server-side, purge legacy client AI deps + env vars, add the second region (picker shows 2+ cards).
+- [x] **Multi-region Phase 4 step 1**: `regionId` required server-side (deploy pending).
+- [ ] **Multi-region Phase 4 (rest)**: purge legacy client AI deps + env vars, add the second region (picker shows 2+ cards).
 - [ ] **Multi-region Phase 5**: hardening — region-tuned prompts, per-region Upstash namespaces if metadata filters get slow.
 - [ ] Concierge v2 cutover (`CONCIERGE_USE_V2=true`) after soak testing — see `docs/concierge-rewrite-spec.md`.
 - [ ] Wire Crashlytics into `reportError()`.

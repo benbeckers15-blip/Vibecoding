@@ -128,7 +128,7 @@ export const testEmbed = onRequest(
 //       { "role": "assistant", "content": "..." }
 //     ],
 //     "userLocation": { "latitude": -42.88, "longitude": 147.32 } | null,
-//     "regionId": "tasmania"  // optional — defaults to "tasmania" if absent
+//     "regionId": "tasmania"  // REQUIRED — lowercase kebab-case region slug
 //   }
 //
 // Response: text/event-stream with three event types:
@@ -139,12 +139,12 @@ export const testEmbed = onRequest(
 // The client appends delta.text into the active assistant bubble as each
 // chunk arrives, then resyncs from done.history when the stream ends.
 //
-// Multi-region: `regionId` is optional during the Phase 2/3 transition.
-// When missing it defaults to "tasmania" so the current client (which
-// doesn't send the field yet) keeps working. Phase 3 wires the client
-// to send the active region from RegionContext explicitly.
-
-const DEFAULT_REGION_ID = "tasmania";
+// Multi-region: `regionId` is REQUIRED (Phase 4). Both clients always send
+// it — the mobile app from RegionContext (Concierge.askStream throws before
+// the request if it's missing) and the website's /api/concierge/stream proxy
+// (which fills its own default before forwarding). A request without a valid
+// regionId is a contract violation and gets a 400, never a silent Tasmania
+// fallback — a wrong-region answer is worse than an error.
 
 interface ConciergeRequest {
   message?: unknown;
@@ -211,19 +211,17 @@ function validateRequest(body: ConciergeRequest): {
     }
     userLocation = { latitude: loc.latitude, longitude: loc.longitude };
   }
-  // regionId — optional, falls back to DEFAULT_REGION_ID for back-compat
-  // with clients that haven't been updated to send it yet. Loose
-  // validation: a non-empty string, lowercase kebab-case style.
-  let regionId: string = DEFAULT_REGION_ID;
-  if (body.regionId !== undefined && body.regionId !== null) {
-    if (typeof body.regionId !== "string" || body.regionId.trim().length === 0) {
-      return { ok: false, error: "`regionId` must be a non-empty string." };
-    }
-    if (!/^[a-z0-9-]+$/.test(body.regionId)) {
-      return { ok: false, error: "`regionId` must be lowercase kebab-case." };
-    }
-    regionId = body.regionId;
+  // regionId — REQUIRED (Phase 4: the "tasmania" back-compat default is
+  // gone). Shape validation only; whether the region actually exists is
+  // checked downstream by regionConfig (unknown ids fail the Firestore
+  // lookup with a clear error).
+  if (typeof body.regionId !== "string" || body.regionId.trim().length === 0) {
+    return { ok: false, error: "`regionId` is required and must be a non-empty string." };
   }
+  if (!/^[a-z0-9-]+$/.test(body.regionId)) {
+    return { ok: false, error: "`regionId` must be lowercase kebab-case." };
+  }
+  const regionId: string = body.regionId;
   // sessionId / userId — both optional strings. We validate shape only; the
   // client generates a UUID v4 for sessionId and forwards the Firebase UID
   // (or omits the field) for userId.
