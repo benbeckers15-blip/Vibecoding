@@ -1,14 +1,18 @@
 # SipLocal — Project Context for Claude
 
+> **Last verified: 2026-06-11** — every claim below was checked against the code on this date.
+
 ## What This App Is
 
-A hyper-regional mobile tourism app focused on the **Tasmania** wine region of Australia. Designed for both tourists and locals as a discovery, planning, and editorial hub for Tasmania's wineries and wine culture.
+A regional mobile wine-tourism app — discovery, trip planning, and editorial hub for a wine region's wineries and wine culture. **Multi-region by architecture**: one binary serves any number of regions; content is partitioned by a `regionId` field and per-region config lives in a `regions/{regionId}` Firestore collection. **Tasmania is the only live region today.**
 
-**Firestore project:** `winery-tourism-tasmania` (set via `EXPO_PUBLIC_FIREBASE_PROJECT_ID` in `.env`). An earlier prototype targeted a Margaret River (WA) Firestore project called `solid-garden-474012-q4` — **that project is deprecated and must not be referenced.** All app reads/writes go to `winery-tourism-tasmania` only.
+**Firestore project:** `winery-tourism-tasmania` (set via `EXPO_PUBLIC_FIREBASE_PROJECT_ID` in `.env`). An earlier prototype targeted a Margaret River (WA) Firestore project called `solid-garden-474012-q4` — **that project is deprecated and must not be referenced.**
 
 **Owner:** Benjamin (benbeckers15@gmail.com)
 **Goal:** Build and launch this app end-to-end using Claude (Cowork + Claude Code)
 **App name (package):** `SipLocal` (Expo slug: `siplocal`, bundle id `com.siplocalguide.app`, URL scheme `siplocal`)
+
+> **SECURITY:** `.env.tasmania` (including the Google Maps API key) exists in git history (commit `4080e9a`, pushed to GitHub remotes). **Rotating that key is recommended.** Never commit `.env*` files — `.gitignore` now covers them, but history is history.
 
 ---
 
@@ -19,22 +23,38 @@ A hyper-regional mobile tourism app focused on the **Tasmania** wine region of A
 | Framework | Expo SDK 54 with React Native 0.81, React 19 |
 | Language | TypeScript 5.9 — **strict mode ON** |
 | Router | Expo Router v6 — file-based routing (typed routes + React Compiler enabled) |
-| Database | Firebase Firestore v12 (in-memory cache; persistent cache unavailable in RN — see firebaseConfig.js) |
+| Database | Firebase Firestore v12 (in-memory cache only; persistent cache unavailable in RN — see firebaseConfig.js) |
 | Auth | Firebase Auth (email/password) with AsyncStorage persistence |
 | Storage | Firebase Cloud Storage |
-| Local persistence | `@react-native-async-storage/async-storage` (saved items, trips) |
+| Backend | **Firebase Cloud Functions Gen2 (TypeScript, Node 22) in `functions/`** — concierge (SSE streaming), deleteAccount (callable), ping, testEmbed |
+| AI / Concierge (server-side) | OpenAI (router/resolver), Gemini (response leg, `LLM_PROVIDER` default `gemini`), Voyage AI embeddings, Upstash Vector, Langfuse observability |
+| Local persistence | `@react-native-async-storage/async-storage` (active region id, trips, session id) |
+| Network state | `@react-native-community/netinfo` via `context/NetworkContext.tsx` |
 | Animations | React Native Reanimated v4 + Reanimated Carousel v4 |
 | Maps | `react-native-maps` 1.20.1 (Google provider) + `react-native-map-clustering` |
-| Location | `expo-location` (foreground only, while active trip is mounted) |
-| Navigation | Custom floating animated tab bar (bottom tabs via `@react-navigation/bottom-tabs`) |
-| State | React hooks + React Context (`AuthContext`, `SavedContext`, `TripContext`) — no Redux/Zustand |
-| Styling | `React Native StyleSheet` + centralized design tokens in `constants/theme.ts` |
-| Fonts | Google Fonts via `@expo-google-fonts/*`: Playfair Display, DM Sans, Bebas Neue, Roboto |
+| Location | `expo-location` (foreground only) |
+| Navigation | Custom floating animated tab bar (`@react-navigation/bottom-tabs`) |
+| State | React hooks + Context (`RegionContext`, `AuthContext`, `SavedContext`, `TripContext`, `NetworkContext`) — no Redux/Zustand |
+| Styling | RN `StyleSheet` + centralized design tokens in `constants/theme.ts` |
+| Fonts | `@expo-google-fonts/*`: Playfair Display, DM Sans, Bebas Neue, Roboto |
 | Icons | `@expo/vector-icons` (Ionicons) |
-| In-app browser | `expo-web-browser` (`openBrowserAsync`) |
-| Images | `expo-image` (replaces RN `Image` for caching + performance) |
-| AI / Concierge | OpenAI (chat completions, mini model for routing), Voyage AI (embeddings), Upstash Vector (RAG index) |
-| Server scripts | `firebase-admin`, `googleapis` (Sheets sync), `node-fetch` |
+| Images | `expo-image` |
+| Streaming fetch | `expo/fetch` (RN's fetch can't stream — needed for the concierge SSE typewriter) |
+
+---
+
+## Multi-Region Architecture (the big one)
+
+The old hardcoded-Tasmania setup (`constants/region.ts`, `REGION_NAME` env var) is **gone**. Replaced by:
+
+- **`regions/{regionId}` Firestore collection** — one doc per region: `displayName`, `brandVoiceLine`, `regionalPrimer` (markdown for the concierge system prompt), `subRegions[]` (name/lat/lon/adjacent — optional, regions may be flat), `suggestedPrompts`, `mapBounds`, `timezone`, `regionAdjective`, `schemaVersion`, etc. Schema in **`types/region.ts`** (`RegionConfig`, `SubRegion`, `RegionMapBounds`, `RegionSummary`) — shared by client AND Cloud Functions.
+- **`context/RegionContext.tsx`** — owns the active region. States: `loading` / `needs_picker` / `ready` / `error`. Persists choice to AsyncStorage (`active_region_id_v1`); auto-selects when exactly one region exists (Tasmania-only users never see the picker). Hooks: `useRegion()`, `useActiveRegionId()`, `useRegionConfig()` (the latter two are only safe below the gate).
+- **`components/RegionGate.tsx`** — blocks the Stack from rendering until the region settles; renders the picker directly for `needs_picker`, `ErrorScreen` (network-aware via `NetworkContext`) on failure.
+- **`app/region-picker.tsx`** — full-screen picker, also addressable at `/region-picker` for switching later.
+- **`regionId` field on every content document** — all content screens query with `where("regionId", "==", regionId)` (home, pour, wineries list, trips hub/create/detail, explore). Composite indexes in `firestore.indexes.json`.
+- **Concierge requests carry `regionId`** — the Cloud Function loads the region's config per cold start and region-filters retrieval.
+
+**Status (see `docs/multi-region-refactor-plan.md`):** Phases 1–3 are shipped (backfill, server dual-mode, client). **Phase 4–5 remain**: require `regionId` server-side (it still defaults to `"tasmania"`), purge legacy client AI deps/env vars, add a second region, hardening. `docs/adding-a-new-region.md` is the playbook for onboarding a region.
 
 ---
 
@@ -42,337 +62,196 @@ A hyper-regional mobile tourism app focused on the **Tasmania** wine region of A
 
 ```
 /
-├── app/                            # Expo Router file-based routes
-│   ├── _layout.tsx                 # Root: font loading, Auth/Saved/Trip providers, Stack
+├── app/
+│   ├── _layout.tsx                 # Root: fonts, RootErrorBoundary > Network > Region > Auth > Saved > Trip > RegionGate > Stack
 │   ├── index.tsx                   # Splash — redirects to /home (signed in) or /auth
 │   ├── auth.tsx                    # Sign in / Create account
+│   ├── region-picker.tsx           # Region picker (gate target + /region-picker route)
 │   ├── trip-active.tsx             # Full-screen modal: active-trip experience
 │   └── (tabs)/
-│       ├── _layout.tsx             # Custom floating animated tab bar (4 visible tabs)
+│       ├── _layout.tsx             # Custom floating animated tab bar (4 visible tabs; explore hidden)
 │       ├── home/
-│       │   ├── _layout.tsx
-│       │   ├── index.tsx           # Home: hero, search, featured winery, "The Pour", "The Library"
-│       │   ├── pour.tsx            # "The Tassie Pour" editorial reader
-│       │   └── articles/           # "The Library" — editorial article pages (linked from home)
-│       │       ├── sommelier-recommendations.tsx
-│       │       ├── hidden-gems.tsx
-│       │       ├── vintage-reports.tsx
-│       │       ├── behind-the-cellar-door.tsx
-│       │       ├── pairings.tsx
-│       │       └── collections/
-│       │           └── [key].tsx   # Dynamic collection screen (filter by boolean tag)
-│       ├── trips/
-│       │   ├── _layout.tsx
-│       │   ├── index.tsx           # Trips hub: premade trips + my trips + CTA
-│       │   ├── create.tsx          # Build-your-own trip
-│       │   └── [id].tsx            # Trip detail (premade or user)
-│       ├── wineries/
-│       │   ├── _layout.tsx
-│       │   ├── index.tsx           # Winery list: search, filter chips, sort, list/map toggle
-│       │   └── [slug].tsx          # Winery detail: parallax hero carousel, hours, badges, editorial
+│       │   ├── index.tsx           # Hero, concierge search, featured winery, "The Pour", article rail
+│       │   ├── pour.tsx            # "The Pour" editorial reader (region-filtered pour_articles)
+│       │   └── articles/           # 5 static editorial pages (sommelier-recommendations, hidden-gems,
+│       │                           #   vintage-reports, behind-the-cellar-door, pairings)
+│       │                           #   NOTE: collections/[key].tsx was REMOVED
+│       ├── trips/                  # index (hub) / create / [id] (premade|user detail)
+│       ├── wineries/               # index (list/map) / [slug] (detail w/ About·Wines·Events·Tasting Notes tabs)
 │       ├── profile/
-│       │   ├── _layout.tsx
-│       │   └── index.tsx           # Saved / Tastings / Palate
-│       └── explore/
-│           ├── _layout.tsx
-│           └── index.tsx           # Hidden route (href: null) — preserved for inbound links
+│       │   ├── index.tsx           # Saved / Tastings / Palate + privacy-policy link
+│       │   └── delete-account.tsx  # Account deletion (Apple 5.1.1(v)) → deleteAccount Cloud Function
+│       └── explore/                # Hidden route (href: null) — kept for inbound links
 ├── components/
-│   ├── ConciergeChat.tsx           # In-app sommelier chat UI
-│   ├── EmptyState.tsx              # Shared empty-state placeholder
-│   ├── ErrorScreen.tsx             # Shared error screen (retry CTA)
-│   ├── RegionGate.tsx              # Blocks rendering until active region loads
-│   ├── RootErrorBoundary.tsx       # Wraps the entire app tree
-│   ├── ScreenErrorBoundary.tsx     # Per-screen error boundary
-│   ├── SkeletonBox.tsx             # Animated loading placeholder
-│   └── articles/                   # Editorial-article rendering system
-│       ├── ArticleRenderer.tsx     # Layout dispatcher (switches on article.layout)
-│       ├── MagazineLayout.tsx      # Image-forward feature spread
-│       ├── EditorialLayout.tsx     # Long-form prose with drop cap
-│       ├── ListLayout.tsx          # Numbered editorial list
-│       ├── InterviewLayout.tsx     # Q&A transcript
-│       └── types.ts                # Article block types
-├── constants/
-│   ├── theme.ts                    # SINGLE SOURCE OF TRUTH for colors/fonts/spacing/radii
-│   └── mapStyle.ts                 # Google Maps custom dark style JSON
-├── context/
-│   ├── AuthContext.tsx             # Firebase auth state + auto-create users/{uid} doc
-│   ├── SavedContext.tsx            # AsyncStorage-backed saved cellar doors
-│   └── TripContext.tsx             # AsyncStorage-backed user trips (one active at a time)
-├── services/
-│   └── concierge/                  # Concierge / RAG client-side services
-│       ├── concierge.ts            # OpenAI wrapper (router → retrieve → respond)
-│       ├── router.ts               # Cheap mini call → structured filters
-│       ├── buildContext.ts         # Loads + compacts winery collection per session
-│       ├── knowledgeRetrieve.ts    # Semantic search over knowledge_chunks (Upstash)
-│       ├── retrieve.ts             # Description hydration for selected wineries
-│       ├── tastingNotes.ts         # Wine-level retrieval from "wines" namespace
-│       ├── systemPrompt.ts         # Sommelier voice + guardrails (cached prompt)
-│       ├── costTracker.ts          # Per-turn token + USD accounting
-│       └── driveTimes.ts           # Google Distance Matrix for trip ordering
-├── types/
-│   └── trip.ts                     # Trip, TripStop, TripStatus, PremadeTrip
-├── utils/
-│   ├── routePlanner.ts             # Google Directions optimisation (TSP-ish)
-│   ├── fetchRoutePolyline.ts       # Decode driving polyline for <Polyline>
-│   └── openExternalDirections.ts   # Hand off to Apple Maps / Google Maps
-├── scripts/                        # Node.js admin / data-pipeline scripts (see below)
-│   └── rag/                        # RAG ingest + retrieve subsystem (Voyage + Upstash)
-├── assets/images/                  # App icon, splash, logos
-├── firebaseConfig.js               # Initializes app, auth, db (memory cache), storage, functions
-├── firestore.rules                 # Security rules (public read content, owner-only users/*)
-├── firebase.json / .firebaserc     # Firebase CLI config
-├── service-account-tasmania.json   # Admin SDK creds for scripts (DO NOT COMMIT)
-├── app.json                        # Expo config
-├── app.config.js                   # Injects EXPO_PUBLIC_GOOGLE_MAPS_API_KEY into native config
-├── .env / .env.tasmania            # EXPO_PUBLIC_* env vars
-├── tsconfig.json                   # strict: true, @/* paths alias
-├── babel.config.js
-├── eslint.config.js
-├── README.md
-├── TASMANIA_SETUP.md               # Region-specific setup notes
-└── TASMANIA_WORKFLOW.md            # Region-specific workflow notes
+│   ├── ConciergeChat.tsx           # Sommelier chat UI — streams SSE, sends regionId + sessionId/userId
+│   ├── LogoPinMarker.tsx           # Branded map pin (manages tracksViewChanges so pins reliably paint)
+│   ├── SectionHeader.tsx           # Shared editorial section header
+│   ├── EmptyState.tsx / ErrorScreen.tsx / SkeletonBox.tsx
+│   ├── RegionGate.tsx / RootErrorBoundary.tsx / ScreenErrorBoundary.tsx
+│   └── articles/                   # ArticleRenderer + ArticleFetcher + Magazine/Editorial/List/Interview layouts
+├── constants/                      # theme.ts (design tokens — single source of truth), mapStyle.ts
+│                                   # NOTE: constants/region.ts NO LONGER EXISTS
+├── context/                        # RegionContext, AuthContext, SavedContext (Firestore-synced),
+│                                   #   TripContext (AsyncStorage), NetworkContext (netinfo)
+├── functions/                      # Cloud Functions (TypeScript, Node 22) — see Concierge section
+│   └── src/
+│       ├── index.ts                # ping, testEmbed, concierge (SSE), re-exports deleteAccount
+│       ├── deleteAccount.ts        # Wipes Auth user + users/{uid} tree
+│       └── concierge/              # v1 orchestrator + retrieval, rateLimit, rerank, resolveCoreference,
+│           └── v2/                 #   regionConfig, geminiResponse, …; v2/ = rewrite behind CONCIERGE_USE_V2
+├── lib/deleteAccount.ts            # Client wrapper: re-auth + callable invocation
+├── services/concierge/             # THIN CLIENT ONLY: concierge.ts (SSE client), buildContext.ts
+│                                   #   (corpus load for inline winery cards), costTracker.ts, types.ts
+├── types/                          # trip.ts, region.ts
+├── utils/                          # routePlanner, fetchRoutePolyline, openExternalDirections,
+│                                   #   errorReporting (Crashlytics-ready reportError), sessionId
+├── scripts/                        # Node admin / data-pipeline scripts (see below) + rag/ + concierge/
+├── docs/                           # multi-region-refactor-plan, adding-a-new-region, concierge-audit,
+│                                   #   concierge-rewrite-spec, ACCOUNT_DELETION, setup-crashlytics
+├── public/                         # privacy.html (hosted privacy policy), index.html
+├── firebaseConfig.js               # app, auth (AsyncStorage persistence), db (memory cache), storage, functions
+├── firestore.rules / firestore.indexes.json / firebase.json / .firebaserc
+├── service-account-tasmania.json   # Admin SDK creds for scripts (gitignored — DO NOT COMMIT)
+├── app.json / app.config.js        # app.config.js injects EXPO_PUBLIC_GOOGLE_MAPS_API_KEY into native config
+├── .env / .env.tasmania            # EXPO_PUBLIC_* vars (gitignored; see SECURITY note above)
+└── TASMANIA_SETUP.md / TASMANIA_WORKFLOW.md / README.md
 ```
 
 ---
 
 ## Screens — What's Built
 
-### Splash (`app/index.tsx`)
-- 2-second minimum splash + waits for Firebase auth state to resolve.
-- `FadingDots` animated indicator.
-- Redirects to `/home` when signed in, `/auth` otherwise.
+### Splash / Auth (`app/index.tsx`, `app/auth.tsx`)
+- 2s minimum splash, waits for Firebase auth; redirects `/home` or `/auth`.
+- Email/password sign-in & sign-up; `AuthContext` auto-creates `users/{uid}` on first sign-in.
 
-### Auth (`app/auth.tsx`)
-- Email/password sign-in & sign-up, toggled via a bottom link.
-- On success, `AuthContext.onAuthStateChanged` fires, auto-creates the `users/{uid}` Firestore doc, and the splash redirects into `/home`.
-- Friendly mapping of Firebase Auth error codes.
+### Region Picker (`app/region-picker.tsx`)
+- Shown by `RegionGate` on first launch when 2+ regions exist (auto-picks when only one). Also reachable later to switch regions; `setRegion()` persists to AsyncStorage and reloads region config.
 
 ### Home (`app/(tabs)/home/index.tsx`)
-- Cinematic Dusk dark hero with parallax cover image (URL + crop position read from `config/homepage` in Firestore so the hero can be re-positioned without a release).
-- Glass search bar opens `ConciergeChat` (OpenAI-backed sommelier).
-- Featured winery block fetched from `wineries` where `featured == true && featuredTier == 'hero'`.
-- "The Tassie Pour" featured-article block reads the latest doc from `pour_articles` (sorted by `issueNumber` desc), tap → `/home/pour`.
-- Article-rail entries are seeded from `explore_articles`.
-
-### Home → Pour (`app/(tabs)/home/pour.tsx`)
-- Article reader for the latest active `pour_articles` issue.
-- Renders typed block list: `paragraph` (with optional drop cap), `pullquote`, `image`.
-- Native `Share.share()`, sponsor block, and "continue reading" rail.
+- Dark parallax hero (image URL + crop from `config/homepage` — still global, not per-region).
+- Search bar opens `ConciergeChat`; suggested prompt chips come from `regionConfig.suggestedPrompts`.
+- Featured winery (`featured == true && featuredTier == 'hero'`), latest `pour_articles` issue, `explore_articles` rail — all region-filtered.
 
 ### Wineries List (`app/(tabs)/wineries/index.tsx`)
-- Fetches entire `wineries` collection, sorted client-side.
-- **Search:** prefix match on winery name.
-- **Boolean filter chips:** Walk-ins, Award-Winning, Tours Offered, Organic, Biodynamic, Restaurant, Dog Friendly.
-- **Sort modes:** `featured` / `nearMe` (uses `expo-location` foreground permission) / `az`.
-- **List/Map toggle:** `FlatList` ↔ `MapView` (Google provider) with clustering and custom dark `MAP_STYLE`.
-- Map markers show a `Callout` with name + rating → pushes to winery detail.
-- Card surfaces a tap-to-call phone CTA when `walkinWelcome === false`.
-- Save toggle uses `useSaved()` from `SavedContext`.
+- Region-filtered `wineries` query; search, boolean filter chips, sort (featured / nearMe / az).
+- List ↔ Map toggle; map camera starts at `regionConfig.mapBounds`; clustering + custom dark `MAP_STYLE`.
+- Save toggle via `useSaved()`.
 
 ### Winery Detail (`app/(tabs)/wineries/[slug].tsx`)
-- Routed by `slug` (which is the Firestore doc ID).
-- Parallax hero carousel: `Animated.ScrollView` + `useAnimatedScrollHandler` drives `translateY` on a Reanimated Carousel in `mode="parallax"`. `HERO_HEIGHT = 400`, `PARALLAX_EXTRA = 80`.
-- Info grid: hours (supports legacy string and structured `hoursStructured`), location label (derived from `REGION_NAME`).
-- Contact: `tel:` call link, `safeOpenURL` for website (auto-prepends `https://`), and `openDirections()` which hands off to Apple Maps (iOS) / `geo:` URI (Android) with a Google Maps universal fallback.
-- Feature badges from boolean Firestore fields (Dog Friendly / Restaurant / Organic / Biodynamic / Walk-ins / Tours / Award-Winning).
-- About section: first paragraph as editorial italic lede (Playfair 600 Italic 17pt), optional `pullQuote` injected after, remaining paragraphs in body style.
-- Save / share modal, custom glass-style back button overlaid on the hero.
+- Routed by `slug` (= Firestore doc id). Parallax hero carousel, hours (legacy string + `hoursStructured`), contact, directions hand-off, feature badges, editorial About with lede + `pullQuote`.
+- **Four content tabs: About / Wines / Events / Tasting Notes.**
+  - **Wines** — public `wines` collection (`where wineryId == slug`): vintage, variety, tasting notes, pairings, awards, bottle image.
+  - **Events** — public `events` collection (`where winerySlug == slug`); past/upcoming aware. (Events are back in-app via this tab — there is still no standalone Events tab screen.)
+  - **Tasting Notes** — community notes from public `winery_tastings`; signed-in users can submit (wine, 0–5 score, note) — also mirrored into their private `users/{uid}/tastings`.
 
-### Trips Hub (`app/(tabs)/trips/index.tsx`)
-- Editorial header + "Active Trip" banner (only when one is in progress → resumes `/trip-active`).
-- **REGIONAL HALF-DAY** — horizontal rail of compact cards (≤3 stops).
-- **REGIONAL FULL-DAY** — vertical stack of large cards (≥4 stops).
-- "My Trips" section from `TripContext` (AsyncStorage-backed).
-- Floating "+ Build Your Own" CTA → `/trips/create`.
-- Curated trips are read from the `premade_trips` Firestore collection (sorted by `order`).
+### Trips (`trips/index.tsx`, `create.tsx`, `[id].tsx`, `trip-active.tsx`)
+- Hub: region-filtered `premade_trips` (half-day rail + full-day stack) + "My Trips" from `TripContext` (AsyncStorage) + build-your-own CTA.
+- Create: pick 2–8 wineries (region-filtered, coords required), reorder, save locally.
+- Detail (`?kind=premade|user`): map preview with `LogoPinMarker` pins + route polyline; route optimisation runs only at start-time. **iOS polyline color workaround**: pass `strokeColors` alongside `strokeColor` (Google Maps SDK style-span bug, react-native-maps #5253) — same workaround in `trip-active.tsx`.
+- Active trip: full-screen modal, live progress, foreground location watch for distance-to-next-stop, mark-visited, native directions hand-off.
 
-### Trip Create (`app/(tabs)/trips/create.tsx`)
-- Pick wineries (only those with coordinates), reorder, name the trip, save.
-- Validation: 2–8 stops (Google Maps multi-stop URL limit).
-- Creates a Trip locally via `TripContext.createTrip()`, then routes to its detail page.
+### Profile (`profile/index.tsx`, `profile/delete-account.tsx`)
+- Live `users/{uid}` profile + Saved / Tastings / Palate tabs from subcollections (`onSnapshot`); inline edit modals; privacy-policy link.
+- **Delete account**: dedicated screen (Apple guideline 5.1.1(v)) → password re-auth → `deleteAccount` Cloud Function wipes Auth user + Firestore tree. See `docs/ACCOUNT_DELETION.md`.
 
-### Trip Detail (`app/(tabs)/trips/[id].tsx`)
-- Two flavours via `?kind=premade|user`:
-  - `premade`: read-only view. "Start Trip" clones into a fresh user Trip, runs route optimisation, pushes to `/trip-active`.
-  - `user`: editable view. "Start Trip" runs route optimisation in place, flips status to `active`, pushes to `/trip-active`. If already completed, shows the read-only summary.
-- Map preview with all stops; optimised order is only computed at start-time (no Directions API hit on every view).
-
-### Trip Active (`app/trip-active.tsx`)
-- Full-screen modal route outside `(tabs)`.
-- Live progress bar (visited / total), optimised stop list, next-stop highlight.
-- Live distance to next stop via `expo-location` foreground watch (subscribes only while mounted).
-- Per-stop "Mark Visited" + auto-complete when the last stop is marked.
-- "Get Directions" hands off to native maps via `openExternalDirections()`.
-
-### Profile (`app/(tabs)/profile/index.tsx`)
-- Avatar, name, location, member-since (live from `users/{uid}`).
-- Stats + Saved (lists / wineries / articles) live from `users/{uid}/savedWineries`, `savedArticles`, `lists` subcollections (via `onSnapshot`).
-- **Tastings** subcollection — per-bottle notes, drives a Palate breakdown chart derived on the fly.
-- Inline edit modals for profile fields.
-
-### Explore (`app/(tabs)/explore/index.tsx`)
-- **Hidden from the tab bar** (`Tabs.Screen` declared with `href: null`).
-- Editorial directory: latest `pour_articles` issue + static "library" rows. Kept around for any existing inbound links — long-form content has moved onto the home tab.
-
-> **Events** and **Specials** screens have been **removed**. The old `app/(tabs)/events/` and `app/(tabs)/specials/` directories no longer exist. The `events` Firestore collection still exists (read-only) but no screen reads from it.
+### Explore (`explore/index.tsx`)
+- Hidden from tab bar (`href: null`); region-filtered editorial directory. Kept for inbound links.
 
 ---
 
 ## Firebase / Backend
 
-**Config:** `firebaseConfig.js` — reads from `.env` via `EXPO_PUBLIC_` variables. Exports:
-- `auth` — Firebase Auth, persisted via `AsyncStorage` (`getReactNativePersistence`) so users stay signed in across restarts.
-- `db` — Firestore. Initialized with `experimentalForceLongPolling: true` (required for Expo + non-US regions). Cache is **in-memory only** — the Firebase JS SDK's `persistentLocalCache` uses IndexedDB, which doesn't exist in React Native, so the persistent cache config silently degrades to memory and emits a boot-time warning. Reads are still cached within a single app session, but the cache is lost on cold restart. For true offline persistence we would need to migrate to `@react-native-firebase/firestore` (native modules).
-- `storage` — Firebase Cloud Storage.
+**Client config:** `firebaseConfig.js` exports `auth` (AsyncStorage persistence), `db` (Firestore, `experimentalForceLongPolling: true`, **memory-only cache** — JS SDK persistent cache needs IndexedDB which RN lacks; true offline would require `@react-native-firebase/firestore`), `storage`, and `functions` (us-central1, used by the callable `deleteAccount`).
 
-**Firestore Collections (current):**
+**Firestore collections:**
 
-| Collection | Purpose / Key Fields |
+| Collection | Purpose / Notes |
 |---|---|
-| `wineries` | `name`, `slug`, `description` (string[]), `pullQuote`, `phone`, `website`, `hours` (string), `hoursStructured` (per-day array), `images` (string[]), `rating`, `userRatingsTotal`, `latitude`, `longitude`, `region`, `googlePlaceId`, `dogFriendly`, `hasRestaurant`, `hasWifi`, `isOrganic`, `isBiodynamic`, `walkinWelcome`, `awardWinning`, `hasTours`, `featured` (bool), `featuredTier` (`'hero'`), `featuredLabel` (string), `boost` (number, for concierge ranking) |
-| `events` | `title`, `wineryName`, `winerySlug`, `venue`, `startDate` / `endDate` (YYYY-MM-DD), `date` (legacy), `description`, `image`, `isWinerySponsored` (bool), `sourceUrl`. **Currently no in-app reader; collection is kept for future re-introduction.** |
-| `homepage_carousel` | `title`, `description`, `imageUrl`, `linkTo`, `order`, `active` (bool) |
-| `premade_trips` | `title`, `blurb`, `heroImage`, `durationHours`, `wineryIds` (string[]), `region`, `order` |
-| `explore_articles` | Article rail entries on the Explore screen |
-| `pour_articles` | "The Tassie Pour" editorial issues — `issueNumber`, `issueLabel`, `kicker`, `headline`, `author`, `date`, `readTime`, `heroImage`, `blocks[]` (typed paragraph/pullquote/image), `sponsor`, `continue` |
-| `knowledge_chunks` | RAG chunked editorial prose + tasting notes. Written by `scripts/rag/ingest.js`. Read by the concierge at query time. |
-| `config/{doc}` | App-wide config. `config/homepage` holds `heroImageUrl` and crop position. |
-| `users/{uid}` | Per-user profile + subcollections: `savedWineries`, `savedArticles`, `lists`, `tastings`. Owner-only access. |
+| `regions/{regionId}` | Per-region config (see Multi-Region section). Public read; Admin-SDK-only writes (`scripts/seed-region-tasmania.js`). |
+| `wineries` | Core winery docs: `name`, `slug`, `regionId`, `region` (sub-region display string), `description[]`, `pullQuote`, `phone`, `website`, `hours`/`hoursStructured`, `images[]`, `rating`, `userRatingsTotal`, lat/lon, `googlePlaceId`, boolean feature flags, `featured`/`featuredTier`/`featuredLabel`, `boost`. |
+| `wines` | Per-winery wine list (`wineryId` FK). Read by the Wines tab; also the source for the concierge's wine index. |
+| `events` | Winery events (`winerySlug` FK). Read by winery detail's Events tab. |
+| `winery_tastings` | **Community tasting notes.** Public read; signed-in create with field validation (authorId == uid, wine ≤120 chars, score 0–5, note ≤1000); update/delete owner-only. |
+| `premade_trips` | Curated trips — `regionId`, `title`, `blurb`, `heroImage`, `durationHours`, `wineryIds[]`, `order`. |
+| `pour_articles` | "The Pour" editorial issues — `regionId`, `issueNumber`, typed `blocks[]`, sponsor, continue rail. |
+| `explore_articles` | Article rail entries — `regionId`. |
+| `knowledge_chunks` | RAG chunks (mirror of Upstash content). Written by `scripts/rag/ingest.js`. |
+| `concierge_rate_limits` | Per-session daily quota counters, written by the Cloud Function via Admin SDK. **No client access.** TTL on `expiresAt`. |
+| `config/{doc}` | Global config — `config/homepage` holds hero image URL + crop. |
+| `homepage_carousel` | Legacy — still in rules/seed script, but **no screen reads it**. |
+| `users/{uid}` | Profile + subcollections `savedWineries`, `savedArticles`, `lists`, `tastings`. Owner-only. |
 
-**Security rules (`firestore.rules`):** public read on all content collections (wineries, events, homepage_carousel, premade_trips, explore_articles, pour_articles, knowledge_chunks, config); writes only via Admin SDK in scripts. `users/{uid}` is owner-only for both read and write, including all subcollections. Everything else is denied.
+**Security rules (`firestore.rules`):** public read on content collections, Admin-SDK-only writes — except `winery_tastings` (authed create/update/delete as above) and `users/{uid}` (owner-only incl. all subcollections). `concierge_rate_limits` denies all client access. Everything else denied. *Known gap: `winery_tastings` `update` only checks authorship — it does not re-validate the field constraints enforced on `create`.*
 
-**Auth:** Firebase Auth email/password is **live**. `AuthContext` listens to `onAuthStateChanged`, auto-creates the user's Firestore doc on first sign-in, and exposes `user`, `loading`, `signOut`.
+**SavedContext is Firestore-backed now:** hearts write to `users/{uid}/savedWineries/{id}` with optimistic local toggle + rollback, and an `onSnapshot` listener reconciles every screen (this is why hearts on the list immediately appear on the profile). Not AsyncStorage.
+
+---
+
+## Concierge (AI sommelier) — SERVER-SIDE
+
+The concierge pipeline moved out of the app. **No AI API keys ship in the JS bundle.**
+
+**Server (`functions/src/`):**
+- `concierge` — public HTTPS Gen2 function, POST `{ message, history (≤40), userLocation?, regionId?, sessionId?, userId? }` → **SSE stream** (`delta` / `done` / `error` events). `regionId` defaults to `"tasmania"` until Phase 4 makes it required.
+- Orchestrator flow: **resolve coreference → route (structured filters) → retrieve → respond**, streaming tokens back. Two implementations: v1 (live) and `v2/` rewrite, selected by `CONCIERGE_USE_V2` env (default off). Both expose the same `AskResult` shape (reply, proposal, wineryCards, history, cost).
+- Retrieval: `retrieve.ts` (winery descriptions), `knowledgeRetrieve.ts` (`knowledge` Upstash namespace), `tastingNotes.ts` (`wines` namespace), `winerySourcesRetrieve.ts` (`winery_sources` namespace, scraped winery-website chunks) — all Voyage-embedded queries against Upstash Vector, with `rerank.ts` reranking. `driveTimes.ts` uses Google Distance Matrix for itinerary ordering. `regionConfig.ts` loads + caches `regions/{regionId}` per cold start; the system prompt is templated from it (`brandVoiceLine`, `regionalPrimer`, sub-regions, timezone-correct "today").
+- Response LLM: Gemini by default (`LLM_PROVIDER`, `geminiResponse.ts`); router/resolver stay on OpenAI. Rollback to OpenAI = one env var.
+- **Abuse protection (3 layers, `index.ts` + `rateLimit.ts`):** in-memory per-IP burst limit (30/min) → Firestore-backed per-session daily quota (`concierge_rate_limits`) → App Check verification (env-gated via `CONCIERGE_ENFORCE_APP_CHECK`, currently off).
+- **Observability:** Langfuse tracing (optional secrets — function works without them), grouped by `sessionId`/`userId`. Secrets bound: OPENAI, GEMINI, VOYAGE, UPSTASH URL/TOKEN, GOOGLE_DIRECTIONS, LANGFUSE keys.
+- `deleteAccount` (callable), `ping`, `testEmbed` (Voyage smoke test).
+- Deploy: `cd functions && npm run deploy` (build = `tsc`, Node 22).
+
+**Client (`services/concierge/`):** `concierge.ts` is a thin SSE client (via `expo/fetch`) hitting `EXPO_PUBLIC_CONCIERGE_URL` (falls back to the deployed cloudfunctions.net URL), keeping the same public API (`init`, `askStream`, `getHistory`, `reset`, …) so `ConciergeChat.tsx` was unchanged. Multi-turn history is sent each turn. `buildContext.ts` still loads the winery corpus client-side — only for `getWinery(slug)` inline-card rendering. The old client-side RAG modules (router/retrieve/knowledgeRetrieve/tastingNotes/systemPrompt/driveTimes) have been **deleted from disk**; the legacy `openai` / `voyageai` / `@upstash/vector` deps and their `EXPO_PUBLIC_*` keys remain in the app's `package.json`/`.env` and are **slated for removal in Phase 4**.
+
+Knowledge-base content lives in `scripts/rag/content/*.md` (+ `tasting-notes/`); `scripts/winery-sources/*.md` holds scraped per-winery source docs. Docs: `docs/concierge-audit.md`, `docs/concierge-rewrite-spec.md`.
 
 ---
 
 ## Design & UI Conventions
 
-The app has been re-themed to **"Forest Slate"** — a modern dark UI tuned for long-form reading. The previous light/wine-red palette is gone. **All colors, fonts, spacing, and radii live in `constants/theme.ts`** — do not inline hex values or font names in new files.
+Theme: **"Forest Slate"** — dark editorial UI. **All colors, fonts, spacing, radii live in `constants/theme.ts`** — never inline hex values or font names.
 
-**Theme tokens (from `constants/theme.ts`):**
+**Tokens (from `constants/theme.ts`):**
+- **Surfaces:** `background` `#0F1411` / `surface` `#1A201B` / `surfaceDeep` `#070A08` / `surfaceElevated` `#222823`
+- **Text:** `textPrimary` `#E8EAE6` / `textSecondary` (ink @ 72%) / `textMuted` (ink @ 50%) / `textOnDark` `#F5F0E6`
+- **Accents:** `accent` `#548323` (forest — CTAs, active tab pill) / `accentSoft` `#9dd560` (lime — kickers, ratings) / `onAccent` `#F5F0E6`
+- **Borders:** `border` / `borderStrong` (10% / 20% alpha hairlines); **photo chrome:** `photoChrome` + `photoOverlay*` gradient stops; **status:** `error` `#E5705F`
 
-- **Surfaces:**
-  - `colors.background` `#0F1411` — deep slate w/ green undertone (page bg)
-  - `colors.surface` `#1A201B` — chips, search bars, cards
-  - `colors.surfaceDeep` `#070A08` — heaviest divider tone
-  - `colors.surfaceElevated` `#222823` — lifted cards
-- **Text:**
-  - `colors.textPrimary` `#E8EAE6` (soft off-white) — primary body
-  - `colors.textSecondary` `ink @ 72%` — captions
-  - `colors.textMuted` `ink @ 50%` — metadata, placeholders
-  - `colors.textOnDark` `#F5F0E6` (warm ivory) — text on photos
-- **Accents:**
-  - `colors.accent` `#548323` — forest green (active tab pill, CTAs, hairlines)
-  - `colors.accentSoft` `#9dd560` — bright lime (kickers, ratings, meta links)
-  - `colors.onAccent` `#F5F0E6` — foreground on the forest accent
-- **Borders:** `colors.border` / `colors.borderStrong` (light hairlines at 10% / 20% alpha on dark surfaces)
-- **Photo chrome:** `colors.photoChrome` (dark glass), `photoOverlayTop/Soft/Medium/Strong/Deep` for gradient stops over imagery
-- **Status:** `colors.error` `#E5705F`
+**Typography:** `fonts.serif` (Playfair 700) headlines; `serifSemiBold(/Italic)` subheads + ledes; `serifItalic`; `sans/sansMedium/sansBold` (DM Sans) body/UI; `display` (Bebas Neue) brand; `roboto/robotoMedium` concierge replies. DM Sans is the **default** `<Text>`/`<TextInput>` font via `defaultProps` in `app/_layout.tsx`.
 
-**Typography:**
-- `fonts.serif` (default = Playfair Display 700 Bold) for headlines
-- `fonts.serifSemiBold` / `serifSemiBoldItalic` (Playfair 600) — subheadings and editorial lede
-- `fonts.serifItalic` (Playfair 400 Italic) — italic body
-- `fonts.sans` / `sansMedium` / `sansBold` (DM Sans 400/500/700) — body, UI, labels
-- `fonts.display` (Bebas Neue 400) — brand logo + hero "by the glass" headline
-- `fonts.roboto` / `robotoMedium` — concierge chat replies
-- DM Sans is wired as the **default** `<Text>` / `<TextInput>` font in `app/_layout.tsx` via `defaultProps`. Anything explicitly setting `fontFamily` (e.g. Playfair for headlines) overrides this.
+**Type scale (`type.*`):** kicker 10 / caption 12 / body 14 / lede 17 / h3 22 / h2 28 / h1 36 / display 54 — each bundles family/size/line-height/tracking.
+**Spacing (`spacing.*`):** xs 4 → hero 40; `hitTarget` 44. **Radii (`radius.*`):** sharp 0 / card 4 / cardLg 12 / pill 999.
 
-**Type scale (`type.*`):** kicker 10 / caption 12 / body 14 / lede 17 / h3 22 / h2 28 / h1 36 / display 54. Each role bundles family + size + line-height + tracking so screens can `...type.lede` to get the editorial pairing in one go.
+**Layout patterns:** `StyleSheet` at the **bottom** of each file; 24px screen horizontal padding (`spacing.xxl`); low-radius cards; pill chips with accent fill when active.
 
-**Spacing scale (`spacing.*`):** xs 4 / sm 8 / md 12 / lg 16 / xl 20 / xxl 24 / xxxl 32 / hero 40 / subSection 24 / hitTarget 44 (Apple HIG floor).
+**Tab bar:** custom `CustomTabBar` in `app/(tabs)/_layout.tsx` — floating pill, animated forest indicator (Reanimated springs), memoized `TabButton`. Visible: Home / Trips / Wineries / Profile. Hidden: `explore` (`href: null`).
 
-**Radii (`radius.*`):** sharp 0 / card 4 / cardLg 12 / pill 999.
-
-**Layout Patterns:**
-- `StyleSheet` definitions go at the **bottom** of each file (existing convention).
-- 24px primary screen horizontal padding (`spacing.xxl`).
-- Cards: low-radius (`radius.card`) for editorial feel; `cardLg` only for elevated/lifted cards.
-- Chips (filters): `radius.pill`, accent fill when active.
-
-**Tab Bar:**
-- Custom `CustomTabBar` in `app/(tabs)/_layout.tsx`.
-- Floating pill, absolutely positioned 20px from bottom (iOS) / 12px (Android).
-- Animated sliding **forest** pill indicator (Reanimated `withSpring`), springs on focused-tab scale and translateY.
-- `TabButton` is `React.memo`.
-- **Visible tabs:** Home (`home`) / Trips (`map`) / Wineries (`wine`) / Profile (`person`).
-- **Hidden:** `explore` is declared with `href: null` so it stays addressable but doesn't appear in the bar.
-
----
-
-## Concierge / RAG (AI sommelier)
-
-The home-screen search bar opens an in-app sommelier that uses a cost-efficient OpenAI RAG flow.
-
-Flow per turn:
-1. **Router** (`services/concierge/router.ts`) — cheap mini call turns the free-form question into structured filters (regions, tags, keywords, day-of-week, intent). Uses prompt caching.
-2. **Build context** (`services/concierge/buildContext.ts`) — winery collection is loaded once per session and compacted.
-3. **Retrieve** — `retrieve.ts` hydrates descriptions for the shortlist; `knowledgeRetrieve.ts` searches the regional knowledge base (history, etiquette, food culture, seasons); `tastingNotes.ts` searches per-bottle notes. All three hit **Upstash Vector** with Voyage-embedded queries.
-4. **Respond** (`services/concierge/concierge.ts`) — final OpenAI call with the cached `systemPrompt.ts` plus retrieved context.
-5. **Cost tracking** (`services/concierge/costTracker.ts`) — per-turn token and USD accounting, separating fresh vs cached input.
-
-Drive-time ordering for trip routing uses Google Distance Matrix (`services/concierge/driveTimes.ts`) — replaces naive haversine sort with actual road duration.
-
-The knowledge base itself lives in `scripts/rag/content/*.md` (regional prose, etiquette, history, food culture, seasons, general directions, plus a `tasting-notes/` folder for individual bottles). `scripts/rag/ingest.js` chunks, tags, embeds (Voyage `voyage-3-lite`, 512-dim — matches the Upstash index dimension), and writes to **both** Upstash (vector index, namespace `knowledge`) and Firestore (`knowledge_chunks` collection). Tasting notes use a separate `wines` namespace via `scripts/rag/ingest-tasting-notes.js`.
+**Error handling:** `RootErrorBoundary` wraps the whole tree; `withScreenErrorBoundary` wraps individual screens; failures route through `utils/errorReporting.ts` `reportError()` (console-only today, Crashlytics-ready — see `docs/setup-crashlytics.md`).
 
 ---
 
 ## Data Pipeline Scripts (`/scripts/`)
 
-Node.js scripts run with `node scripts/<name>.js` against the `winery-tourism-tasmania` project using `service-account-tasmania.json`.
+Run with `node scripts/<name>.js` against `winery-tourism-tasmania` using `service-account-tasmania.json`. Highlights (the directory has ~60 scripts; names are self-describing):
 
-**Ingestion / geocoding**
-- `upload-tasmania-wineries.js` — upload scraped winery data (PlaceID + name) to Firestore.
-- `add-missing-wineries-tasmania.js` — add hardcoded missing wineries via Places lookup.
-- `geocode-tasmania-wineries.js` / `geocode-wineries.js` — pull lat/lon from Google Places.
-- `fetch-place-details-tasmania.js` / `fetch-place-details.js` — pull phone / website / hours / photos.
-- `extract_place_ids.js` — export all `googlePlaceId` values.
-- `test-places-api.js` — smoke-test one winery against Places API.
+**Multi-region** — `backfill-region-id.js` (stamp `regionId: "tasmania"` on all content docs), `seed-region-tasmania.js` (seed `regions/tasmania`), `rag/backfill-region-upstash.js` (add `regionId` metadata to existing vectors).
 
-**Cleanup / migration**
-- `cleanup-duplicate-wineries-tasmania.js` / `cleanup-placeid-docs-tasmania.js` — remove PlaceID-based duplicates after re-uploading with slug IDs.
-- `fix-slugs.js` — backfill `slug` from doc ID.
-- `check-slugs.js`, `check-place-ids.js`, `check-coords.js` — audits.
+**Ingestion / geocoding / enrichment** — `upload-tasmania-wineries.js`, `add-missing-wineries-tasmania.js`, `geocode-*.js`, `fetch-place-details*.js`, `merge-ratings*.js`, `add-hours-structured*.js`, `add-featured-fields.js`, `add-award-*.js`, `add-winery-filters.js`, `add-boost-field.js`, `extract_place_ids.js`, `test-places-api.js`.
 
-**Enrichment**
-- `merge-ratings-tasmania.js` / `merge-ratings.js` — refresh Google ratings + user_ratings_total.
-- `add-hours-structured-tasmania.js` / `add-hours-structured.js` — parse hours string into `hoursStructured[]`.
-- `add-featured-fields.js`, `add-award-region-fields.js`, `add-award-winning-wineries.js`, `add-winery-filters.js`, `add-boost-field.js` — backfill boolean / metadata fields.
+**Cleanup / audits** — `cleanup-duplicate-wineries-tasmania.js`, `cleanup-placeid-docs-tasmania.js`, `fix-slugs.js`, `check-slugs.js` / `check-place-ids.js` / `check-coords.js` / `check-explore-articles.js`, `audit-winery-fields.js`, `list-winery-ids.js`.
 
-**Validation**
-- `audit-winery-fields.js` — report missing required fields.
+**Sheets sync** — `export-wineries-csv-tasmania.js`, `export-to-sheets-tasmania.js`, `import-from-sheets-tasmania.js`, `push-winery-ids-to-template.js`, `seed-wines-from-csv.js` (seed the `wines` collection from the spreadsheet template).
 
-**Sheets sync**
-- `export-wineries-csv-tasmania.js` — CSV export.
-- `export-to-sheets-tasmania.js` — push wineries to a Google Sheet.
-- `import-from-sheets-tasmania.js` — pull updates back without overwriting blanks.
+**Content / editorial** — `seed-explore-articles.js`, `seed-pour.js`, `seed-carousel.js`, `seed-premade-trips(-smart).js`, `generate-descriptions-tasmania.js` (Claude-drafted descriptions → human review in `scripts/review/tasmania/`), `upload-hero-image*.js`, `set-hero-position.js`, `upload-premade-trip-thumbnails-tasmania.js`, `strip-citations.js`.
 
-**Content / editorial**
-- `seed-explore-articles.js`, `seed-pour.js`, `seed-carousel.js` — seed the editorial collections.
-- `seed-premade-trips.js` / `seed-premade-trips-smart.js` — seed curated trips (smart variant resolves to live winery doc IDs).
-- `generate-descriptions-tasmania.js` — auto-generate editorial winery descriptions + pull quotes via Claude; review files saved to `scripts/review/tasmania/` for human approval before upload.
+**Winery sources (concierge grounding)** — `collect-winery-sources.js` / `probe-winery-sources.js` / `audit-winery-sources.js` (scrape + vet winery websites into `scripts/winery-sources/*.md`), `ingest-winery-sources.js` (embed into the `winery_sources` Upstash namespace).
 
-**Hero image management**
-- `upload-hero-image-tasmania.js` / `upload-hero-image.js` — upload to Cloud Storage and write public URL to `config/homepage.heroImageUrl`.
-- `set-hero-position.js` — adjust crop (X/Y %) and zoom for the home hero.
+**RAG** — `rag/ingest.js` (knowledge markdown → Upstash `knowledge` namespace + Firestore `knowledge_chunks`; Voyage `voyage-3-lite`, 512-dim), `rag/ingest-tasting-notes.js` (`wines` namespace), `rag/query.js`, `rag/retrieve.js`, `rag/lib/*`, `embed-wineries.js`, `inspect-embeddings.js`, `test-retrieval.js`.
 
-**RAG / embeddings**
-- `embed-wineries.js` — embed winery descriptions to Upstash for semantic shortlisting.
-- `test-retrieval.js` — sanity-check the live index with sample queries.
-- `scripts/rag/ingest.js` — chunk + tag + embed knowledge-base Markdown into Upstash + Firestore.
-- `scripts/rag/ingest-tasting-notes.js` — same flow for the `wines` namespace.
-- `scripts/rag/retrieve.js` — importable retriever used by client services.
-- `scripts/rag/query.js` — CLI to test queries without spinning up the app.
-- `scripts/rag/lib/*` — voyage-client, upstash-client, firestore-client, chunker, metadata tagger, util.
+**Concierge testing (`scripts/concierge/`)** — `test-queries.js` / `test-queries-live.js` / `test-gemini-live.js`, `ab-test-providers.js` (+ `ab-test-report.md`), `eval-v2.js` (v2 orchestrator eval), `sommelier-prompt.js`.
 
-**Cost monitoring**
-- `measure-token-usage.js` — send one realistic concierge query, print token usage + projected cost.
-- `verify-token-savings.js` — quantify savings from prompt-shape changes.
-
-**Schema / housekeeping**
-- `updateEventsSchema.mjs` — backfill missing fields on `events` docs.
-- `check-explore-articles.js` — list `explore_articles`.
-- `_check-project.js`, `_check-hero.js` — temporary diagnostics (safe to delete).
+**Cost** — `measure-token-usage.js`, `verify-token-savings.js`. **Housekeeping** — `updateEventsSchema.mjs`.
 
 > **Do not reintroduce** the deprecated WA Firestore project (`solid-garden-474012-q4`) or its credentials.
 
@@ -381,54 +260,54 @@ Node.js scripts run with `node scripts/<name>.js` against the `winery-tourism-ta
 ## Known Issues & Tech Debt
 
 ### 🟠 Medium Priority
-- No `useFirestoreCollection` shared hook — fetch logic is copy-pasted across screens (the persistent Firestore cache softens this, but a hook would centralize loading/error states).
-- `FlatList` missing `removeClippedSubviews` and batching props for long lists.
-- No URL validation before `Linking.openURL()` on the phone `tel:` link (the website path is mitigated by `safeOpenURL`).
-- The hidden `explore` tab still ships its full screen — fine for now, but worth pruning if it stops being a deep-link target.
-- `_check-project.js` / `_check-hero.js` are temporary diagnostics still in the repo.
+- **Legacy AI deps in the app `package.json`** — `openai`, `voyageai`, `@upstash/vector` are no longer used by the client (concierge is server-side) and are slated for removal in Phase 4 along with their `EXPO_PUBLIC_*` env vars. `firebase-admin`, `googleapis`, `node-fetch` are also in app deps but are **script-only** — should move to a scripts-local package.json or devDependencies.
+- **`winery_tastings` rules gap** — `update` doesn't re-validate the field constraints that `create` enforces (an author could update their note past the size/score limits).
+- No `useFirestoreCollection` shared hook — fetch logic is copy-pasted across screens.
+- Firestore cache is memory-only (lost on cold restart); true offline needs `@react-native-firebase/firestore`.
+- The hidden `explore` tab still ships its full screen.
 
 ### 🟡 Lower Priority / Future
-- No test framework (no Jest, no Testing Library).
-- No error boundaries.
-- No server-side search or pagination (all client-side; OK at current data volume).
+- **No test framework** (no Jest / Testing Library) — the concierge eval scripts are the closest thing.
+- `reportError()` is console-only — Crashlytics not yet wired (`docs/setup-crashlytics.md` has the steps).
 - No push notifications.
-- Several `expo-*` packages declared but lightly used (`expo-haptics`, `expo-constants`, `expo-symbols`, `expo-system-ui`) — review and prune.
+- **No `eas.json`** — store submission pipeline not set up yet.
+- No server-side search or pagination (client-side only; fine at current volume).
+- Lightly-used `expo-*` packages (`expo-haptics`, `expo-constants`, `expo-symbols`, `expo-system-ui`) — review and prune.
 
 ---
 
 ## Roadmap / Planned Features
 
-- [ ] Decide whether to re-introduce an Events surface or fold events into the home rail.
-- [ ] Decide whether to re-introduce a Specials surface (was previously a placeholder; now removed).
+- [ ] **Multi-region Phase 4**: require `regionId` server-side, purge legacy client AI deps + env vars, add the second region (picker shows 2+ cards).
+- [ ] **Multi-region Phase 5**: hardening — region-tuned prompts, per-region Upstash namespaces if metadata filters get slow.
+- [ ] Concierge v2 cutover (`CONCIERGE_USE_V2=true`) after soak testing — see `docs/concierge-rewrite-spec.md`.
+- [ ] Wire Crashlytics into `reportError()`.
+- [ ] App Check enforcement on the concierge endpoint (`CONCIERGE_ENFORCE_APP_CHECK`).
 - [ ] Push notifications for trip reminders + new "Pour" issues.
-- [ ] Offline tile pre-cache for active-trip map.
-- [ ] Submit to App Store and Google Play.
-- [ ] Concierge memory across turns (currently each turn is stateless beyond the system prompt).
+- [ ] EAS build config + App Store / Google Play submission.
+- [ ] Decide fate of `homepage_carousel` (unused) and a standalone Events surface (events currently live only on the winery detail tab).
 
 ---
 
 ## Development Notes
 
-- **Run:** `npx expo start` (uses `app.config.js` so the Google Maps API key from `.env` is injected into native config)
-- **iOS simulator:** `npx expo run:ios`
-- **Android:** `npx expo run:android`
-- **Lint:** `npm run lint` (`expo lint`)
-- TypeScript strict mode is **ON** — keep all types explicit, avoid `any`.
-- Prefer functional components with hooks.
-- `StyleSheet` definitions go at the **bottom** of each file (existing convention).
-- Use design tokens from `constants/theme.ts`. Do **not** inline hex colors or raw font family strings in new code — add a token if you need one.
-- **Shared state:** React Context only (`AuthContext`, `SavedContext`, `TripContext`). Add a new Context before reaching for Redux/Zustand.
-- Firebase config reads from `.env` via `EXPO_PUBLIC_` variables — never hardcode secrets.
-- `service-account-tasmania.json` is for Admin SDK in scripts — **do not commit this to git**.
-- The deprecated WA Firestore project (`solid-garden-474012-q4`) is no longer used; reject any code or config that references it.
+- **Run:** `npx expo start` (`app.config.js` injects the Google Maps key from `.env` into native config)
+- **iOS / Android:** `npx expo run:ios` / `npx expo run:android` — **Lint:** `npm run lint`
+- **Functions:** `cd functions && npm run build` (tsc) / `npm run serve` (emulator) / `npm run deploy`
+- TypeScript strict mode is **ON** — explicit types, no `any`. Functional components + hooks.
+- `StyleSheet` definitions at the **bottom** of each file.
+- Pull all colors/fonts/spacing/radii from `constants/theme.ts` — add a token if you need one.
+- **Shared state:** React Context only. Add a new Context before reaching for Redux/Zustand.
+- Firebase config reads from `.env` via `EXPO_PUBLIC_` vars; server secrets live in Firebase Secrets Manager (`firebase functions:secrets:set …`) — **never hardcode secrets, never commit `.env*` or `service-account*.json`** (and remember the `.env.tasmania` history exposure above).
 
 ## Working with This Codebase
 
 When making changes:
-1. Keep TypeScript strict — define interfaces for all Firestore data shapes (see `types/trip.ts` for the pattern).
-2. Follow Expo Router's file-based routing structure.
-3. Match the existing **dark editorial** aesthetic: forest-slate surfaces, Playfair serif for titles, DM Sans for body, lime/forest accents, low-radius cards.
-4. Pull colors, fonts, spacing, and radii from `constants/theme.ts` — never inline hex.
-5. For anything region-specific in UI copy, use `REGION_NAME` / `REGION_NAME_UPPER` from `constants/region.ts` so the app is re-skinnable to another wine region by flipping `EXPO_PUBLIC_REGION_NAME` in `.env`.
-6. Test on both iOS and Android where possible (Google Maps provider and `expo-location` permissions in particular).
-7. Never commit `.env`, `.env.tasmania`, or `service-account-tasmania.json`.
+1. Keep TypeScript strict — define interfaces for Firestore data shapes (see `types/trip.ts`, `types/region.ts`).
+2. Follow Expo Router's file-based routing.
+3. Match the dark editorial aesthetic: forest-slate surfaces, Playfair titles, DM Sans body, lime/forest accents, low-radius cards.
+4. **Region-aware by default:** any new content query must filter `where("regionId", "==", useActiveRegionId())`; any region-specific copy/config comes from `useRegionConfig()` — never hardcode "Tasmania". New per-region settings go on the `regions/{regionId}` doc + `types/region.ts` (bump `schemaVersion`).
+5. New screens get `withScreenErrorBoundary` and report failures via `reportError()`.
+6. Anything touching the concierge pipeline belongs in `functions/src/concierge/` (server), not the client; keep `types/region.ts` the shared contract.
+7. Test on both iOS and Android where possible (maps provider, `expo-location`, and the iOS polyline `strokeColors` workaround in particular).
+8. Reject any code or config referencing the deprecated WA project (`solid-garden-474012-q4`).
