@@ -7,15 +7,20 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
-  deleteDoc,
+  addDoc,
+  collection,
   doc,
   getDoc,
+  getDocs,
+  onSnapshot,
+  query,
   serverTimestamp,
-  setDoc,
+  where,
 } from "firebase/firestore";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import SkeletonBox from "../../../components/SkeletonBox";
 import {
+  ActivityIndicator,
   Dimensions,
   Linking,
   Modal,
@@ -24,12 +29,14 @@ import {
   Share,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { Image } from "expo-image";
 import Animated, {
   Extrapolation,
   interpolate,
+  useAnimatedRef,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
@@ -39,6 +46,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
 import { useAuth } from "../../../context/AuthContext";
 import { useRegionConfig } from "../../../context/RegionContext";
+import { useSaved } from "../../../context/SavedContext";
 import { db } from "../../../firebaseConfig";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -73,7 +81,7 @@ function openDirections(lat: number, lng: number, name: string) {
   );
 }
 
-const { width } = Dimensions.get("window");
+const { width, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const HERO_HEIGHT = 400;
 const PARALLAX_EXTRA = 80;
 
@@ -101,6 +109,96 @@ interface WineryData {
   region?: string;
   latitude?: number;
   longitude?: number;
+}
+
+// ── Section tabs (About / Events / Tasting Notes) ────────────────────────────
+type DetailTab = "about" | "wines" | "events" | "tastings";
+
+const DETAIL_TABS: { id: DetailTab; label: string }[] = [
+  { id: "about",    label: "About" },
+  { id: "wines",    label: "Wines" },
+  { id: "events",   label: "Events" },
+  { id: "tastings", label: "Tasting Notes" },
+];
+
+/** Wine docs from the public `wines` collection (the same collection the
+ *  concierge's tasting-note index is built from — see
+ *  scripts/rag/ingest-tasting-notes.js for the authoritative field list). */
+interface WineDoc {
+  id: string;
+  name: string;
+  vintage: string;
+  variety: string;
+  style: string;
+  abv: string;
+  price: string;
+  tastingNotes: string;
+  pairings: string;
+  awards: string;
+  /** Optional bottle/label photo — uploaded by the winery via the web portal. */
+  image: string;
+  boost: number;
+}
+
+/** Event docs from the public `events` collection, shaped for display. */
+interface WineryEvent {
+  id: string;
+  title: string;
+  venue: string;
+  dateLabel: string;
+  /** Raw ISO start date (YYYY-MM-DD) — chronological sort key. */
+  sortDate: string;
+  description: string;
+  image: string;
+  sourceUrl: string;
+  isPast: boolean;
+}
+
+/** Community tasting notes from the public `winery_tastings` collection. */
+interface CommunityTastingNote {
+  id: string;
+  wine: string;
+  score: number;
+  note: string;
+  authorName: string;
+  dateLabel: string;
+  sortKey: number;
+}
+
+const MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+/** "2026-03-12" → "12 Mar 2026". Falls back to the raw string. */
+function formatISODate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return iso;
+  return `${parseInt(m[3], 10)} ${MONTHS[parseInt(m[2], 10) - 1]} ${m[1]}`;
+}
+
+/** Single date or "12 Mar – 14 Mar 2026"-style range label. */
+function formatEventRange(start: string, end: string): string {
+  if (!start) return "";
+  if (!end || end === start) return formatISODate(start);
+  return `${formatISODate(start)} – ${formatISODate(end)}`;
+}
+
+/** Firestore Timestamp (or anything with toDate) → "12 Mar 2026". */
+function formatTimestamp(ts: unknown): string {
+  if (!ts || typeof (ts as { toDate?: unknown }).toDate !== "function") {
+    return "";
+  }
+  const d = (ts as { toDate: () => Date }).toDate();
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+/** Firestore Timestamp → millis for client-side sorting (no composite index). */
+function timestampMillis(ts: unknown): number {
+  if (!ts || typeof (ts as { toMillis?: unknown }).toMillis !== "function") {
+    return 0;
+  }
+  return (ts as { toMillis: () => number }).toMillis();
 }
 
 // Feature badges — Ionicon names instead of emoji.
@@ -147,14 +245,78 @@ function WineryDetailsScreen() {
 
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
   const region = useRegionConfig();
+  const { user } = useAuth();
+  const { isSaved: isWinerySaved, toggle: toggleSavedWinery } = useSaved();
   const [winery, setWinery] = useState<WineryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [hoursVisible, setHoursVisible] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
-  const [saveLoading, setSaveLoading] = useState(false);
+
+  // ── Section tabs (About / Events / Tasting Notes) ─────────────────────────
+  // Two pieces of state so a tab switch can feel smooth when the user has
+  // scrolled deep into a long section:
+  //   • `tab`        — the SELECTED tab. Updates instantly (underline moves,
+  //                    data fetching kicks off).
+  //   • `contentTab` — the tab whose content is RENDERED. When the user is
+  //                    scrolled past the tab strip, we first glide the scroll
+  //                    back up to the strip, then swap the content. Swapping
+  //                    immediately would shrink the content under the user's
+  //                    feet and the scroll position would clamp with an
+  //                    abrupt snap to the top.
+  const [tab, setTab] = useState<DetailTab>("about");
+  const [contentTab, setContentTab] = useState<DetailTab>("about");
+  const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  const tabsYRef = useRef(0);
+  const tabSwapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function switchTab(next: DetailTab) {
+    if (next === tab && next === contentTab) return;
+    setTab(next);
+    if (tabSwapTimer.current) clearTimeout(tabSwapTimer.current);
+    const tabsY = tabsYRef.current;
+    if (scrollY.value > tabsY && tabsY > 0) {
+      // Scroll the strip to the top of the viewport first; the old (long)
+      // content stays mounted during the glide so nothing clamps.
+      scrollRef.current?.scrollTo({ y: tabsY, animated: true });
+      tabSwapTimer.current = setTimeout(() => setContentTab(next), 300);
+    } else {
+      setContentTab(next);
+    }
+  }
+
+  // Clear any pending content swap on unmount.
+  useEffect(() => {
+    return () => {
+      if (tabSwapTimer.current) clearTimeout(tabSwapTimer.current);
+    };
+  }, []);
+
+  // Events — fetched lazily the first time the tab is opened.
+  const [events, setEvents] = useState<WineryEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventsLoaded, setEventsLoaded] = useState(false);
+
+  // Wines — fetched lazily the first time the tab is opened.
+  const [wines, setWines] = useState<WineDoc[]>([]);
+  const [winesLoading, setWinesLoading] = useState(false);
+  const [winesLoaded, setWinesLoaded] = useState(false);
+  const [expandedWineId, setExpandedWineId] = useState<string | null>(null);
+
+  // Community tasting notes — live subscription while the tab is open.
+  const [notes, setNotes] = useState<CommunityTastingNote[]>([]);
+  const [notesLoading, setNotesLoading] = useState(true);
+
+  // Add-a-note form
+  const [noteFormOpen, setNoteFormOpen] = useState(false);
+  const [formWine, setFormWine] = useState("");
+  const [formScore, setFormScore] = useState(0);
+  const [formNote, setFormNote] = useState("");
+  const [submittingNote, setSubmittingNote] = useState(false);
+
+  // Saved state comes from the shared SavedContext (live Firestore sync),
+  // so hearts on the list screen and this page always agree.
+  const isSaved = slug ? isWinerySaved(slug) : false;
 
   // Parallax scroll tracking
   const scrollY = useSharedValue(0);
@@ -218,44 +380,197 @@ function WineryDetailsScreen() {
     })();
   }, [slug]);
 
-  // ── Check whether this winery is already saved ────────────────────────────
+  // ── Events — lazy fetch on first open of the Events tab ───────────────────
   useEffect(() => {
-    if (!user || !slug) return;
-    const savedRef = doc(db, "users", user.uid, "savedWineries", slug);
-    getDoc(savedRef).then((snap) => setIsSaved(snap.exists()));
-  }, [user, slug]);
-
-  // ── Toggle save / unsave ──────────────────────────────────────────────────
-  async function toggleSave() {
-    if (!user || !slug || !winery || saveLoading) return;
-    setSaveLoading(true);
-    try {
-      const savedRef = doc(db, "users", user.uid, "savedWineries", slug);
-      if (isSaved) {
-        await deleteDoc(savedRef);
-        setIsSaved(false);
-      } else {
-        await setDoc(savedRef, {
-          name:      winery.name,
-          region:    region.displayName,
-          rating:    winery.rating ?? 0,
-          distance:  "",
-          image:     winery.images[0] ?? "",
-          savedAt:   serverTimestamp(),
+    if (tab !== "events" || eventsLoaded || !slug) return;
+    let cancelled = false;
+    (async () => {
+      setEventsLoading(true);
+      try {
+        const snap = await getDocs(
+          query(collection(db, "events"), where("winerySlug", "==", slug))
+        );
+        if (cancelled) return;
+        const today = new Date().toISOString().slice(0, 10);
+        const items: WineryEvent[] = snap.docs.map((d) => {
+          const data = d.data();
+          const start: string = data.startDate ?? data.date ?? "";
+          const end: string = data.endDate ?? "";
+          return {
+            id:          d.id,
+            title:       data.title ?? "Event",
+            venue:       data.venue ?? "",
+            dateLabel:   formatEventRange(start, end),
+            sortDate:    start,
+            description: data.description ?? "",
+            image:       data.image ?? "",
+            sourceUrl:   data.sourceUrl ?? "",
+            isPast:      Boolean(start) && (end || start) < today,
+          };
         });
-        setIsSaved(true);
+        // Upcoming first (soonest at the top), then past (most recent first).
+        const upcoming = items
+          .filter((e) => !e.isPast)
+          .sort((a, b) => a.sortDate.localeCompare(b.sortDate));
+        const past = items
+          .filter((e) => e.isPast)
+          .sort((a, b) => b.sortDate.localeCompare(a.sortDate));
+        setEvents([...upcoming, ...past]);
+        setEventsLoaded(true);
+      } catch (err) {
+        console.warn("[winery detail] failed to load events:", err);
+      } finally {
+        if (!cancelled) setEventsLoading(false);
       }
-    } catch (e) {
-      console.warn("toggleSave error:", e);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, eventsLoaded, slug]);
+
+  // ── Wines — lazy fetch on first open of the Wines tab ─────────────────────
+  useEffect(() => {
+    if (tab !== "wines" || winesLoaded || !slug) return;
+    let cancelled = false;
+    (async () => {
+      setWinesLoading(true);
+      try {
+        const snap = await getDocs(
+          query(collection(db, "wines"), where("wineryId", "==", slug))
+        );
+        if (cancelled) return;
+        const items: WineDoc[] = snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id:           d.id,
+            name:         String(data.name ?? "Unnamed wine"),
+            vintage:      String(data.vintage ?? ""),
+            // `varietal` is a legacy alias for `variety` in the source sheet.
+            variety:      String(data.variety ?? data.varietal ?? ""),
+            style:        String(data.style ?? ""),
+            abv:          String(data.abv ?? ""),
+            price:        String(data.price ?? ""),
+            tastingNotes: String(data.tastingNotes ?? ""),
+            pairings:     String(data.pairings ?? ""),
+            awards:       String(data.awards ?? ""),
+            image:        String(data.image ?? ""),
+            boost:        typeof data.boost === "number" ? data.boost : 0,
+          };
+        });
+        // Boosted wines first (same signal the concierge ranks on), then A–Z.
+        items.sort(
+          (a, b) => b.boost - a.boost || a.name.localeCompare(b.name)
+        );
+        setWines(items);
+        setWinesLoaded(true);
+      } catch (err) {
+        console.warn("[winery detail] failed to load wines:", err);
+      } finally {
+        if (!cancelled) setWinesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, winesLoaded, slug]);
+
+  // ── Community tasting notes — live while the tab is open ──────────────────
+  useEffect(() => {
+    if (tab !== "tastings" || !slug) return;
+    setNotesLoading(true);
+    const unsub = onSnapshot(
+      // Equality filter only — sorted client-side so no composite index is
+      // needed on the new collection.
+      query(collection(db, "winery_tastings"), where("winerySlug", "==", slug)),
+      (snap) => {
+        const items: CommunityTastingNote[] = snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id:         d.id,
+            wine:       data.wine ?? "",
+            score:      typeof data.score === "number" ? data.score : 0,
+            note:       data.note ?? "",
+            authorName: data.authorName ?? "Anonymous",
+            dateLabel:  formatTimestamp(data.createdAt),
+            sortKey:    timestampMillis(data.createdAt),
+          };
+        });
+        items.sort((a, b) => b.sortKey - a.sortKey);
+        setNotes(items);
+        setNotesLoading(false);
+      },
+      (err) => {
+        console.warn("[winery detail] tasting notes listener error:", err);
+        setNotesLoading(false);
+      }
+    );
+    return unsub;
+  }, [tab, slug]);
+
+  // ── Post a community tasting note ──────────────────────────────────────────
+  async function submitTastingNote() {
+    const wine = formWine.trim();
+    const note = formNote.trim();
+    if (!user || !winery || !slug || !wine || formScore === 0 || submittingNote)
+      return;
+    setSubmittingNote(true);
+    try {
+      // Display name from the user's profile doc, falling back to the email
+      // prefix so notes are never blankly attributed.
+      let authorName = "";
+      try {
+        const uSnap = await getDoc(doc(db, "users", user.uid));
+        authorName = String(uSnap.data()?.name ?? "").trim();
+      } catch {
+        /* fall through to email prefix */
+      }
+      if (!authorName) authorName = user.email?.split("@")[0] ?? "Guest";
+
+      await addDoc(collection(db, "winery_tastings"), {
+        winerySlug: slug,
+        wineryName: winery.name,
+        wine,
+        score:      formScore,
+        note,
+        authorId:   user.uid,
+        authorName,
+        createdAt:  serverTimestamp(),
+      });
+      // Mirror into the private profile subcollection so the profile's
+      // Tastings list and Palate breakdown keep working.
+      await addDoc(collection(db, "users", user.uid, "tastings"), {
+        wineryName: winery.name,
+        wine,
+        score:     formScore,
+        note,
+        createdAt: serverTimestamp(),
+      });
+      setFormWine("");
+      setFormScore(0);
+      setFormNote("");
+      setNoteFormOpen(false);
+    } catch (err) {
+      console.warn("[winery detail] failed to post tasting note:", err);
     } finally {
-      setSaveLoading(false);
+      setSubmittingNote(false);
     }
+  }
+
+  // ── Toggle save / unsave (delegates to SavedContext → Firestore) ──────────
+  function toggleSave() {
+    if (!slug || !winery) return;
+    toggleSavedWinery(slug, {
+      name:   winery.name,
+      image:  winery.images[0] ?? "",
+      rating: winery.rating,
+      region: region.displayName,
+    });
   }
 
   // ── Loading skeleton ───────────────────────────────────────────────────────
   if (loading) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
         <SkeletonBox
           style={{ height: HERO_HEIGHT, borderRadius: 0, backgroundColor: colors.surfaceDeep }}
         />
@@ -320,8 +635,12 @@ function WineryDetailsScreen() {
   };
 
   return (
-    <>
+    // The whole screen starts below the status bar / Dynamic Island so the
+    // hero photo is never cut by the front-facing camera. The strip above
+    // is solid page background.
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
       <Animated.ScrollView
+        ref={scrollRef}
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
@@ -331,8 +650,9 @@ function WineryDetailsScreen() {
         {/* ── Hero Carousel ─────────────────────────────────────────────────── */}
         <View style={styles.heroContainer}>
 
-          {/* Glass header buttons */}
-          <View style={[styles.headerOverlay, { top: insets.top + 10 }]}>
+          {/* Glass header buttons — hero already sits below the notch, so
+              these only need a small inset from its top edge. */}
+          <View style={[styles.headerOverlay, { top: spacing.md }]}>
             <Pressable
               style={styles.headerBtn}
               onPress={() => {
@@ -367,19 +687,6 @@ function WineryDetailsScreen() {
               <Text style={styles.headerBtnText}>{backLabel}</Text>
             </Pressable>
             <View style={styles.headerRight}>
-              <Pressable
-                style={styles.headerIconBtn}
-                onPress={toggleSave}
-                disabled={saveLoading}
-                accessibilityRole="button"
-                accessibilityLabel={isSaved ? "Unsave winery" : "Save winery"}
-              >
-                <Ionicons
-                  name={isSaved ? "heart" : "heart-outline"}
-                  size={16}
-                  color={isSaved ? colors.accentSoft : colors.textOnDark}
-                />
-              </Pressable>
               <Pressable
                 style={styles.headerIconBtn}
                 onPress={handleShare}
@@ -459,6 +766,20 @@ function WineryDetailsScreen() {
             )}
           </View>
 
+          {/* Save (heart) — bottom-right of the hero */}
+          <Pressable
+            style={[styles.headerIconBtn, styles.heroSaveBtn]}
+            onPress={toggleSave}
+            accessibilityRole="button"
+            accessibilityLabel={isSaved ? "Unsave winery" : "Save winery"}
+          >
+            <Ionicons
+              name={isSaved ? "heart" : "heart-outline"}
+              size={16}
+              color={isSaved ? colors.error : colors.textOnDark}
+            />
+          </Pressable>
+
           {/* Pagination dashes */}
           {winery.images.length > 1 && (
             <View style={styles.dotsContainer}>
@@ -489,7 +810,7 @@ function WineryDetailsScreen() {
             >
               <Text style={styles.infoCellLabel}>HOURS</Text>
               <View style={styles.valueRow}>
-                <Ionicons name="calendar-outline" size={14} color={colors.textMuted} />
+                <Ionicons name="calendar-outline" size={16} color={colors.textMuted} />
                 <Text style={styles.appointmentLink}>By Appointment Only</Text>
               </View>
               {winery.website ? (
@@ -505,7 +826,7 @@ function WineryDetailsScreen() {
             >
               <Text style={styles.infoCellLabel}>HOURS</Text>
               <View style={styles.valueRow}>
-                <Ionicons name="time-outline" size={14} color={colors.textMuted} />
+                <Ionicons name="time-outline" size={16} color={colors.textMuted} />
                 <Text style={styles.infoCellValue}>
                   {winery.hours[0]?.time ?? "N/A"}
                 </Text>
@@ -545,7 +866,7 @@ function WineryDetailsScreen() {
               >
                 <Text style={styles.infoCellLabel}>LOCATION</Text>
                 <View style={styles.valueRow}>
-                  <Ionicons name="location-outline" size={14} color={colors.textMuted} />
+                  <Ionicons name="location-outline" size={16} color={colors.textMuted} />
                   <Text style={styles.infoCellValue}>{locationLabel}</Text>
                 </View>
                 {hasCoords ? (
@@ -571,7 +892,7 @@ function WineryDetailsScreen() {
             >
               <Text style={styles.contactLabel}>CALL</Text>
               <View style={styles.valueRow}>
-                <Ionicons name="call-outline" size={14} color={colors.textMuted} />
+                <Ionicons name="call-outline" size={16} color={colors.textMuted} />
                 <Text style={styles.contactValue}>{winery.phone}</Text>
               </View>
             </Pressable>
@@ -589,7 +910,7 @@ function WineryDetailsScreen() {
             >
               <Text style={styles.contactLabel}>WEBSITE</Text>
               <View style={styles.valueRow}>
-                <Ionicons name="globe-outline" size={14} color={colors.textMuted} />
+                <Ionicons name="globe-outline" size={16} color={colors.textMuted} />
                 <Text style={styles.contactLink} numberOfLines={1}>
                   {winery.website
                     .replace(/^https?:\/\//, "")
@@ -625,14 +946,47 @@ function WineryDetailsScreen() {
           </View>
         )}
 
-        {/* ── About Section ─────────────────────────────────────────────────── */}
-        <View style={styles.aboutSection}>
+        {/* ── Section tabs — About / Events / Tasting Notes ─────────────────── */}
+        <View
+          style={styles.sectionTabs}
+          onLayout={(e) => {
+            tabsYRef.current = e.nativeEvent.layout.y;
+          }}
+        >
+          {DETAIL_TABS.map((t) => {
+            const active = tab === t.id;
+            return (
+              <Pressable
+                key={t.id}
+                onPress={() => switchTab(t.id)}
+                style={styles.sectionTabItem}
+                accessibilityRole="button"
+                accessibilityLabel={`${t.label} tab`}
+                accessibilityState={{ selected: active }}
+              >
+                <Text
+                  style={[
+                    styles.sectionTabLabel,
+                    active && styles.sectionTabLabelActive,
+                  ]}
+                >
+                  {t.label}
+                </Text>
+                {/* The green indicator line — sits under the active word */}
+                <View
+                  style={[
+                    styles.sectionTabUnderline,
+                    active && styles.sectionTabUnderlineActive,
+                  ]}
+                />
+              </Pressable>
+            );
+          })}
+        </View>
 
-          {/* Section header */}
-          <View style={styles.aboutHeader}>
-            <View style={styles.goldLine} />
-            <Text style={styles.aboutLabel}>ABOUT</Text>
-          </View>
+        {/* ── About ──────────────────────────────────────────────────────────── */}
+        {contentTab === "about" && (
+        <View style={styles.tabSection}>
 
           {/* Paragraphs */}
           {winery.description.map((para, idx) => (
@@ -654,6 +1008,297 @@ function WineryDetailsScreen() {
             </React.Fragment>
           ))}
         </View>
+        )}
+
+        {/* ── Wines ──────────────────────────────────────────────────────────── */}
+        {contentTab === "wines" && (
+        <View style={styles.tabSection}>
+          {winesLoading ? (
+            <ActivityIndicator
+              size="small"
+              color={colors.accent}
+              style={styles.tabLoading}
+            />
+          ) : wines.length === 0 ? (
+            <Text style={styles.tabEmptyText}>
+              No wines listed for {winery.name} yet. Check back soon.
+            </Text>
+          ) : (
+            wines.map((w, idx) => {
+              const expanded = expandedWineId === w.id;
+              const meta = [w.vintage, w.variety, w.style, w.abv && `${w.abv} ABV`]
+                .filter(Boolean)
+                .join("  ·  ");
+              const hasDetail = Boolean(
+                w.tastingNotes || w.pairings || w.awards
+              );
+              return (
+                <Pressable
+                  key={w.id}
+                  style={[
+                    styles.wineRow,
+                    idx === wines.length - 1 && styles.wineRowLast,
+                  ]}
+                  onPress={() =>
+                    hasDetail && setExpandedWineId(expanded ? null : w.id)
+                  }
+                  disabled={!hasDetail}
+                  accessibilityRole={hasDetail ? "button" : undefined}
+                  accessibilityLabel={
+                    hasDetail
+                      ? `${w.name}. ${expanded ? "Collapse" : "Expand"} details`
+                      : w.name
+                  }
+                  accessibilityState={hasDetail ? { expanded } : undefined}
+                >
+                  <View style={styles.wineRowInner}>
+                    {w.image ? (
+                      <Image
+                        source={{ uri: w.image }}
+                        style={styles.wineThumb}
+                        contentFit="cover"
+                        transition={150}
+                        accessibilityLabel={`Bottle photo of ${w.name}`}
+                      />
+                    ) : null}
+                    <View style={styles.wineBody}>
+                      <View style={styles.wineHeadLine}>
+                        <Text style={styles.wineName}>{w.name}</Text>
+                        {w.price ? (
+                          <Text style={styles.winePrice}>{w.price}</Text>
+                        ) : null}
+                      </View>
+                      {meta ? <Text style={styles.wineMeta}>{meta}</Text> : null}
+                      {w.tastingNotes ? (
+                        <Text
+                          style={styles.wineNotes}
+                          numberOfLines={expanded ? undefined : 2}
+                        >
+                          {w.tastingNotes}
+                        </Text>
+                      ) : null}
+                      {expanded && w.pairings ? (
+                        <>
+                          <Text style={styles.wineDetailLabel}>PAIRS WITH</Text>
+                          <Text style={styles.wineDetailText}>{w.pairings}</Text>
+                        </>
+                      ) : null}
+                      {expanded && w.awards ? (
+                        <>
+                          <Text style={styles.wineDetailLabel}>AWARDS</Text>
+                          <Text style={styles.wineDetailText}>{w.awards}</Text>
+                        </>
+                      ) : null}
+                    </View>
+                  </View>
+                  {hasDetail ? (
+                    <Ionicons
+                      name={expanded ? "chevron-up" : "chevron-down"}
+                      size={14}
+                      color={colors.textMuted}
+                      style={styles.wineChevron}
+                    />
+                  ) : null}
+                </Pressable>
+              );
+            })
+          )}
+        </View>
+        )}
+
+        {/* ── Events ─────────────────────────────────────────────────────────── */}
+        {contentTab === "events" && (
+        <View style={styles.tabSection}>
+          {eventsLoading ? (
+            <ActivityIndicator
+              size="small"
+              color={colors.accent}
+              style={styles.tabLoading}
+            />
+          ) : events.length === 0 ? (
+            <Text style={styles.tabEmptyText}>
+              No events posted for {winery.name} yet. Check back soon.
+            </Text>
+          ) : (
+            events.map((ev) => (
+              <View
+                key={ev.id}
+                style={[styles.eventCard, ev.isPast && styles.eventCardPast]}
+              >
+                {ev.image ? (
+                  <Image
+                    source={{ uri: ev.image }}
+                    style={styles.eventImage}
+                    contentFit="cover"
+                    transition={150}
+                  />
+                ) : null}
+                <View style={styles.eventBody}>
+                  <View style={styles.eventMetaRow}>
+                    {ev.dateLabel ? (
+                      <Text style={styles.eventDate}>{ev.dateLabel}</Text>
+                    ) : null}
+                    {ev.isPast ? (
+                      <Text style={styles.eventPastTag}>PAST</Text>
+                    ) : null}
+                  </View>
+                  <Text style={styles.eventTitle}>{ev.title}</Text>
+                  {ev.venue ? (
+                    <Text style={styles.eventVenue}>{ev.venue}</Text>
+                  ) : null}
+                  {ev.description ? (
+                    <Text style={styles.eventDesc} numberOfLines={4}>
+                      {ev.description}
+                    </Text>
+                  ) : null}
+                  {ev.sourceUrl ? (
+                    <Pressable
+                      onPress={() => safeOpenURL(ev.sourceUrl)}
+                      hitSlop={8}
+                      accessibilityRole="link"
+                      accessibilityLabel={`More info about ${ev.title}`}
+                    >
+                      <Text style={styles.eventLink}>More info ›</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+        )}
+
+        {/* ── Tasting Notes ──────────────────────────────────────────────────── */}
+        {contentTab === "tastings" && (
+        <View style={styles.tabSection}>
+          {/* Header row — count + add-note toggle */}
+          <View style={styles.notesHeaderRow}>
+            <Text style={styles.notesCount}>
+              {notesLoading
+                ? " "
+                : `${notes.length} NOTE${notes.length === 1 ? "" : "S"}`}
+            </Text>
+            {user ? (
+              <Pressable
+                style={styles.addNoteBtn}
+                onPress={() => setNoteFormOpen((open) => !open)}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  noteFormOpen ? "Close tasting note form" : "Add a tasting note"
+                }
+              >
+                <Ionicons
+                  name={noteFormOpen ? "close" : "create-outline"}
+                  size={18}
+                  color={colors.onAccent}
+                />
+              </Pressable>
+            ) : null}
+          </View>
+
+          {/* Add-a-note form */}
+          {noteFormOpen && (
+            <View style={styles.noteForm}>
+              <TextInput
+                style={styles.formInput}
+                placeholder="Wine (e.g. 2023 Pinot Noir)"
+                placeholderTextColor={colors.textMuted}
+                value={formWine}
+                onChangeText={setFormWine}
+              />
+              <View style={styles.starRow}>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <Pressable
+                    key={n}
+                    onPress={() => setFormScore(n)}
+                    hitSlop={6}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${n} star${n === 1 ? "" : "s"}`}
+                    accessibilityState={{ selected: formScore >= n }}
+                  >
+                    <Ionicons
+                      name={formScore >= n ? "star" : "star-outline"}
+                      size={24}
+                      color={
+                        formScore >= n ? colors.accentSoft : colors.textMuted
+                      }
+                    />
+                  </Pressable>
+                ))}
+              </View>
+              <TextInput
+                style={[styles.formInput, styles.formInputMultiline]}
+                placeholder="Your tasting note…"
+                placeholderTextColor={colors.textMuted}
+                value={formNote}
+                onChangeText={setFormNote}
+                multiline
+              />
+              <Pressable
+                style={[
+                  styles.postBtn,
+                  (!formWine.trim() || formScore === 0 || submittingNote) &&
+                    styles.postBtnDisabled,
+                ]}
+                onPress={submitTastingNote}
+                disabled={
+                  !formWine.trim() || formScore === 0 || submittingNote
+                }
+                accessibilityRole="button"
+                accessibilityLabel="Post tasting note"
+                accessibilityState={{
+                  disabled: !formWine.trim() || formScore === 0 || submittingNote,
+                  busy: submittingNote,
+                }}
+              >
+                {submittingNote ? (
+                  <ActivityIndicator size="small" color={colors.onAccent} />
+                ) : (
+                  <Text style={styles.postBtnText}>Post Note</Text>
+                )}
+              </Pressable>
+            </View>
+          )}
+
+          {/* Notes list */}
+          {notesLoading ? (
+            <ActivityIndicator
+              size="small"
+              color={colors.accent}
+              style={styles.tabLoading}
+            />
+          ) : notes.length === 0 ? (
+            <Text style={styles.tabEmptyText}>
+              No tasting notes yet. Be the first to share one.
+            </Text>
+          ) : (
+            notes.map((n, idx) => (
+              <View
+                key={n.id}
+                style={[
+                  styles.noteRow,
+                  idx === notes.length - 1 && styles.noteRowLast,
+                ]}
+              >
+                <View style={styles.noteHeadLine}>
+                  <Text style={styles.noteAuthor}>
+                    {n.authorName.toUpperCase()}
+                  </Text>
+                  <Text style={styles.noteDate}>{n.dateLabel}</Text>
+                </View>
+                <View style={styles.noteTitleLine}>
+                  <Text style={styles.noteWine}>{n.wine}</Text>
+                  <Text style={styles.noteScore}>★ {n.score.toFixed(1)}</Text>
+                </View>
+                {n.note ? (
+                  <Text style={styles.noteText}>“{n.note}”</Text>
+                ) : null}
+              </View>
+            ))
+          )}
+        </View>
+        )}
       </Animated.ScrollView>
 
       {/* ── Hours Modal ───────────────────────────────────────────────────────── */}
@@ -701,12 +1346,17 @@ function WineryDetailsScreen() {
           </Pressable>
         </Pressable>
       </Modal>
-    </>
+    </View>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
+  // Outer wrapper — pads the whole screen below the status bar / notch.
+  screen: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -777,6 +1427,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
+  // Heart sits at the hero's bottom-right, aligned with heroContent's bottom.
+  heroSaveBtn: {
+    position: "absolute",
+    bottom: spacing.xxxl,
+    right: spacing.xxl,
+    zIndex: 10,
+  },
+
   // ── Hero ──────────────────────────────────────────────────────────────────
   heroContainer: {
     position: "relative",
@@ -815,6 +1473,8 @@ const styles = StyleSheet.create({
     bottom: spacing.xxxl,                     // 32 — was 28
     left: spacing.xxl,
     right: spacing.xxl,
+    // Keep long titles from running under the bottom-right save button.
+    paddingRight: spacing.hitTarget + spacing.sm,
   },
   // Hero text sits over the photo's dark scrim — uses on-dark tokens.
   heroTitle: {
@@ -970,26 +1630,297 @@ const styles = StyleSheet.create({
   },
 
   // ── About Section ─────────────────────────────────────────────────────────
-  aboutSection: {
+  // ── Section tab strip — About / Events / Tasting Notes ───────────────────
+  sectionTabs: {
+    flexDirection: "row",
+    justifyContent: "space-between",          // equal spacing between all 4 tabs
+    paddingHorizontal: spacing.xxl,
+    marginTop: spacing.xxxl,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  sectionTabItem: {
+    paddingTop: spacing.sm,
+    minHeight: spacing.hitTarget,             // 44pt tap floor
+    justifyContent: "flex-end",
+  },
+  sectionTabLabel: {
+    ...type.body,
+    fontSize: type.body.fontSize + 1,         // 14 → 15, slightly larger tab labels
+    lineHeight: type.body.lineHeight + 1,
+    fontWeight: weights.emphasis,
+    color: colors.textMuted,
+  },
+  sectionTabLabelActive: {
+    color: colors.textPrimary,
+  },
+  // The green indicator line, sitting directly under the tab word. Hangs
+  // 1px over the strip's hairline so the active state reads as connected.
+  sectionTabUnderline: {
+    height: 2,
+    marginTop: spacing.md,
+    marginBottom: -1,
+    backgroundColor: "transparent",
+  },
+  sectionTabUnderlineActive: {
+    backgroundColor: colors.accent,
+  },
+
+  // Shared wrapper for each tab's content. The minHeight keeps the total
+  // content tall enough that sitting at the tab strip's scroll offset is
+  // always valid — without it, swapping to a short tab (e.g. an empty
+  // Events list) shrinks the content and the scroll position clamps with
+  // an abrupt snap. (The remaining ~120px comes from the scroll view's
+  // contentContainer bottom padding.)
+  tabSection: {
     paddingHorizontal: spacing.xxl,           // 24 (already standardised)
     paddingTop: spacing.xxxl,
     paddingBottom: spacing.hero,
+    minHeight: SCREEN_HEIGHT - 120,
   },
-  aboutHeader: {
+  tabLoading: {
+    marginTop: spacing.xl,
+    alignSelf: "center",
+  },
+  tabEmptyText: {
+    ...type.body,
+    color: colors.textMuted,
+    lineHeight: 22,
+  },
+
+  // ── Wines tab ─────────────────────────────────────────────────────────────
+  wineRow: {
+    paddingVertical: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  wineRowLast: {
+    borderBottomWidth: 0,
+  },
+  wineRowInner: {
+    flexDirection: "row",
+  },
+  wineThumb: {
+    width: 56,
+    height: 72,
+    borderRadius: radius.card,
+    backgroundColor: colors.surface,
+    marginRight: spacing.lg,
+  },
+  wineBody: {
+    flex: 1,
+  },
+  wineHeadLine: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    marginBottom: spacing.xs,
+  },
+  wineName: {
+    fontFamily: fonts.serif,
+    fontSize: 17,
+    color: colors.textPrimary,
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  winePrice: {
+    ...type.caption,
+    fontWeight: weights.emphasis,
+    color: colors.accentSoft,
+  },
+  wineMeta: {
+    ...type.kicker,
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
+  },
+  wineNotes: {
+    ...type.body,
+    color: colors.textSecondary,
+    lineHeight: 21,
+  },
+  wineDetailLabel: {
+    ...type.kicker,
+    color: colors.accentSoft,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  wineDetailText: {
+    ...type.caption,
+    color: colors.textSecondary,
+    lineHeight: 18,
+  },
+  wineChevron: {
+    alignSelf: "center",
+    marginTop: spacing.sm,
+  },
+
+  // ── Events tab ────────────────────────────────────────────────────────────
+  eventCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.card,
+    overflow: "hidden",
+    marginBottom: spacing.lg,
+  },
+  eventCardPast: {
+    opacity: 0.55,
+  },
+  eventImage: {
+    width: "100%",
+    height: 140,
+    backgroundColor: colors.surfaceDeep,
+  },
+  eventBody: {
+    padding: spacing.lg,
+    gap: spacing.xs,
+  },
+  eventMetaRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md,
-    marginBottom: spacing.xxxl,
+    justifyContent: "space-between",
   },
-  goldLine: {
-    width: spacing.xxl,
-    height: 1,
-    backgroundColor: colors.accent,
-  },
-  aboutLabel: {
+  eventDate: {
     ...type.kicker,
-    letterSpacing: 3,
     color: colors.accentSoft,
+  },
+  eventPastTag: {
+    ...type.kicker,
+    color: colors.textMuted,
+  },
+  eventTitle: {
+    fontFamily: fonts.serif,
+    fontSize: 18,
+    color: colors.textPrimary,
+  },
+  eventVenue: {
+    ...type.caption,
+    color: colors.textSecondary,
+  },
+  eventDesc: {
+    ...type.body,
+    color: colors.textSecondary,
+    lineHeight: 21,
+    marginTop: spacing.xs,
+  },
+  eventLink: {
+    ...type.caption,
+    fontWeight: weights.emphasis,
+    color: colors.accentSoft,
+    marginTop: spacing.sm,
+    minHeight: spacing.xl,
+  },
+
+  // ── Tasting Notes tab ─────────────────────────────────────────────────────
+  notesHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: spacing.xl,
+  },
+  notesCount: {
+    ...type.kicker,
+    letterSpacing: 2,
+    color: colors.textMuted,
+  },
+  // Icon-only circular button — pencil to open the form, × to close it.
+  addNoteBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  noteForm: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.cardLg,
+    padding: spacing.lg,
+    gap: spacing.md,
+    marginBottom: spacing.xxl,
+  },
+  formInput: {
+    backgroundColor: colors.surfaceDeep,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.card,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    ...type.body,
+    color: colors.textPrimary,
+    minHeight: spacing.hitTarget,
+  },
+  formInputMultiline: {
+    minHeight: 88,
+    textAlignVertical: "top",
+  },
+  starRow: {
+    flexDirection: "row",
+    gap: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  postBtn: {
+    backgroundColor: colors.accent,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing.md,
+    minHeight: spacing.hitTarget,
+  },
+  postBtnDisabled: {
+    opacity: 0.5,
+  },
+  postBtnText: {
+    ...type.caption,
+    fontWeight: weights.emphasis,
+    letterSpacing: 1,
+    color: colors.onAccent,
+  },
+  noteRow: {
+    paddingVertical: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  noteRowLast: {
+    borderBottomWidth: 0,
+  },
+  noteHeadLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: spacing.xs,
+  },
+  noteAuthor: {
+    ...type.kicker,
+    color: colors.accentSoft,
+  },
+  noteDate: {
+    ...type.kicker,
+    color: colors.textMuted,
+  },
+  noteTitleLine: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  noteWine: {
+    fontFamily: fonts.serif,
+    fontSize: 17,
+    color: colors.textPrimary,
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  noteScore: {
+    ...type.caption,
+    fontWeight: weights.emphasis,
+    color: colors.accentSoft,
+  },
+  noteText: {
+    ...type.caption,
+    fontStyle: "italic",
+    color: colors.textSecondary,
+    lineHeight: 18,
+    marginTop: spacing.xs,
   },
   // First paragraph — editorial lede (italic, slightly larger)
   ledeParagraph: {

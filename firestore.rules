@@ -17,6 +17,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Per-winery wine list (also the source for the concierge's wine
+    // index — see scripts/rag/ingest-tasting-notes.js). Read by the
+    // winery detail "Wines" tab; writes only via Admin SDK / Sheets sync.
+    match /wines/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /homepage_carousel/{doc} {
       allow read: if true;
       allow write: if false;
@@ -72,6 +80,27 @@ service cloud.firestore {
     // field for this collection (one-time setup, see rateLimit.ts).
     match /concierge_rate_limits/{doc} {
       allow read, write: if false;
+    }
+
+    // ── Community tasting notes ──────────────────────────────────────────────
+    // Public notes shown on each winery's "Tasting Notes" tab. Anyone can
+    // read; signed-in users may create notes attributed to themselves and
+    // may only modify/delete their own. Field checks keep payloads sane.
+    match /winery_tastings/{doc} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.winerySlug is string
+        && request.resource.data.wine is string
+        && request.resource.data.wine.size() > 0
+        && request.resource.data.wine.size() <= 120
+        && request.resource.data.score is number
+        && request.resource.data.score >= 0
+        && request.resource.data.score <= 5
+        && request.resource.data.note is string
+        && request.resource.data.note.size() <= 1000;
+      allow update, delete: if request.auth != null
+        && resource.data.authorId == request.auth.uid;
     }
 
     // ── Per-user collections ─────────────────────────────────────────────────
