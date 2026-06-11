@@ -160,6 +160,40 @@ function WineriesScreen() {
 
   const { isSaved, toggle: toggleSaved } = useSaved();
 
+  // ── Save-confirmation toast ────────────────────────────────────────────────
+  // Brief pill that fades in above the tab bar when a heart is tapped, then
+  // auto-dismisses. Re-tapping resets the timer so rapid toggles don't stack.
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showSaveToast = useCallback(
+    (message: string) => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+      setToastMessage(message);
+      Animated.timing(toastOpacity, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }).start();
+      toastTimer.current = setTimeout(() => {
+        Animated.timing(toastOpacity, {
+          toValue: 0,
+          duration: 240,
+          useNativeDriver: true,
+        }).start(() => setToastMessage(null));
+      }, 2200);
+    },
+    [toastOpacity]
+  );
+
+  // Clear any pending dismiss timer on unmount.
+  useEffect(() => {
+    return () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    };
+  }, []);
+
   const [wineries, setWineries] = useState<Winery[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<Error | null>(null);
@@ -486,7 +520,18 @@ function WineriesScreen() {
                   style={styles.heartBtn}
                   onPress={(e) => {
                     e.stopPropagation();
-                    toggleSaved(item.id);
+                    const willSave = !isSaved(item.id);
+                    toggleSaved(item.id, {
+                      name: item.name,
+                      image: item.images?.[0] ?? "",
+                      rating: item.rating,
+                      region: item.region ?? region.displayName,
+                    });
+                    showSaveToast(
+                      willSave
+                        ? `${item.name} added to your saved wineries`
+                        : `${item.name} removed from your saved wineries`
+                    );
                   }}
                   hitSlop={8}
                   accessibilityRole="button"
@@ -1260,6 +1305,23 @@ function WineriesScreen() {
           />
         </View>
       )}
+
+      {/* ── Save-confirmation toast ─────────────────────────────────────────── */}
+      {toastMessage !== null && (
+        <Animated.View
+          pointerEvents="none"
+          accessibilityLiveRegion="polite"
+          style={[
+            styles.toast,
+            { bottom: insets.bottom + 92, opacity: toastOpacity },
+          ]}
+        >
+          <Ionicons name="heart" size={14} color={colors.accentSoft} />
+          <Text style={styles.toastText} numberOfLines={2}>
+            {toastMessage}
+          </Text>
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -1953,6 +2015,32 @@ const styles = StyleSheet.create({
     ...type.kicker,
     letterSpacing: 2,
     color: colors.textMuted,
+  },
+
+  // ── Save-confirmation toast ──────────────────────────────────────────────
+  toast: {
+    position: "absolute",
+    left: spacing.xxl,
+    right: spacing.xxl,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.cardLg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  toastText: {
+    ...type.caption,
+    color: colors.textPrimary,
+    flex: 1,
   },
 });
 
