@@ -128,9 +128,15 @@ Declare exactly this — it matches what the code actually does:
 | Email address | Yes (account sign-up) | Yes | No | App functionality |
 | User ID | Yes (Firebase UID) | Yes | No | App functionality |
 | Precise location | Yes (near-me sort, distance-to-stop, concierge context) | Yes (sent with userId when signed in) | No | App functionality |
-| Other user content (saved wineries, tasting notes, chat messages) | Yes | Yes | No | App functionality |
+| Other user content (saved wineries, tasting notes, chat messages) | Yes | Yes | No | App functionality, Analytics |
+| Product interaction (screens viewed, buttons tapped, articles opened) | Yes (once analytics ships) | Yes | No | App functionality, Analytics |
 
-No third-party advertising, no tracking across apps → **no ATT prompt needed**.
+No third-party advertising, no linking with third-party data for ads, no data-broker
+sales of user-level data → **not "tracking" under ATT, no ATT prompt needed**. The
+aggregated winery-insights program is fine under these labels because partners only
+ever receive de-identified statistics — never user-level data. If that ever changes
+(user-level data to partners), the labels, the policy, AND an ATT prompt would all
+need revisiting first.
 (If Crashlytics gets wired in later, add "Crash Data" before the next submission.)
 
 ### Review notes (App Review Information section)
