@@ -202,7 +202,7 @@ The concierge pipeline moved out of the app. **No AI API keys ship in the JS bun
 - `deleteAccount` (callable), `ping`, `testEmbed` (Voyage smoke test).
 - Deploy: `cd functions && npm run deploy` (build = `tsc`, Node 22).
 
-**Client (`services/concierge/`):** `concierge.ts` is a thin SSE client (via `expo/fetch`) hitting `EXPO_PUBLIC_CONCIERGE_URL` (falls back to the deployed cloudfunctions.net URL), keeping the same public API (`init`, `askStream`, `getHistory`, `reset`, …) so `ConciergeChat.tsx` was unchanged. Multi-turn history is sent each turn. `buildContext.ts` still loads the winery corpus client-side — only for `getWinery(slug)` inline-card rendering. The old client-side RAG modules (router/retrieve/knowledgeRetrieve/tastingNotes/systemPrompt/driveTimes) have been **deleted from disk**; the legacy `openai` / `voyageai` / `@upstash/vector` deps and their `EXPO_PUBLIC_*` keys remain in the app's `package.json`/`.env` and are **slated for removal in Phase 4**.
+**Client (`services/concierge/`):** `concierge.ts` is a thin SSE client (via `expo/fetch`) hitting `EXPO_PUBLIC_CONCIERGE_URL` (falls back to the deployed cloudfunctions.net URL), keeping the same public API (`init`, `askStream`, `getHistory`, `reset`, …) so `ConciergeChat.tsx` was unchanged. Multi-turn history is sent each turn. `buildContext.ts` still loads the winery corpus client-side — only for `getWinery(slug)` inline-card rendering. The old client-side RAG modules (router/retrieve/knowledgeRetrieve/tastingNotes/systemPrompt/driveTimes) have been **deleted from disk**, and the legacy `openai` / `voyageai` / `@upstash/vector` deps now live in **devDependencies** (used only by `scripts/`) — nothing AI-related ships in app `dependencies`, and no `EXPO_PUBLIC_*` AI keys exist in the env files.
 
 Knowledge-base content lives in `scripts/rag/content/*.md` (+ `tasting-notes/`); `scripts/winery-sources/*.md` holds scraped per-winery source docs. Docs: `docs/concierge-audit.md`, `docs/concierge-rewrite-spec.md`.
 
@@ -260,7 +260,6 @@ Run with `node scripts/<name>.js` against `winery-tourism-tasmania` using `servi
 ## Known Issues & Tech Debt
 
 ### 🟠 Medium Priority
-- **Legacy AI deps in the app `package.json`** — `openai`, `voyageai`, `@upstash/vector` are no longer used by the client (concierge is server-side) and are slated for removal in Phase 4 along with their `EXPO_PUBLIC_*` env vars. `firebase-admin`, `googleapis`, `node-fetch` are also in app deps but are **script-only** — should move to a scripts-local package.json or devDependencies.
 - **`winery_tastings` rules gap** — `update` doesn't re-validate the field constraints that `create` enforces (an author could update their note past the size/score limits).
 - No `useFirestoreCollection` shared hook — fetch logic is copy-pasted across screens.
 - Firestore cache is memory-only (lost on cold restart); true offline needs `@react-native-firebase/firestore`.
@@ -279,7 +278,8 @@ Run with `node scripts/<name>.js` against `winery-tourism-tasmania` using `servi
 ## Roadmap / Planned Features
 
 - [x] **Multi-region Phase 4 step 1**: `regionId` required server-side (deploy pending).
-- [ ] **Multi-region Phase 4 (rest)**: purge legacy client AI deps + env vars, add the second region (picker shows 2+ cards).
+- [x] **Multi-region Phase 4 step 2**: legacy AI deps (`openai`, `voyageai`, `@upstash/vector`) and script-only deps (`firebase-admin`, `googleapis`, `node-fetch`) moved to devDependencies — scripts keep working, nothing AI-related in app `dependencies`. Stale `EXPO_PUBLIC_REGION_NAME` removed from env files.
+- [ ] **Multi-region Phase 4 (rest)**: add the second region (picker shows 2+ cards).
 - [ ] **Multi-region Phase 5**: hardening — region-tuned prompts, per-region Upstash namespaces if metadata filters get slow.
 - [ ] Concierge v2 cutover (`CONCIERGE_USE_V2=true`) after soak testing — see `docs/concierge-rewrite-spec.md`.
 - [ ] Wire Crashlytics into `reportError()`.
