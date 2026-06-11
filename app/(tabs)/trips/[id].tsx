@@ -14,7 +14,6 @@ import { withScreenErrorBoundary } from "../../../components/ScreenErrorBoundary
 // computed at start-time so we don't hit the Directions API on every view.
 
 import { Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
 import * as Location from "expo-location";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
@@ -29,7 +28,8 @@ import {
   Text,
   View,
 } from "react-native";
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { Polyline, PROVIDER_GOOGLE } from "react-native-maps";
+import { LogoPinMarker } from "../../../components/LogoPinMarker";
 import { fetchRoutePolyline, type LatLng } from "../../../utils/fetchRoutePolyline";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 // REGION_NAME_UPPER used to come from a constants/region.ts module —
@@ -198,6 +198,24 @@ function TripDetailScreen() {
     );
   }, [routeCoords, stops]);
   const usingRealRoute = routeCoords.length > 1;
+
+  // ── Workaround: react-native-maps 1.20.1 + iOS Google provider bug ────────
+  // The native polyline is created with a default-colored style SPAN, and
+  // spans take precedence over `strokeColor` in the Google Maps SDK — so
+  // solid polylines always render Google-default BLUE no matter what
+  // strokeColor we pass. The `strokeColors` prop is the one code path that
+  // rebuilds the spans with our colors, so we pass it alongside strokeColor
+  // (which still covers Android, where strokeColors is ignored). The array
+  // must match the coordinates' length — one span per segment.
+  // https://github.com/react-native-maps/react-native-maps/issues/5253
+  const routeStrokeColors = useMemo(
+    () => routeDisplayCoords.map(() => colors.accent),
+    [routeDisplayCoords]
+  );
+  const casingStrokeColors = useMemo(
+    () => routeDisplayCoords.map(() => colors.background),
+    [routeDisplayCoords]
+  );
 
   // ── Map region — center on stops ──────────────────────────────────────────
   // We compute from stops with finite coords only. Even though the upstream
@@ -494,29 +512,33 @@ function TripDetailScreen() {
                   trip triggered this because its longer fetch completed after
                   the map was active, whereas shorter trips' fetches completed
                   during initialization when the SDK is more forgiving.
-                  The casing is shown only for the real route; its conditional
-                  render (add/remove, not key-swap) is safe. */}
-              {routeDisplayCoords.length > 1 && usingRealRoute && (
+                  The casing is rendered whenever there's a line at all (not
+                  only for the real route) for the same reason: adding a NEW
+                  native polyline mid-life — i.e. when the Directions fetch
+                  resolves after the map is active — can leave it rendering
+                  with the Google SDK's defaults (blue stroke) instead of our
+                  props. Mounting both polylines up front and only updating
+                  coordinates/width afterwards avoids that entirely. */}
+              {routeDisplayCoords.length > 1 && (
                 <Polyline
                   key="route-casing"
                   coordinates={routeDisplayCoords}
                   strokeColor={colors.background}
+                  strokeColors={casingStrokeColors}
                   strokeWidth={9}
                   zIndex={1}
                   geodesic
                 />
               )}
               {routeDisplayCoords.length > 1 && (
-                // strokeOpacity isn't on react-native-maps@1.20.1's Polyline
-                // type (it was on older versions). Bake the alpha into
-                // strokeColor instead — keeps the visual identical while
-                // letting tsc pass. colors.accentSoft is #9dd560 == rgb(157,213,96).
+                // Brand forest green. strokeColors carries the color on
+                // iOS+Google (see workaround comment above); strokeColor
+                // covers Android.
                 <Polyline
                   key="route-polyline"
                   coordinates={routeDisplayCoords}
-                  strokeColor={
-                    usingRealRoute ? colors.accentSoft : "rgba(157,213,96,0.45)"
-                  }
+                  strokeColor={colors.accent}
+                  strokeColors={routeStrokeColors}
                   strokeWidth={usingRealRoute ? 5 : 2}
                   zIndex={2}
                   geodesic
@@ -533,27 +555,19 @@ function TripDetailScreen() {
                 ) {
                   return null;
                 }
+                // LogoPinMarker keeps tracksViewChanges ON until the pin
+                // image has decoded, then freezes — fixes the intermittent
+                // blank-pin bug where the marker snapshotted an empty view
+                // before the image loaded.
                 return (
-                  <Marker
+                  <LogoPinMarker
                     key={s.wineryId}
                     coordinate={{
                       latitude: s.latitude,
                       longitude: s.longitude,
                     }}
                     title={`${idx + 1}. ${s.name}`}
-                    // The lime logo-pin's tip is at bottom-center.
-                    anchor={{ x: 0.5, y: 1 }}
-                    // Static preview — no per-frame view updates needed,
-                    // and disabling tracking avoids Marker render churn on
-                    // Android when the parent re-renders.
-                    tracksViewChanges={false}
-                  >
-                    <Image
-                      source={require("../../../assets/images/logo-pin.png")}
-                      style={styles.markerPin}
-                      contentFit="contain"
-                    />
-                  </Marker>
+                  />
                 );
               })}
             </MapView>
@@ -712,9 +726,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   map: { width: "100%", height: "100%" },
-  // Lime logo pin — same dimensions as the wineries list and the active
-  // trip map for visual consistency across the app's three map surfaces.
-  markerPin: { width: 36, height: 48 },
   mapLoadingOverlay: {
     position: "absolute",
     bottom: 8,

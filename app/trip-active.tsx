@@ -13,21 +13,20 @@
 // impact is bounded to the duration of the active trip.
 
 import { Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Location from "expo-location";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { Polyline, PROVIDER_GOOGLE } from "react-native-maps";
+import { LogoPinMarker } from "../components/LogoPinMarker";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -166,6 +165,25 @@ export default function TripActiveScreen() {
     );
   }, [routeCoords, trip?.stops]);
   const usingRealRoute = routeCoords.length > 1;
+
+  // ── Workaround: react-native-maps 1.20.1 + iOS Google provider bug ────────
+  // The native polyline is created with a default-colored style SPAN, and
+  // spans take precedence over `strokeColor` in the Google Maps SDK — so
+  // solid polylines always render Google-default BLUE regardless of the
+  // strokeColor prop. `strokeColors` is the one prop that rebuilds the spans
+  // with our colors; pass it alongside strokeColor (which covers Android).
+  // The dashed fallback line is NOT given strokeColors — the dash code path
+  // already rebuilds its spans with the right color, and setting both could
+  // clobber the dashes.
+  // https://github.com/react-native-maps/react-native-maps/issues/5253
+  const routeStrokeColors = useMemo(
+    () => routeDisplayCoords.map(() => colors.accent),
+    [routeDisplayCoords]
+  );
+  const casingStrokeColors = useMemo(
+    () => routeDisplayCoords.map(() => colors.background),
+    [routeDisplayCoords]
+  );
 
   // ── Map region — center on stops with sensible padding ───────────────────
   // Compute over only stops with finite coords. Without this filter, a single
@@ -374,11 +392,17 @@ export default function TripActiveScreen() {
                   children list to register native overlays — Fragment wrappers
                   can prevent the polyline from being picked up, which is why
                   the route was previously invisible. */}
+              {/* Stable keys on both polylines — key-swapping remounts the
+                  native overlay, which is both crash-prone mid-session and
+                  loses our styling. The casing only accompanies the solid
+                  real route (a dark band under the dashed fallback would
+                  read as a road). */}
               {routeDisplayCoords.length > 1 && usingRealRoute && (
                 <Polyline
                   key="route-casing"
                   coordinates={routeDisplayCoords}
                   strokeColor={colors.background}
+                  strokeColors={casingStrokeColors}
                   strokeWidth={10}
                   zIndex={1}
                   geodesic
@@ -386,9 +410,10 @@ export default function TripActiveScreen() {
               )}
               {routeDisplayCoords.length > 1 && (
                 <Polyline
-                  key={usingRealRoute ? "route-line" : "route-fallback"}
+                  key="route-polyline"
                   coordinates={routeDisplayCoords}
-                  strokeColor={colors.accentSoft}
+                  strokeColor={colors.accent}
+                  strokeColors={usingRealRoute ? routeStrokeColors : undefined}
                   strokeWidth={usingRealRoute ? 6 : 3}
                   lineDashPattern={usingRealRoute ? undefined : [8, 6]}
                   zIndex={2}
@@ -407,38 +432,21 @@ export default function TripActiveScreen() {
                 }
                 const visited = trip.visitedStopIds.includes(s.wineryId);
                 const isCurrent = idx === trip.currentStopIndex;
+                // LogoPinMarker manages tracksViewChanges internally: ON
+                // until the pin image decodes (so the pin never snapshots
+                // blank), then frozen — re-enabled briefly when
+                // visited/current changes so the new look is captured.
                 return (
-                  <Marker
+                  <LogoPinMarker
                     key={s.wineryId}
                     coordinate={{
                       latitude: s.latitude,
                       longitude: s.longitude,
                     }}
                     title={`${idx + 1}. ${s.name}`}
-                    // The lime logo-pin's tip is at bottom-center; this
-                    // anchor drops the tip on the coordinate.
-                    anchor={{ x: 0.5, y: 1 }}
-                    // The default RN Maps Marker re-renders aggressively
-                    // on Android when a child View changes. The pin's
-                    // appearance only depends on `visited`/`isCurrent`,
-                    // both of which already trigger a parent re-render,
-                    // so we can opt out of the per-frame view tracking
-                    // and avoid Android Marker stutter.
-                    tracksViewChanges={false}
-                  >
-                    {/* visited → faded, current → enlarged for emphasis,
-                        upcoming → default. Single SVG-derived PNG asset
-                        keeps the brand mark consistent across states. */}
-                    <Image
-                      source={require("../assets/images/logo-pin.png")}
-                      style={[
-                        styles.markerPin,
-                        isCurrent && styles.markerPinCurrent,
-                        visited && styles.markerPinVisited,
-                      ]}
-                      contentFit="contain"
-                    />
-                  </Marker>
+                    current={isCurrent}
+                    visited={visited}
+                  />
                 );
               })}
             </MapView>
@@ -654,15 +662,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   map: { width: "100%", height: "100%" },
-  // Lime logo pin. Asset is 36×48 native px so the displayed size below
-  // matches 1:1 — no scaling, no aspect letterbox.
-  markerPin: { width: 36, height: 48 },
-  // Bigger pin for the active stop. Marker `anchor={{x:0.5,y:1}}` is
-  // relative to the View's dimensions, so the tip stays on the
-  // coordinate even though the box grows.
-  markerPinCurrent: { width: 46, height: 61 },
-  // Faded pin for stops already visited.
-  markerPinVisited: { opacity: 0.4 },
   mapLoadingOverlay: {
     position: "absolute",
     bottom: 8,
