@@ -11,7 +11,9 @@ import {
   collection,
   doc,
   getDoc,
+  getDocFromServer,
   getDocs,
+  getDocsFromServer,
   onSnapshot,
   query,
   serverTimestamp,
@@ -104,6 +106,10 @@ interface WineryData {
   hasRestaurant?: boolean;
   isOrganic?: boolean;
   isBiodynamic?: boolean;
+  hasCharcuterie?: boolean;
+  hasWifi?: boolean;
+  hasFireplace?: boolean;
+  wheelchairAccessible?: boolean;
   rating?: number;
   userRatingsTotal?: number;
   region?: string;
@@ -219,6 +225,10 @@ const FEATURE_BADGES: {
   { key: "hasRestaurant", label: "Restaurant",   icon: "restaurant-outline"  },
   { key: "isOrganic",     label: "Organic",      icon: "leaf-outline"        },
   { key: "isBiodynamic",  label: "Biodynamic",   icon: "flower-outline"      },
+  { key: "hasCharcuterie",       label: "Charcuterie",          icon: "fast-food-outline"     },
+  { key: "hasWifi",              label: "Wi-Fi",                icon: "wifi-outline"          },
+  { key: "hasFireplace",         label: "Fireplace",            icon: "flame-outline"         },
+  { key: "wheelchairAccessible", label: "Wheelchair Accessible", icon: "accessibility-outline" },
 ];
 
 function normaliseHours(raw: unknown): HoursEntry[] {
@@ -295,7 +305,6 @@ function WineryDetailsScreen() {
   // Events — fetched lazily the first time the tab is opened.
   const [events, setEvents] = useState<WineryEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
-  const [eventsLoaded, setEventsLoaded] = useState(false);
 
   // Wines — fetched lazily the first time the tab is opened.
   const [wines, setWines] = useState<WineDoc[]>([]);
@@ -343,7 +352,9 @@ function WineryDetailsScreen() {
     (async () => {
       try {
         const docRef = doc(db, "wineries", slug);
-        const docSnap = await getDoc(docRef);
+        // getDocFromServer bypasses the in-memory cache so portal-approved
+        // changes (photo reorders, new images) always appear immediately.
+        const docSnap = await getDocFromServer(docRef);
         if (docSnap.exists()) {
           const data = docSnap.data();
           setWinery({
@@ -361,6 +372,10 @@ function WineryDetailsScreen() {
             hasRestaurant:   !!data.hasRestaurant,
             isOrganic:       !!data.isOrganic,
             isBiodynamic:    !!data.isBiodynamic,
+            hasCharcuterie:  !!data.hasCharcuterie,
+            hasWifi:         !!data.hasWifi,
+            hasFireplace:    !!data.hasFireplace,
+            wheelchairAccessible: !!data.wheelchairAccessible,
             rating:          typeof data.rating === "number" ? data.rating : undefined,
             userRatingsTotal: typeof data.userRatingsTotal === "number"
                                ? data.userRatingsTotal : undefined,
@@ -380,14 +395,18 @@ function WineryDetailsScreen() {
     })();
   }, [slug]);
 
-  // ── Events — lazy fetch on first open of the Events tab ───────────────────
+  // ── Events — re-fetch every time the Events tab is opened (not just first) ──
+  // Using getDocsFromServer (bypasses cache) + re-fetching on each tab switch
+  // ensures newly-approved events appear without requiring an app restart.
   useEffect(() => {
-    if (tab !== "events" || eventsLoaded || !slug) return;
+    if (tab !== "events" || !slug) return;
     let cancelled = false;
     (async () => {
       setEventsLoading(true);
       try {
-        const snap = await getDocs(
+        // getDocsFromServer bypasses the Firebase in-memory cache so newly-
+        // approved events always appear without requiring an app restart.
+        const snap = await getDocsFromServer(
           query(collection(db, "events"), where("winerySlug", "==", slug))
         );
         if (cancelled) return;
@@ -416,7 +435,6 @@ function WineryDetailsScreen() {
           .filter((e) => e.isPast)
           .sort((a, b) => b.sortDate.localeCompare(a.sortDate));
         setEvents([...upcoming, ...past]);
-        setEventsLoaded(true);
       } catch (err) {
         console.warn("[winery detail] failed to load events:", err);
       } finally {
@@ -426,7 +444,7 @@ function WineryDetailsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [tab, eventsLoaded, slug]);
+  }, [tab, slug]);
 
   // ── Wines — lazy fetch on first open of the Wines tab ─────────────────────
   useEffect(() => {
@@ -667,15 +685,21 @@ function WineryDetailsScreen() {
                   router.replace("/(tabs)/home?openConcierge=1" as any);
                   return;
                 }
-                if (router.canGoBack()) {
-                  router.back();
-                } else if (from === "trip" && tripId) {
-                  // Fallback when the stack was reset (e.g. after a deep link):
-                  // route the user back to the originating trip itinerary.
+                // When the user arrived from a trip itinerary, route them back
+                // to that specific trip — NOT a plain router.back(). The winery
+                // detail was pushed onto the *wineries* tab stack (rooted at the
+                // wineries list), so router.back() would pop to the list rather
+                // than the trip the user came from. Override the natural pop the
+                // same way the concierge case does.
+                if (from === "trip" && tripId) {
                   const kindQS = kind ? `?kind=${kind}` : "";
                   router.replace(
                     `/trips/${encodeURIComponent(tripId)}${kindQS}` as any
                   );
+                  return;
+                }
+                if (router.canGoBack()) {
+                  router.back();
                 } else {
                   router.replace("/(tabs)/wineries");
                 }

@@ -50,6 +50,9 @@ type Winery = {
   walkinWelcome?: boolean;
   awardWinning?: boolean;
   hasTours?: boolean;
+  hasCharcuterie?: boolean;
+  hasFireplace?: boolean;
+  wheelchairAccessible?: boolean;
   rating?: number;
   userRatingsTotal?: number;
   latitude?: number;
@@ -88,6 +91,10 @@ const BOOLEAN_FILTERS: {
   { key: "isBiodynamic",  label: "Biodynamic",    icon: "flower-outline"     },
   { key: "hasRestaurant", label: "Restaurant",    icon: "restaurant-outline" },
   { key: "dogFriendly",   label: "Dog Friendly",  icon: "paw"                },
+  { key: "hasCharcuterie",       label: "Charcuterie",          icon: "fast-food-outline"    },
+  { key: "hasWifi",              label: "Wi-Fi",                icon: "wifi-outline"         },
+  { key: "hasFireplace",         label: "Fireplace",            icon: "flame-outline"        },
+  { key: "wheelchairAccessible", label: "Wheelchair Accessible", icon: "accessibility-outline" },
 ];
 
 const VALID_FILTER_KEYS: (keyof Winery)[] = [
@@ -98,6 +105,10 @@ const VALID_FILTER_KEYS: (keyof Winery)[] = [
   "walkinWelcome",
   "awardWinning",
   "hasTours",
+  "hasCharcuterie",
+  "hasWifi",
+  "hasFireplace",
+  "wheelchairAccessible",
   "featured",
 ];
 
