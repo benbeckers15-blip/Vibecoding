@@ -166,7 +166,7 @@ function ExploreScreen() {
             <View style={styles.featuredImg}>
               <Image
                 source={{ uri: pour.heroImage }}
-                style={StyleSheet.absoluteFillObject}
+                style={StyleSheet.absoluteFill}
                 contentFit="cover"
                 transition={150}
               />
@@ -211,7 +211,7 @@ function ExploreScreen() {
                 source={{
                   uri: "https://images.unsplash.com/photo-1505252585461-04db1eb84625?w=900&q=80",
                 }}
-                style={StyleSheet.absoluteFillObject}
+                style={StyleSheet.absoluteFill}
                 contentFit="cover"
                 transition={150}
               />

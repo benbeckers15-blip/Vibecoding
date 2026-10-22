@@ -255,7 +255,7 @@ function PourScreen() {
         <View style={styles.heroImg}>
           <Image
             source={{ uri: article.heroImage }}
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
             contentFit="cover"
             transition={150}
           />

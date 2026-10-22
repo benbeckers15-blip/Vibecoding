@@ -745,7 +745,7 @@ function WineryDetailsScreen() {
                     <View style={styles.heroImage}>
                       <Image
                         source={{ uri: String(item) }}
-                        style={StyleSheet.absoluteFillObject}
+                        style={StyleSheet.absoluteFill}
                         contentFit="cover"
                         transition={200}
                       />
@@ -1476,7 +1476,7 @@ const styles = StyleSheet.create({
     height: HERO_HEIGHT + PARALLAX_EXTRA,
   },
   heroGradient: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   heroPlaceholder: {
     height: HERO_HEIGHT + PARALLAX_EXTRA,
