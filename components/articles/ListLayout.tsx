@@ -8,7 +8,6 @@
 
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
 import {
   Image,
   ImageBackground,
@@ -27,13 +26,13 @@ import {
   sectionText,
 } from "./types";
 import type { Article, ArticleSection } from "./types";
+import { goBackOr } from "../../utils/navigation";
 
 interface Props {
   article: Article;
 }
 
 export default function ListLayout({ article }: Props) {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
 
   const handleShare = async (): Promise<void> => {
@@ -136,7 +135,7 @@ export default function ListLayout({ article }: Props) {
         <View style={styles.topBarSide}>
           <Pressable
             style={styles.backBtn}
-            onPress={() => router.back()}
+            onPress={() => goBackOr("/(tabs)/home")}
             accessibilityRole="button"
             accessibilityLabel="Back to home"
           >

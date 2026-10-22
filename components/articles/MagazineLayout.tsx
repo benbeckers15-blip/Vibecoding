@@ -9,7 +9,6 @@
 
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
 import {
   Dimensions,
   Image,
@@ -29,6 +28,7 @@ import {
   sectionText,
 } from "./types";
 import type { Article, ArticleSection } from "./types";
+import { goBackOr } from "../../utils/navigation";
 
 const { width } = Dimensions.get("window");
 
@@ -37,7 +37,6 @@ interface Props {
 }
 
 export default function MagazineLayout({ article }: Props) {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
 
   const handleShare = async (): Promise<void> => {
@@ -195,7 +194,7 @@ export default function MagazineLayout({ article }: Props) {
         <View style={styles.topBarSide}>
           <Pressable
             style={styles.backBtn}
-            onPress={() => router.back()}
+            onPress={() => goBackOr("/(tabs)/home")}
             accessibilityRole="button"
             accessibilityLabel="Back to home"
           >

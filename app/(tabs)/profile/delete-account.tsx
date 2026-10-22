@@ -50,6 +50,7 @@ import {
   type,
   weights,
 } from "../../../constants/theme";
+import { goBackOr } from "../../../utils/navigation";
 
 function DeleteAccountScreen() {
   const insets = useSafeAreaInsets();
@@ -111,7 +112,7 @@ function DeleteAccountScreen() {
         <View style={styles.topBar}>
           <Pressable
             style={styles.iconBtn}
-            onPress={() => router.back()}
+            onPress={() => goBackOr("/(tabs)/profile")}
             accessibilityRole="button"
             accessibilityLabel="Back"
           >
@@ -211,7 +212,7 @@ function DeleteAccountScreen() {
 
           <Pressable
             style={styles.cancelBtn}
-            onPress={() => router.back()}
+            onPress={() => goBackOr("/(tabs)/profile")}
             disabled={submitting}
             accessibilityRole="button"
             accessibilityLabel="Cancel and go back"

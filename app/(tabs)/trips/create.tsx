@@ -33,6 +33,7 @@ import { useActiveRegionId, useRegionConfig } from "../../../context/RegionConte
 import { useTrips } from "../../../context/TripContext";
 import { db } from "../../../firebaseConfig";
 import { TripStop } from "../../../types/trip";
+import { goBackOr } from "../../../utils/navigation";
 
 const MIN_STOPS = 2;
 const MAX_STOPS = 8;
@@ -167,7 +168,7 @@ function CreateTripScreen() {
       <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
         <Pressable
           style={styles.backBtn}
-          onPress={() => router.back()}
+          onPress={() => goBackOr("/(tabs)/trips")}
           hitSlop={12}
           accessibilityRole="button"
           accessibilityLabel="Back to trips"

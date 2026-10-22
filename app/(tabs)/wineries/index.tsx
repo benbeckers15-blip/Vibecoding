@@ -468,19 +468,6 @@ function WineriesScreen() {
   const renderCard = ({ item }: { item: Winery }) => {
     const hasImage = item.images && item.images.length > 0;
 
-    // TEMPORARY debug: dump the first image URL for every rendered winery
-    // so we can compare working vs broken heroes. Tag with [hero-debug] so
-    // it's easy to filter in Metro's terminal (Cmd-F "hero-debug").
-    // REMOVE once we've identified the URL pattern issue.
-    if (__DEV__) {
-      console.log(
-        "[hero-debug]",
-        item.name,
-        "→",
-        (item.images?.[0] || "(no image)").slice(0, 100)
-      );
-    }
-
     // Distance chip — only when Near Me is active AND winery has finite coords.
     // `typeof NaN === "number"` is true, so the looser check here would render
     // a "NaN km" distance chip on any winery whose lat/lng was stored as NaN.

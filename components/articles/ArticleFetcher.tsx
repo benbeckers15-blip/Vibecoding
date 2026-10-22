@@ -9,7 +9,7 @@
 // and the screen reflects the new content. No release required.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useRouter } from "expo-router";
+
 import { doc, getDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
@@ -17,6 +17,7 @@ import { colors, fonts, spacing, type, weights } from "../../constants/theme";
 import { db } from "../../firebaseConfig";
 import ArticleRenderer from "./ArticleRenderer";
 import type { Article } from "./types";
+import { goBackOr } from "../../utils/navigation";
 
 interface Props {
   /** Document ID in the `explore_articles` collection. */
@@ -24,7 +25,6 @@ interface Props {
 }
 
 export default function ArticleFetcher({ slug }: Props) {
-  const router = useRouter();
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,7 +104,7 @@ export default function ArticleFetcher({ slug }: Props) {
       <View style={styles.center}>
         <Text style={styles.errorText}>{error ?? "Article unavailable."}</Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOr("/(tabs)/home")}
           style={styles.backBtn}
           accessibilityRole="button"
         >

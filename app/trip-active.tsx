@@ -13,7 +13,7 @@
 // impact is bounded to the duration of the active trip.
 
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import * as Location from "expo-location";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -39,11 +39,11 @@ import { useTrips } from "../context/TripContext";
 import { distanceKm } from "../utils/routePlanner";
 import { fetchRoutePolyline, type LatLng } from "../utils/fetchRoutePolyline";
 import { openExternalDirections } from "../utils/openExternalDirections";
+import { goBackOr } from "../utils/navigation";
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function TripActiveScreen() {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ tripId?: string }>();
   const tripId = String(params.tripId ?? "");
@@ -241,7 +241,7 @@ export default function TripActiveScreen() {
       Alert.alert(
         "Trip complete",
         "You’ve visited every cellar door on this trip. Cheers!",
-        [{ text: "Done", onPress: () => router.back() }]
+        [{ text: "Done", onPress: () => goBackOr("/(tabs)/trips") }]
       );
     }
   }, [trip?.status]);
@@ -296,15 +296,15 @@ export default function TripActiveScreen() {
           text: "End Trip",
           style: "destructive",
           onPress: () => {
-            // Suppress the auto-completion alert + its router.back(). The
+            // Suppress the auto-completion alert + its back navigation. The
             // user just confirmed via this dialog, so the secondary "Trip
             // complete · Cheers!" alert would (a) double-confirm and (b)
-            // race a second router.back() into a stack that's already been
+            // race a second back navigation into a stack that's already been
             // popped by the manual back() below — which is the
             // NavigationContainer onUnhandledAction crash we were seeing.
             completedShown.current = true;
             completeTrip(trip.id);
-            router.back();
+            goBackOr("/(tabs)/trips");
           },
         },
       ]
@@ -317,7 +317,7 @@ export default function TripActiveScreen() {
       <View style={styles.center}>
         <Text style={styles.emptyText}>This trip is no longer available.</Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOr("/(tabs)/trips")}
           accessibilityRole="button"
           accessibilityLabel="Close"
         >
@@ -332,7 +332,7 @@ export default function TripActiveScreen() {
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
       <View style={[styles.topBar, { paddingTop: insets.top + 14 }]}>
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOr("/(tabs)/trips")}
           hitSlop={12}
           accessibilityRole="button"
           accessibilityLabel="Close trip view"

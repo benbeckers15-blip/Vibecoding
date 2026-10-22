@@ -5,7 +5,6 @@ import { withScreenErrorBoundary } from "../../../components/ScreenErrorBoundary
 
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
 import { collection, getDocs, limit, orderBy, query, where } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { useActiveRegionId } from "../../../context/RegionContext";
@@ -23,6 +22,7 @@ import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, fonts, radius, spacing, type, weights } from "../../../constants/theme";
 import { db } from "../../../firebaseConfig";
+import { goBackOr } from "../../../utils/navigation";
 
 const { width } = Dimensions.get("window");
 
@@ -78,7 +78,6 @@ interface PourArticle {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 function PourScreen() {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const regionId = useActiveRegionId();
 
@@ -161,7 +160,7 @@ function PourScreen() {
         <Text style={styles.loadingText}>Issue unavailable</Text>
         <Pressable
           style={styles.errorBackBtn}
-          onPress={() => router.back()}
+          onPress={() => goBackOr("/(tabs)/home")}
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >
@@ -229,7 +228,7 @@ function PourScreen() {
         <View style={styles.topBarSide}>
           <Pressable
             style={styles.backBtn}
-            onPress={() => router.back()}
+            onPress={() => goBackOr("/(tabs)/home")}
             accessibilityRole="button"
             accessibilityLabel="Back to home"
           >

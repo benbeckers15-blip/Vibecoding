@@ -41,6 +41,7 @@ import { useTrips } from "../../../context/TripContext";
 import { db } from "../../../firebaseConfig";
 import { PremadeTrip, TripStop } from "../../../types/trip";
 import { optimiseRoute } from "../../../utils/routePlanner";
+import { goBackOr } from "../../../utils/navigation";
 
 // Geometry of the floating tab bar in app/(tabs)/_layout.tsx — kept in sync
 // here so the bottom CTA can sit clear of it instead of being hidden behind.
@@ -339,7 +340,7 @@ function TripDetailScreen() {
           style: "destructive",
           onPress: () => {
             deleteTrip(tripId);
-            router.back();
+            goBackOr("/(tabs)/trips");
           },
         },
       ]
@@ -361,7 +362,7 @@ function TripDetailScreen() {
         <Text style={styles.emptyText}>This trip no longer exists.</Text>
         <Pressable
           style={styles.backBtn}
-          onPress={() => router.back()}
+          onPress={() => goBackOr("/(tabs)/trips")}
           accessibilityRole="button"
           accessibilityLabel="Back to trips"
         >
@@ -388,7 +389,7 @@ function TripDetailScreen() {
         <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
           <Pressable
             style={styles.backBtn}
-            onPress={() => router.back()}
+            onPress={() => goBackOr("/(tabs)/trips")}
             hitSlop={12}
             accessibilityRole="button"
             accessibilityLabel="Back to trips"
