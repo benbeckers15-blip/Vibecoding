@@ -655,8 +655,9 @@ function WineryDetailsScreen() {
   return (
     // The whole screen starts below the status bar / Dynamic Island so the
     // hero photo is never cut by the front-facing camera. The strip above
-    // is solid page background.
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    // is solid page background. Extra top padding nudges the whole screen
+    // down slightly to sit clear of the notch and give the brand header air.
+    <View style={[styles.screen, { paddingTop: insets.top + spacing.lg }]}>
       <Animated.ScrollView
         ref={scrollRef}
         style={styles.container}
@@ -1466,7 +1467,8 @@ const styles = StyleSheet.create({
   },
   heroCardFrame: {
     height: HERO_HEIGHT,
-    borderRadius: 0,
+    // All four corners rounded so the photo reads as a self-contained card.
+    borderRadius: radius.cardLg,
     overflow: "hidden",
   },
   heroImage: {
@@ -1482,6 +1484,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: spacing.md,
+    borderRadius: radius.cardLg,
+    overflow: "hidden",
   },
   heroPlaceholderEmoji: {
     fontSize: 48,

@@ -31,15 +31,15 @@
 // undertone harmonises with the forest/lime accents and reduces eye strain
 // on text-heavy screens (article reading, winery editorial copy).
 export const palette = {
-  // Surfaces (dark, layered for hierarchy — each tier ~6% lighter than the last)
-  paper:        "#0F1411",   // primary background — deep slate w/ green undertone
-                             //   ~6% luminance — anchors the page without crushing to black.
-  paperTint:    "#1A201B",   // surface / chrome — chips, search bars, cards
-                             //   ~10% lift over paper so cards read as raised.
-  paperDeep:    "#070A08",   // heaviest surface / divider tone — footers, inset rows
-                             //   ~3% luminance — used sparingly for depth contrast.
-  paperLight:   "#222823",   // elevated surface — lifted cards w/ shadow, modal panels.
-                             //   ~14% — clearly "floats" off the page.
+  // Surfaces (dark, layered for hierarchy — each tier lighter than the last)
+  paper:        "#202824",   // primary background — muted forest green, eased off
+                             //   near-black so large areas read softer on the eyes.
+  paperTint:    "#2C342E",   // surface / chrome — chips, search bars, cards
+                             //   lifted over paper so cards read as raised.
+  paperDeep:    "#141A15",   // heaviest surface / divider tone — footers, inset rows
+                             //   sits below paper for depth contrast.
+  paperLight:   "#363F37",   // elevated surface — lifted cards w/ shadow, modal panels.
+                             //   clearly "floats" off the page.
 
   // Ink (text)
   ink:          "#E8EAE6",   // soft off-white — primary text. Not pure white:
@@ -58,7 +58,7 @@ export const palette = {
 
   // Input / search surface — a touch lighter than `paperTint` so an input
   // feels visually pressable on dark surfaces (key UX cue: "this is editable").
-  inputGray:    "#262C27",
+  inputGray:    "#333B35",
   // Pure white — used for a solid light input surface (e.g. the hero concierge
   // search bar) so it reads as a crisp, tappable field over photography.
   white:        "#FFFFFF",
@@ -161,7 +161,7 @@ export const colors = {
   // Use these as the *final* color in a vertical gradient so the photo
   // feels mounted on the page rather than abruptly cut off.
   // In dark mode both stops use the dark page color.
-  fadeToBgSoft:           "rgba(15,20,17,0.92)",
+  fadeToBgSoft:           "rgba(32,40,36,0.92)",
   fadeToBg:               palette.paper,
 
   // ── Modal scrim ────────────────────────────────────────────────────────

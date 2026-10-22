@@ -10,12 +10,14 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
 import { colors, radius, spacing } from "../../constants/theme";
+import { CoverProvider, useCover } from "../../context/CoverContext";
 
 const { width } = Dimensions.get("window");
 const BAR_WIDTH_FALLBACK = Math.min(520, width * 0.92);
@@ -95,6 +97,12 @@ const TabButton = React.memo(function TabButton({
 });
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
+  // While the home cover (opening primer screen) is still showing, hide the
+  // floating tab bar entirely so the cover reads as a separate full-screen
+  // intro rather than a tab inside the app. (The actual early return happens
+  // below, after all hooks, to satisfy the rules of hooks.)
+  const { coverVisible } = useCover();
+
   // Routes declared with `href: null` should not appear in the bar. Expo
   // Router strips `href` from the descriptor and instead sets
   // `tabBarItemStyle: { display: 'none' }`, so we filter on that. Also remap
@@ -145,6 +153,10 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
   const animatedCircleStyle = useAnimatedStyle(() => ({
     left: circleLeft.value,
   }));
+
+  // Hide the bar while the opening cover is up — all hooks above have run, so
+  // this conditional return is safe.
+  if (coverVisible) return null;
 
   return (
     <View style={styles.container}>
@@ -201,19 +213,26 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 
 export default function TabLayout() {
   return (
-    <Tabs
-      tabBar={(props) => <CustomTabBar {...props} />}
-      screenOptions={{ headerShown: false }}
-    >
-      <Tabs.Screen name="home" options={{ title: "Home", tabBarLabel: "Home" }} />
-      <Tabs.Screen name="trips" options={{ title: "Trips", tabBarLabel: "Trips" }} />
-      <Tabs.Screen name="wineries" options={{ title: "Wineries", tabBarLabel: "Wineries" }} />
-      <Tabs.Screen name="profile" options={{ title: "Profile", tabBarLabel: "Profile" }} />
-      {/* `explore` is preserved as a route for any existing inbound links,
-          but its article content now lives on the home tab — so it is
-          hidden from the floating nav. */}
-      <Tabs.Screen name="explore" options={{ href: null }} />
-    </Tabs>
+    // GestureHandlerRootView is required for the home cover's slide-to-open
+    // pan gesture (react-native-gesture-handler). CoverProvider tracks whether
+    // that cover is still showing so the tab bar can hide itself while it is.
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <CoverProvider>
+        <Tabs
+          tabBar={(props) => <CustomTabBar {...props} />}
+          screenOptions={{ headerShown: false }}
+        >
+          <Tabs.Screen name="home" options={{ title: "Home", tabBarLabel: "Home" }} />
+          <Tabs.Screen name="trips" options={{ title: "Trips", tabBarLabel: "Trips" }} />
+          <Tabs.Screen name="wineries" options={{ title: "Wineries", tabBarLabel: "Wineries" }} />
+          <Tabs.Screen name="profile" options={{ title: "Profile", tabBarLabel: "Profile" }} />
+          {/* `explore` is preserved as a route for any existing inbound links,
+              but its article content now lives on the home tab — so it is
+              hidden from the floating nav. */}
+          <Tabs.Screen name="explore" options={{ href: null }} />
+        </Tabs>
+      </CoverProvider>
+    </GestureHandlerRootView>
   );
 }
 
